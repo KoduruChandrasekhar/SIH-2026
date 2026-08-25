@@ -1,0 +1,509 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+@import "tailwindcss";
+
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  font-family:
+    "Plus Jakarta Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #1c1c1e;
+  background: #ffffff;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background: #ffffff;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* =========================================================
+   PAGE ANIMATIONS
+   ========================================================= */
+
+@keyframes traceFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes traceFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes traceSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes traceScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tracePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.trace-fade-up {
+  animation: traceFadeUp 0.55s ease-out both;
+}
+
+.trace-fade-in {
+  animation: traceFadeIn 0.5s ease-out both;
+}
+
+.trace-slide-right {
+  animation: traceSlideRight 0.5s ease-out both;
+}
+
+.trace-scale-in {
+  animation: traceScaleIn 0.45s ease-out both;
+}
+
+.trace-delay-1 {
+  animation-delay: 80ms;
+}
+
+.trace-delay-2 {
+  animation-delay: 150ms;
+}
+
+.trace-delay-3 {
+  animation-delay: 220ms;
+}
+
+.trace-delay-4 {
+  animation-delay: 290ms;
+}
+
+.trace-delay-5 {
+  animation-delay: 360ms;
+}
+
+/* =========================================================
+   CARDS
+   ========================================================= */
+
+.trace-card {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease;
+}
+
+.trace-card:hover {
+  transform: translateY(-3px);
+  border-color: #dedee2;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.07),
+    0 2px 5px rgba(0, 0, 0, 0.03);
+}
+
+.trace-card:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+/* =========================================================
+   FEATURE CARD ICON
+   ========================================================= */
+
+.trace-icon {
+  transition:
+    transform 220ms ease,
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+.trace-card:hover .trace-icon {
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* =========================================================
+   BUTTON
+   ========================================================= */
+
+.trace-button {
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.trace-button:hover {
+  transform: translateY(-1px);
+}
+
+.trace-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* =========================================================
+   ARROW
+   ========================================================= */
+
+.trace-arrow {
+  transition: transform 200ms ease;
+}
+
+.group:hover .trace-arrow {
+  transform: translateX(3px);
+}
+
+/* =========================================================
+   LIVE DOT
+   ========================================================= */
+
+.trace-live-dot {
+  animation: tracePulse 1.8s ease-in-out infinite;
+}
+
+/* =========================================================
+   ABOUT SLIDER ARROWS
+   ========================================================= */
+
+.trace-slider-button {
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.trace-slider-button:hover {
+  transform: scale(1.06);
+  background: #f5f5f7;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.trace-slider-button:active {
+  transform: scale(0.96);
+}
+
+/* =========================================================
+   MAP
+   ========================================================= */
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+
+  font-family:
+    "Plus Jakarta Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px;
+}
+
+.trace-popup .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.trace-popup .leaflet-popup-content {
+  margin: 14px 16px;
+}
+
+.trace-marker {
+  background: transparent;
+  border: 0;
+}
+
+.trace-marker > div {
+  width: 30px;
+  height: 30px;
+
+  border: 3px solid white;
+  border-radius: 9999px;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.trace-camera-marker {
+  background: transparent;
+  border: 0;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d1d6;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aeaeb2;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 640px) {
+  .trace-card:hover {
+    transform: none;
+  }
+}
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  font-family:
+    "Plus Jakarta Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  color: #1c1c1e;
+  background: #f8f9fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+body {
+  background: #f8f9fa;
+  overflow-x: hidden;
+}
+button,
+input,
+select {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* =========================================================
+   SMOOTH, ELEGANT FLY-IN ANIMATIONS
+   ========================================================= */
+
+@keyframes slide-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-40vw) skewX(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) skewX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(40vw) skewX(-6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) skewX(0);
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-left {
+  animation: slide-in-left 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.slide-right {
+  animation: slide-in-right 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.fade-up {
+  animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.delay-100 {
+  animation-delay: 100ms;
+}
+.delay-200 {
+  animation-delay: 200ms;
+}
+.delay-300 {
+  animation-delay: 300ms;
+}
+.delay-400 {
+  animation-delay: 400ms;
+}
+
+/* =========================================================
+   MAP LIVE ANIMATIONS
+   ========================================================= */
+
+@keyframes grid-scroll {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 80px 80px;
+  }
+}
+
+.animate-grid-scroll {
+  animation: grid-scroll 3.5s linear infinite;
+}
+
+@keyframes radar-ping {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(3.5);
+    opacity: 0;
+  }
+}
+
+.animate-radar-ping::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: radar-ping 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+/* =========================================================
+   BACKGROUND BLOBS
+   ========================================================= */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* =========================================================
+   TEXT & DOT FX
+   ========================================================= */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.trace-live-dot {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
