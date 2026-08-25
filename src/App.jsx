@@ -1,9 +1,10 @@
 import { useState } from "react";
 import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
+import TrackingPage from "./pages/TrackingPage";
 import Modal from "./components/Modal";
 import Shell from "./components/Shell";
-
+import TrafficPage from "./pages/TrafficPage";
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -20,11 +21,14 @@ export default function App() {
 
   return (
     <Shell>
-      {page === "home" ? (
-        <HomePage navigate={navigate} openModal={openModal} />
-      ) : (
-        <DashboardPage navigate={navigate} openModal={openModal} initialArea={selectedArea} />
+      {page === "home" && <HomePage navigate={navigate} openModal={openModal} page={page} />}
+      {page === "dashboard" && (
+        <DashboardPage navigate={navigate} openModal={openModal} initialArea={selectedArea} page={page} />
       )}
+      {page === "tracking" && (
+        <TrackingPage navigate={navigate} openModal={openModal} page={page} />
+      )}
+      {page === "traffic" && <TrafficPage navigate={navigate} openModal={openModal} />}
       <Modal modal={modal} close={() => setModal(null)} />
     </Shell>
   );
