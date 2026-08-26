@@ -21,7 +21,7 @@ export default function HomePage({ navigate, openModal }) {
   const [slide, setSlide] = useState(0);
   const currentSlide = slides[slide];
 
-  // Live animated telemetry tickers for card badges
+  // Live animated telemetry tickers
   const [liveSpeed, setLiveSpeed] = useState(42);
   const [activeFeeds, setActiveFeeds] = useState(254);
 
@@ -61,17 +61,14 @@ export default function HomePage({ navigate, openModal }) {
       onMouseMove={handleMouseMove}
       className="relative flex w-full flex-col gap-6 pb-10 overflow-hidden"
     >
-      
-      {/* =====================================================
-          INTERACTIVE CURSOR SPOTLIGHT (Follows mouse everywhere)
-          ===================================================== */}
+      {/* Interactive Cursor Spotlight */}
       <div
         className="pointer-events-none absolute -inset-px rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 z-30"
         style={{
           background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(59,130,246,0.12), transparent 80%)`,
         }}
       />
-      
+
       {/* Background Blobs */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-blue-300/30 mix-blend-multiply blur-[100px] filter" />
@@ -84,30 +81,8 @@ export default function HomePage({ navigate, openModal }) {
         <Navbar page="home" navigate={navigate} openModal={openModal} />
       </div>
 
-      {/* About Slider */}
-      <section
-        className="
-          fade-up
-          delay-100
-          group
-          relative
-          w-full
-          overflow-hidden
-          rounded-[24px]
-          border
-          border-white/60
-          bg-white/60
-          px-5
-          py-5
-          shadow-[0_8px_32px_rgba(0,0,0,0.04)]
-          backdrop-blur-xl
-          transition-all
-          duration-500
-          hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)]
-          sm:px-7
-          sm:py-6
-        "
-      >
+      {/* About Slider (Now directly below Navbar) */}
+      <section className="fade-up delay-100 group relative w-full overflow-hidden rounded-[24px] border border-white/60 bg-white/60 px-5 py-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)] sm:px-7 sm:py-6">
         <img
           src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1200&auto=format&fit=crop"
           alt="City Intelligence"
@@ -146,12 +121,10 @@ export default function HomePage({ navigate, openModal }) {
         </div>
       </section>
 
-      {/* Main Content: Cards & Map */}
+      {/* Main Feature Cards & GIS Map */}
       <section className="grid w-full gap-5 lg:grid-cols-[1.1fr_1fr] xl:grid-cols-[1.2fr_1fr]">
-        
-        {/* 2x2 Grid with Clean Typography & Telemetry Badges */}
+        {/* 2x2 Feature Grid */}
         <div className="grid gap-5 sm:grid-cols-2 overflow-hidden py-2 px-2 -mx-2">
-          
           <FeatureCard
             direction="slide-left"
             delay="delay-100"
@@ -187,7 +160,7 @@ export default function HomePage({ navigate, openModal }) {
             title="Traffic"
             description="City-Wide Traffic Analytics. Visualize origin-destination patterns and congestion bottlenecks."
             button="Analyze Traffic"
-            onClick={() => navigate("dashboard")}
+            onClick={() => navigate("traffic")}
             theme="orange"
             bgImage="https://images.unsplash.com/photo-1506146332389-18140dc7b2fb?q=80&w=800&auto=format&fit=crop"
             liveBadge="3 Congestion Zones"
@@ -201,7 +174,7 @@ export default function HomePage({ navigate, openModal }) {
             title="Alerts"
             description="Anomalous Route & Blacklist Alerts. Instant notifications for high-interest vehicles."
             button="View Alerts"
-            onClick={() => openModal("Alert Center", "The alert service monitors suspicious vehicle movement.")}
+            onClick={() => navigate("alerts")}
             theme="red"
             bgImage="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=800&auto=format&fit=crop"
             liveBadge="3 Priority Flags"
@@ -210,11 +183,11 @@ export default function HomePage({ navigate, openModal }) {
           />
         </div>
 
-        {/* Real Interactive Leaflet GIS Map */}
-        <div className="fade-up delay-400 flex h-full min-h-[420px] w-full flex-col rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:shadow-[0_15px_35px_rgba(0,0,0,0.08)]">
+        {/* Real Interactive Leaflet GIS Map with Solid Hover Effect */}
+        <div className="fade-up delay-400 group flex h-full min-h-[420px] w-full flex-col rounded-[28px] border-2 border-white/80 bg-white/70 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-blue-500 hover:bg-white hover:shadow-[8px_8px_0px_0px_rgba(37,99,235,1)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-600 shadow-[inset_0_0_0_1px_rgba(34,197,94,0.2)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-600 shadow-[inset_0_0_0_1px_rgba(34,197,94,0.2)] transition-colors group-hover:bg-blue-500/10 group-hover:text-blue-600 group-hover:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.3)]">
                 <Map size={20} strokeWidth={2.5} />
               </div>
               <h3 className="text-xl font-extrabold text-gray-900">Network Overview</h3>
@@ -222,9 +195,9 @@ export default function HomePage({ navigate, openModal }) {
 
             <button
               onClick={() => navigate("tracking")}
-              className="group relative overflow-hidden rounded-xl bg-gray-900 px-5 py-2.5 text-xs font-bold text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)] transition-transform hover:scale-105 active:scale-95"
+              className="group/btn relative overflow-hidden rounded-xl bg-gray-900 px-5 py-2.5 text-xs font-bold text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)] transition-transform hover:scale-105 active:scale-95"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-700 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" />
               <span className="relative z-10">Open GIS Tracking</span>
             </button>
           </div>
@@ -254,24 +227,24 @@ export default function HomePage({ navigate, openModal }) {
               ))}
             </MapContainer>
 
-            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 rounded-xl border border-white/60 bg-white/90 px-3.5 py-2 text-[10px] font-bold text-gray-800 shadow-xl backdrop-blur-md pointer-events-none">
+            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 rounded-xl border border-white/60 bg-white/90 px-3.5 py-2 text-[10px] font-bold text-gray-800 shadow-xl backdrop-blur-md pointer-events-none transition-colors group-hover:border-blue-200">
               <span className="trace-live-dot h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" /> LIVE ANPR MESH
             </div>
           </div>
 
           <div className="mt-5 flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <Radar size={16} className="text-gray-400" />
-              <span className="text-xs font-bold text-gray-500">254 camera nodes synchronized</span>
+              <Radar size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+              <span className="text-xs font-bold text-gray-500 group-hover:text-gray-700 transition-colors">254 camera nodes synchronized</span>
             </div>
-            <button onClick={() => navigate("tracking")} className="group flex items-center gap-1.5 text-xs font-extrabold text-blue-600 transition hover:text-blue-800">
-              Full Trajectory Mode <ChevronRight size={14} className="transition-transform group-hover:translate-x-1" />
+            <button onClick={() => navigate("tracking")} className="group/link flex items-center gap-1.5 text-xs font-extrabold text-blue-600 transition hover:text-blue-800">
+              Full Trajectory Mode <ChevronRight size={14} className="transition-transform group-hover/link:translate-x-1" />
             </button>
           </div>
         </div>
       </section>
 
-      {/* Status Strip */}
+      {/* System Status Strip */}
       <section className="fade-up delay-400 flex w-full flex-col gap-4 rounded-[20px] border border-white/60 bg-white/70 px-6 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="trace-live-dot h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.8)]" />
@@ -439,7 +412,6 @@ function FeatureCard({
           </div>
         </div>
 
-        {/* Clean, perfectly stable description text */}
         <p className={`mt-2.5 max-w-[260px] text-[11.5px] leading-relaxed transition-colors duration-500 min-h-[44px] ${t.descText}`}>
           {description}
         </p>

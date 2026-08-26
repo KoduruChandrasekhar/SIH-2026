@@ -5,6 +5,7 @@ import TrackingPage from "./pages/TrackingPage";
 import Modal from "./components/Modal";
 import Shell from "./components/Shell";
 import TrafficPage from "./pages/TrafficPage";
+import AlertsPage from "./pages/AlertsPage";
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -29,6 +30,7 @@ export default function App() {
         <TrackingPage navigate={navigate} openModal={openModal} page={page} />
       )}
       {page === "traffic" && <TrafficPage navigate={navigate} openModal={openModal} />}
+      {page === "alerts" && <AlertsPage navigate={navigate} openModal={openModal} />}
       <Modal modal={modal} close={() => setModal(null)} />
     </Shell>
   );
