@@ -8,10 +8,14 @@ import {
   TrafficCone,
 } from "lucide-react";
 
+import tracenetLogo from "../assets/tracenet-logo.jpg"; 
+
 export default function Navbar({ page, navigate, openModal }) {
   const item = (label, icon, target) => {
     const Icon = icon;
-    const isActive = page === target;
+    
+    // BULLETPROOF ACTIVE CHECK: ignores capitals, spaces, and undefined errors
+    const isActive = String(page).toLowerCase().trim() === String(target).toLowerCase().trim();
 
     return (
       <button
@@ -52,10 +56,16 @@ export default function Navbar({ page, navigate, openModal }) {
         <span className="relative z-10">{label}</span>
 
         {/* Hover Indicator Slide Bar */}
-        <span className="absolute bottom-0 left-0 h-[2px] w-full bg-blue-600 scale-x-0 transition-transform duration-300 group-hover:scale-x-100 origin-left" />
+        <span 
+          className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-600 origin-left transition-transform duration-300 ${
+            isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+          }`} 
+        />
       </button>
     );
   };
+
+  const isAlertsActive = String(page).toLowerCase().trim() === "alerts";
 
   return (
     <header
@@ -78,67 +88,41 @@ export default function Navbar({ page, navigate, openModal }) {
         transition-all
       "
     >
-      {/* BRAND LOGO & SYSTEM STATUS */}
+      {/* BRAND LOGO & TITLE */}
       <div className="flex items-center justify-between lg:justify-start gap-4">
         <button
-          onClick={() =>
-            openModal(
-              "Trace Net Platform Overview",
-              "Trace Net is a centralized AI-powered multi-camera ANPR trajectory tracking and urban traffic analytics platform."
-            )
-          }
+          onClick={() => navigate("home")}
           className="group flex items-center gap-3 text-left transition-transform active:scale-95"
         >
-          <div
-            className="
-              flex
-              h-[42px]
-              w-[42px]
-              shrink-0
-              items-center
-              justify-center
-              rounded-2xl
-              bg-gradient-to-tr
-              from-blue-600
-              via-indigo-600
-              to-purple-600
-              text-white
-              shadow-[0_8px_20px_rgba(79,70,229,0.35)]
-              transition-all
-              duration-500
-              group-hover:rotate-12
-              group-hover:scale-110
-              group-hover:shadow-[0_12px_25px_rgba(79,70,229,0.5)]
-            "
-          >
-            <Route size={22} className="transition-transform duration-500 group-hover:scale-110" />
-          </div>
+          {/* Logo Image */}
+          <img 
+            src={tracenetLogo} 
+            alt="TraceNet Icon" 
+            className="h-10 w-10 sm:h-12 sm:w-12 object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-md"
+          />
 
           <div>
             <div className="flex items-center gap-2">
               <h1
                 className="
-                  bg-gradient-to-r
-                  from-gray-900
-                  via-gray-700
-                  to-gray-900
-                  bg-clip-text
-                  text-lg
+                  text-2xl
+                  sm:text-3xl
                   font-black
-                  tracking-tight
+                  tracking-tighter
                   text-transparent
-                  sm:text-xl
+                  bg-clip-text
+                  bg-gradient-to-r
+                  from-blue-500
+                  via-cyan-400
+                  to-blue-600
+                  drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]
                   transition-all
                   duration-300
-                  group-hover:text-blue-600
+                  group-hover:drop-shadow-[0_0_25px_rgba(59,130,246,1)]
                 "
               >
-                Trace Net
+                TraceNet
               </h1>
-              {/* Live Status Badge with Hover Pulse */}
-              <span className="hidden xl:flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-widest text-emerald-600 border border-emerald-500/20 transition-transform duration-300 group-hover:scale-105">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 trace-live-dot" /> LIVE AI
-              </span>
             </div>
             <p
               className="
@@ -147,7 +131,8 @@ export default function Navbar({ page, navigate, openModal }) {
                 font-extrabold
                 uppercase
                 tracking-[2px]
-                text-blue-600
+                text-blue-500
+                drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]
                 md:block
               "
             >
@@ -173,15 +158,10 @@ export default function Navbar({ page, navigate, openModal }) {
         {item("Tracking", Navigation, "tracking")}
         {item("Traffic", TrafficCone, "traffic")}
 
-        {/* Alerts Center Button with Hover FX */}
+        {/* Alerts Route Button with Red FX */}
         <button
-          onClick={() =>
-            openModal(
-              "Alert Center",
-              "Blacklist Alerts & Anomaly Monitor is active.\n\nHigh-interest vehicle events, congestion anomalies and suspicious movement patterns can be reviewed from the centralized alert service."
-            )
-          }
-          className="
+          onClick={() => navigate("alerts")}
+          className={`
             group
             relative
             flex
@@ -192,32 +172,32 @@ export default function Navbar({ page, navigate, openModal }) {
             py-2
             text-xs
             font-bold
-            text-[#636366]
             transition-all
             duration-300
-            hover:bg-red-500/10
-            hover:text-red-600
-            hover:scale-105
-            hover:shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]
             sm:text-sm
             overflow-hidden
-          "
+            ${
+              isAlertsActive
+                ? "bg-red-500/10 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)] scale-[1.02]"
+                : "text-[#636366] hover:bg-red-500/10 hover:text-red-600 hover:scale-105 hover:shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
+            }
+          `}
         >
-          <Bell size={16} className="transition-transform duration-300 group-hover:rotate-12 group-hover:scale-125 text-red-500" />
+          <Bell 
+            size={16} 
+            className={`transition-transform duration-300 group-hover:rotate-12 group-hover:scale-125 ${isAlertsActive ? "text-red-500" : "text-red-500"}`} 
+          />
           <span className="relative z-10">Alerts</span>
-          <span className="absolute bottom-0 left-0 h-[2px] w-full bg-red-500 scale-x-0 transition-transform duration-300 group-hover:scale-x-100 origin-left" />
+          <span 
+            className={`absolute bottom-0 left-0 h-[2px] w-full bg-red-500 origin-left transition-transform duration-300 ${isAlertsActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} 
+          />
         </button>
 
         <div className="mx-1.5 hidden h-5 w-[1px] rounded-full bg-gray-200 sm:block" />
 
-        {/* Operator Login Button with Hover Animation */}
+        {/* Operator Login Button */}
         <button
-          onClick={() =>
-            openModal(
-              "Operator Login",
-              "Trace Net secure operator authentication gateway."
-            )
-          }
+          onClick={() => navigate("login")}
           className="
             group
             relative
