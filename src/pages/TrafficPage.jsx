@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Activity,
   BarChart3,
@@ -15,9 +15,10 @@ import {
 } from "lucide-react";
 import { MapContainer, TileLayer, Circle, Popup } from "react-leaflet";
 import Navbar from "../components/Navbar";
+import { fetchTrafficCorridors, fetchTrafficOD } from "../api";
 
 // Mock Traffic Corridor Data with enhanced details
-const initialCorridors = [
+const localCorridors = [
   {
     id: "COR-01",
     name: "Kukatpally Y-Junction",
@@ -77,7 +78,7 @@ const initialCorridors = [
 ];
 
 // Origin-Destination Mock Routes
-const odRoutes = [
+const localOdRoutes = [
   { origin: "Kukatpally", destination: "Balanagar", count: "1,842 vehicles" },
   { origin: "Balanagar", destination: "Madhapur", count: "1,426 vehicles" },
   { origin: "Kukatpally", destination: "Cyberabad", count: "2,103 vehicles" },
@@ -85,10 +86,22 @@ const odRoutes = [
 
 export default function TrafficPage({ navigate, openModal }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCorridor, setSelectedCorridor] = useState(initialCorridors[0]);
+  const [corridors, setCorridors] = useState(localCorridors);
+  const [odRoutes, setOdRoutes] = useState(localOdRoutes);
+  const [selectedCorridor, setSelectedCorridor] = useState(localCorridors[0]);
+
+  // Fetch from API with fallback
+  useEffect(() => {
+    fetchTrafficCorridors().then((data) => {
+      if (data) { setCorridors(data); setSelectedCorridor(data[0]); }
+    });
+    fetchTrafficOD().then((data) => {
+      if (data) setOdRoutes(data);
+    });
+  }, []);
 
   // Filter corridors based on search query
-  const filteredCorridors = initialCorridors.filter((corridor) =>
+  const filteredCorridors = corridors.filter((corridor) =>
     corridor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     corridor.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
     corridor.status.toLowerCase().includes(searchQuery.toLowerCase())
@@ -170,7 +183,7 @@ export default function TrafficPage({ navigate, openModal }) {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                {initialCorridors.map((corridor) => (
+                {corridors.map((corridor) => (
                   <Circle
                     key={corridor.id}
                     center={[corridor.lat, corridor.lng]}

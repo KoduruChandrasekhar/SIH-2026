@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -23,10 +23,12 @@ import {
 } from "recharts";
 import { MapContainer, TileLayer, Popup, CircleMarker, Circle } from "react-leaflet";
 import Navbar from "../components/Navbar";
+import { useTheme } from "../ThemeContext";
+import { fetchDashboard } from "../api";
 
-// --- MOCK DATA ---
+// --- LOCAL MOCK DATA (fallback) ---
 
-const camerasData = [
+const localCamerasData = [
   {
     id: "CAM-01 (Kukatpally Y-Junction)",
     lat: 17.4947,
@@ -38,7 +40,7 @@ const camerasData = [
     trend: "Severe Gridlock",
     trafficChange: "+45%",
     since: "4 PM",
-    color: "#ef4444", // Red 
+    color: "#ef4444",
   },
   {
     id: "CAM-02 (JNTU Main Road)",
@@ -51,7 +53,7 @@ const camerasData = [
     trend: "Moderate Flow",
     trafficChange: "+15%",
     since: "5 PM",
-    color: "#f97316", // Orange
+    color: "#f97316",
   },
   {
     id: "CAM-03 (KPHB Colony Phase 1)",
@@ -64,7 +66,7 @@ const camerasData = [
     trend: "Clear Route",
     trafficChange: "-10%",
     since: "3 PM",
-    color: "#10b981", // Green 
+    color: "#10b981",
   },
   {
     id: "CAM-04 (Balanagar Cross)",
@@ -81,19 +83,19 @@ const camerasData = [
   },
 ];
 
-const flowTrendsData = [
+const localFlowTrendsData = [
   { time: "6 AM", volume: 4000 }, { time: "9 AM", volume: 11000 },
   { time: "12 PM", volume: 7500 }, { time: "3 PM", volume: 8500 },
   { time: "6 PM", volume: 13500 }, { time: "9 PM", volume: 5000 },
 ];
 
-const densityTrendsData = [
+const localDensityTrendsData = [
   { time: "6 AM", density: 25 }, { time: "9 AM", density: 92 },
   { time: "12 PM", density: 55 }, { time: "3 PM", density: 70 },
   { time: "6 PM", density: 95 }, { time: "9 PM", density: 35 },
 ];
 
-const congestionTrendsData = [
+const localCongestionTrendsData = [
   { time: "6 AM", delay: 2 }, { time: "9 AM", delay: 28 },
   { time: "12 PM", delay: 12 }, { time: "3 PM", delay: 18 },
   { time: "6 PM", delay: 35 }, { time: "9 PM", delay: 5 },
@@ -101,13 +103,18 @@ const congestionTrendsData = [
 
 // Custom Tooltip for Recharts
 const CustomTooltip = ({ active, payload, label, suffix = "" }) => {
+  const { theme } = useTheme();
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl border border-gray-100 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-md">
-        <p className="text-[10px] font-extrabold text-gray-400 uppercase">{label}</p>
+      <div className={`rounded-xl border px-3 py-2 shadow-xl backdrop-blur-md ${
+        theme === 'dark' 
+          ? 'border-gray-700 bg-gray-800/95 text-gray-200' 
+          : 'border-gray-100 bg-white/95'
+      }`}>
+        <p className={`text-[10px] font-extrabold uppercase ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>{label}</p>
         <div className="flex items-center gap-2 mt-1">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: payload[0].color || payload[0].payload.color || "#3b82f6" }} />
-          <span className="text-xs font-black text-gray-900">
+          <span className={`text-xs font-black ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
             {payload[0].value} {suffix}
           </span>
         </div>
@@ -118,10 +125,31 @@ const CustomTooltip = ({ active, payload, label, suffix = "" }) => {
 };
 
 export default function DashboardPage({ navigate, openModal }) {
-  const [selectedCam, setSelectedCam] = useState(camerasData[0]);
+  const { theme } = useTheme();
+  const [camerasData, setCamerasData] = useState(localCamerasData);
+  const [flowTrendsData, setFlowTrendsData] = useState(localFlowTrendsData);
+  const [densityTrendsData, setDensityTrendsData] = useState(localDensityTrendsData);
+  const [congestionTrendsData, setCongestionTrendsData] = useState(localCongestionTrendsData);
+  const [selectedCam, setSelectedCam] = useState(localCamerasData[0]);
+
+  // Fetch from API with fallback
+  useEffect(() => {
+    fetchDashboard().then((data) => {
+      if (data) {
+        if (data.cameras) { setCamerasData(data.cameras); setSelectedCam(data.cameras[0]); }
+        if (data.flowTrends) setFlowTrendsData(data.flowTrends);
+        if (data.densityTrends) setDensityTrendsData(data.densityTrends);
+        if (data.congestionTrends) setCongestionTrendsData(data.congestionTrends);
+      }
+    });
+  }, []);
 
   const camId = selectedCam.id.split(' ')[0];
   const camName = selectedCam.id.replace(camId, '').trim().replace(/[()]/g, '');
+
+  const gridColor = theme === 'dark' ? '#1e2030' : '#f3f4f6';
+  const tickColor = theme === 'dark' ? '#6b7280' : '#9ca3af';
+  const cursorFill = theme === 'dark' ? '#1e2030' : '#f9fafb';
 
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10 min-h-screen">
@@ -188,7 +216,7 @@ export default function DashboardPage({ navigate, openModal }) {
             >
               <TileLayer
                 attribution='&copy; OpenStreetMap'
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               
               {camerasData.map((cam) => (
@@ -300,9 +328,9 @@ export default function DashboardPage({ navigate, openModal }) {
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 700 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 700 }} tickFormatter={(val) => `${val / 1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} tickFormatter={(val) => `${val / 1000}k`} />
                 <Tooltip content={<CustomTooltip suffix="Vehicles" />} />
                 <Area type="monotone" dataKey="volume" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorFlow)" />
               </AreaChart>
@@ -321,10 +349,10 @@ export default function DashboardPage({ navigate, openModal }) {
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={densityTrendsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 700 }} dy={10} />
-                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 700 }} />
-                <Tooltip content={<CustomTooltip suffix="%" />} cursor={{ fill: '#f9fafb' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} dy={10} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} />
+                <Tooltip content={<CustomTooltip suffix="%" />} cursor={{ fill: cursorFill }} />
                 <Bar dataKey="density" radius={[4, 4, 0, 0]} barSize={24}>
                   {densityTrendsData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.density > 85 ? '#ef4444' : entry.density > 50 ? '#f97316' : '#10b981'} />
@@ -346,9 +374,9 @@ export default function DashboardPage({ navigate, openModal }) {
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={congestionTrendsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 700 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 700 }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} />
                 <Tooltip content={<CustomTooltip suffix="mins delay" />} />
                 <Line type="stepAfter" dataKey="delay" stroke="#f97316" strokeWidth={3} dot={false} />
               </LineChart>

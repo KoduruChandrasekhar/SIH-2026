@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -16,9 +16,10 @@ import {
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import Navbar from "../components/Navbar";
+import { fetchAlerts } from "../api";
 
 // Alert data incorporating distinct congestion vs surge, and route anomalies
-const initialAlerts = [
+const localAlerts = [
   {
     id: "ALT-9041",
     plateNumber: "TS09EA4512",
@@ -92,14 +93,24 @@ const initialAlerts = [
 ];
 
 export default function AlertsPage({ navigate, openModal }) {
-  const [alerts, setAlerts] = useState(initialAlerts);
+  const [alerts, setAlerts] = useState(localAlerts);
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAlert, setSelectedAlert] = useState(initialAlerts[0]);
+  const [selectedAlert, setSelectedAlert] = useState(localAlerts[0]);
   const [toastMessage, setToastMessage] = useState(null);
 
   const [newPlate, setNewPlate] = useState("");
   const [newReason, setNewReason] = useState("");
+
+  // Fetch from API with fallback
+  useEffect(() => {
+    fetchAlerts().then((data) => {
+      if (data) {
+        setAlerts(data);
+        setSelectedAlert(data[0]);
+      }
+    });
+  }, []);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);

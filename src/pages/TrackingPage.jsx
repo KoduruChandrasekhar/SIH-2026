@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Activity,
   ArrowRight,
@@ -28,9 +28,10 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import Navbar from "../components/Navbar";
+import { fetchVehicles } from "../api";
 
 // Comprehensive Mock Database with Sample Plates & Trajectories
-const vehicles = {
+const localVehicles = {
   TS09AB4521: {
     plate: "TS09AB4521",
     type: "Sedan",
@@ -144,6 +145,19 @@ export default function TrackingPage({ navigate, openModal }) {
   const [live, setLive] = useState(false);
   const [copied, setCopied] = useState(false);
   const [fit, setFit] = useState(0);
+  const [vehicles, setVehiclesData] = useState(localVehicles);
+  const apiLoaded = useRef(false);
+
+  // Fetch from API with fallback
+  useEffect(() => {
+    if (apiLoaded.current) return;
+    fetchVehicles().then((data) => {
+      if (data) {
+        setVehiclesData(data);
+        apiLoaded.current = true;
+      }
+    });
+  }, []);
 
   const vehicle = vehicles[plate];
   const points = useMemo(() => vehicle.hops.map((h) => [h[7], h[8]]), [vehicle]);

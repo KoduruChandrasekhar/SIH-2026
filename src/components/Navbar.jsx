@@ -3,14 +3,19 @@ import {
   Home,
   LayoutDashboard,
   LogIn,
+  Moon,
   Navigation,
   Route,
+  Sun,
   TrafficCone,
 } from "lucide-react";
 
 import tracenetLogo from "../assets/tracenet-logo.jpg"; 
+import { useTheme } from "../ThemeContext";
 
 export default function Navbar({ page, navigate, openModal }) {
+  const { theme, toggleTheme } = useTheme();
+
   const item = (label, icon, target) => {
     const Icon = icon;
     
@@ -194,6 +199,20 @@ export default function Navbar({ page, navigate, openModal }) {
         </button>
 
         <div className="mx-1.5 hidden h-5 w-[1px] rounded-full bg-gray-200 sm:block" />
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          className="theme-toggle-btn"
+          title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+          aria-label="Toggle theme"
+        >
+          {theme === "light" ? (
+            <Moon size={16} className="transition-transform duration-300 hover:rotate-12" />
+          ) : (
+            <Sun size={16} className="text-amber-400 transition-transform duration-300 hover:rotate-45" />
+          )}
+        </button>
 
         {/* Operator Login Button */}
         <button

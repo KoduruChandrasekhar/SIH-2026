@@ -4,7 +4,39 @@
 
 @import "leaflet/dist/leaflet.css";
 
+/* =========================================================
+   THEME VARIABLES
+   ========================================================= */
+
 :root {
+  /* Light theme (default) */
+  --bg-base: #f8f9fa;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-card-solid: #ffffff;
+  --bg-card-hover: #ffffff;
+  --bg-input: rgba(249, 250, 251, 0.5);
+  --bg-input-solid: #f9fafb;
+  --bg-elevated: rgba(255, 255, 255, 0.7);
+  --bg-subtle: rgba(249, 250, 251, 0.5);
+  --bg-blob-1: rgba(147, 197, 253, 0.3);
+  --bg-blob-2: rgba(196, 181, 253, 0.3);
+  --bg-blob-3: rgba(165, 243, 252, 0.3);
+
+  --text-primary: #1c1c1e;
+  --text-secondary: #636366;
+  --text-tertiary: #9ca3af;
+  --text-muted: #aeaeb2;
+
+  --border-primary: rgba(229, 231, 235, 0.8);
+  --border-subtle: rgba(255, 255, 255, 0.8);
+  --border-input: rgba(229, 231, 235, 0.8);
+
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.02);
+
+  --scrollbar-thumb: #d1d1d6;
+  --scrollbar-thumb-hover: #aeaeb2;
+
   font-family:
     "Plus Jakarta Sans",
     -apple-system,
@@ -12,12 +44,44 @@
     "Segoe UI",
     sans-serif;
 
-  color: #1c1c1e;
-  background: #ffffff;
+  color: var(--text-primary);
+  background: var(--bg-base);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+[data-theme="dark"] {
+  --bg-base: #0f1117;
+  --bg-card: rgba(30, 32, 44, 0.85);
+  --bg-card-solid: #1a1c2e;
+  --bg-card-hover: #22243a;
+  --bg-input: rgba(30, 32, 44, 0.6);
+  --bg-input-solid: #1e2030;
+  --bg-elevated: rgba(30, 32, 44, 0.75);
+  --bg-subtle: rgba(30, 32, 44, 0.4);
+  --bg-blob-1: rgba(59, 130, 246, 0.08);
+  --bg-blob-2: rgba(139, 92, 246, 0.08);
+  --bg-blob-3: rgba(6, 182, 212, 0.08);
+
+  --text-primary: #e8eaed;
+  --text-secondary: #9ba1b0;
+  --text-tertiary: #6b7280;
+  --text-muted: #4b5563;
+
+  --border-primary: rgba(55, 65, 81, 0.6);
+  --border-subtle: rgba(55, 65, 81, 0.4);
+  --border-input: rgba(55, 65, 81, 0.6);
+
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.2);
+
+  --scrollbar-thumb: #374151;
+  --scrollbar-thumb-hover: #4b5563;
+
+  color: var(--text-primary);
+  background: var(--bg-base);
 }
 
 * {
@@ -33,17 +97,313 @@ body,
 
 body {
   min-width: 320px;
-  background: #ffffff;
+  background: var(--bg-base);
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 button,
 input,
 select {
   font: inherit;
+  cursor: pointer;
 }
 
-button {
-  cursor: pointer;
+/* =========================================================
+   DARK MODE - GLOBAL OVERRIDES
+   ========================================================= */
+
+/* Cards and panels */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/80,
+[data-theme="dark"] .bg-white\/70,
+[data-theme="dark"] .bg-white\/60 {
+  background-color: var(--bg-card-solid) !important;
+}
+
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-50\/50,
+[data-theme="dark"] .bg-gray-50\/70,
+[data-theme="dark"] .bg-\[\\#f8f9fa\] {
+  background-color: #151725 !important;
+}
+
+[data-theme="dark"] .bg-gray-100 {
+  background-color: #1e2030 !important;
+}
+
+/* Text overrides */
+[data-theme="dark"] .text-gray-900 {
+  color: #e8eaed !important;
+}
+
+[data-theme="dark"] .text-gray-800 {
+  color: #d1d5db !important;
+}
+
+[data-theme="dark"] .text-gray-700 {
+  color: #bfc5d0 !important;
+}
+
+[data-theme="dark"] .text-gray-600 {
+  color: #9ba1b0 !important;
+}
+
+[data-theme="dark"] .text-gray-500 {
+  color: #7c8291 !important;
+}
+
+[data-theme="dark"] .text-gray-400 {
+  color: #6b7280 !important;
+}
+
+[data-theme="dark"] .text-\[\\#1c1c1e\] {
+  color: #e8eaed !important;
+}
+
+[data-theme="dark"] .text-\[\\#636366\] {
+  color: #9ba1b0 !important;
+}
+
+/* Border overrides */
+[data-theme="dark"] .border-white\/80,
+[data-theme="dark"] .border-white\/60 {
+  border-color: rgba(55, 65, 81, 0.5) !important;
+}
+
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-gray-200\/80,
+[data-theme="dark"] .border-gray-200\/60 {
+  border-color: rgba(55, 65, 81, 0.5) !important;
+}
+
+[data-theme="dark"] .border-gray-100 {
+  border-color: rgba(55, 65, 81, 0.4) !important;
+}
+
+[data-theme="dark"] .border-gray-300 {
+  border-color: rgba(75, 85, 99, 0.5) !important;
+}
+
+/* Shadows */
+[data-theme="dark"] .shadow-\[0_8px_32px_rgba\(0\,0\,0\,0\.04\)\],
+[data-theme="dark"] .shadow-\[0_8px_32px_rgba\(0\,0\,0\,\.04\)\],
+[data-theme="dark"] .shadow-\[0_8px_32px_rgba\(0\,0\,0\,0\.06\)\] {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+[data-theme="dark"] .shadow-\[0_4px_24px_rgba\(0\,0\,0\,0\.02\)\] {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .shadow-\[0_6px_20px_rgba\(0\,0\,0\,\.03\)\] {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Backdrop blur cards */
+[data-theme="dark"] .backdrop-blur-xl,
+[data-theme="dark"] .backdrop-blur-2xl {
+  backdrop-filter: blur(20px);
+}
+
+/* Input fields */
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="search"] {
+  background-color: #1e2030 !important;
+  border-color: rgba(55, 65, 81, 0.6) !important;
+  color: #e8eaed !important;
+}
+
+[data-theme="dark"] input::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Bg color overrides for specific components */
+[data-theme="dark"] .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-blue-600\/10,
+[data-theme="dark"] .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+[data-theme="dark"] .bg-red-50,
+[data-theme="dark"] .bg-red-100,
+[data-theme="dark"] .bg-red-500\/10 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-orange-50,
+[data-theme="dark"] .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-amber-50,
+[data-theme="dark"] .bg-amber-50\/70,
+[data-theme="dark"] .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-emerald-50,
+[data-theme="dark"] .bg-emerald-50\/60 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-purple-50 {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-green-500\/10 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+/* Specific border color overrides */
+[data-theme="dark"] .border-blue-100,
+[data-theme="dark"] .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+[data-theme="dark"] .border-amber-200 {
+  border-color: rgba(245, 158, 11, 0.25) !important;
+}
+
+[data-theme="dark"] .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+[data-theme="dark"] .border-red-500\/80 {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+[data-theme="dark"] .border-amber-500\/80 {
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Hover overrides */
+[data-theme="dark"] .hover\:bg-gray-200:hover {
+  background-color: #2a2d40 !important;
+}
+
+[data-theme="dark"] .hover\:bg-gray-100:hover {
+  background-color: #22243a !important;
+}
+
+[data-theme="dark"] .hover\:bg-gray-50:hover {
+  background-color: #1e2030 !important;
+}
+
+[data-theme="dark"] .hover\:bg-white:hover {
+  background-color: #22243a !important;
+}
+
+[data-theme="dark"] .hover\:bg-blue-50:hover {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+/* App container override */
+[data-theme="dark"] .bg-gradient-to-br.from-slate-50 {
+  background: #0f1117 !important;
+}
+
+/* Login page left-side branding - keep dark as-is */
+[data-theme="dark"] .bg-gradient-to-br.from-blue-900 {
+  background: linear-gradient(135deg, #0f172a, #1e1b4b, #0f172a) !important;
+}
+
+/* Modal */
+[data-theme="dark"] .bg-white\/90 {
+  background-color: rgba(26, 28, 46, 0.95) !important;
+}
+
+[data-theme="dark"] .bg-black\/40,
+[data-theme="dark"] .bg-black\/45 {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Navbar Login Button */
+[data-theme="dark"] .bg-gray-900 {
+  background-color: #2563eb !important;
+}
+
+[data-theme="dark"] .hover\:bg-gray-800:hover {
+  background-color: #1d4ed8 !important;
+}
+
+/* Fix the Recharts tooltip for dark mode */
+[data-theme="dark"] .recharts-default-tooltip {
+  background-color: #1a1c2e !important;
+  border-color: rgba(55, 65, 81, 0.5) !important;
+}
+
+/* Leaflet popup dark mode */
+[data-theme="dark"] .leaflet-popup-content-wrapper {
+  background: #1a1c2e !important;
+  color: #e8eaed !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .leaflet-popup-tip {
+  background: #1a1c2e !important;
+}
+
+[data-theme="dark"] .leaflet-control-zoom a {
+  background-color: #1a1c2e !important;
+  color: #e8eaed !important;
+  border-color: rgba(55, 65, 81, 0.5) !important;
+}
+
+[data-theme="dark"] .leaflet-control-zoom a:hover {
+  background-color: #22243a !important;
+}
+
+[data-theme="dark"] .leaflet-control-attribution {
+  background: rgba(15, 17, 23, 0.8) !important;
+  color: #6b7280 !important;
+}
+
+[data-theme="dark"] .leaflet-control-attribution a {
+  color: #6b7280 !important;
+}
+
+/* Leaflet map container in dark mode gets a dark tile filter */
+[data-theme="dark"] .leaflet-tile-pane {
+  filter: brightness(0.75) contrast(1.15) saturate(0.85);
+}
+
+/* Fix selected cam card in dark dashboard */
+[data-theme="dark"] .shadow-sm {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Checkbox */
+[data-theme="dark"] input[type="checkbox"] {
+  accent-color: #3b82f6;
+}
+
+/* Toast/notification */
+[data-theme="dark"] .bg-gray-950\/90 {
+  background-color: rgba(10, 12, 20, 0.95) !important;
+}
+
+/* Home page gradient overlay keeps working in dark */
+[data-theme="dark"] .from-gray-900\/95 {
+  /* Keep existing, already dark */
+}
+
+/* Ring overrides */
+[data-theme="dark"] .ring-1.ring-orange-500\/20 {
+  --tw-ring-color: rgba(249, 115, 22, 0.3);
+}
+
+[data-theme="dark"] .ring-2.ring-red-500\/20 {
+  --tw-ring-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="dark"] .ring-2.ring-amber-500\/20 {
+  --tw-ring-color: rgba(245, 158, 11, 0.3);
 }
 
 /* =========================================================
@@ -163,6 +523,11 @@ button {
     0 2px 5px rgba(0, 0, 0, 0.03);
 }
 
+[data-theme="dark"] .trace-card:hover {
+  border-color: rgba(55, 65, 81, 0.6);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
 .trace-card:active {
   transform: translateY(-1px) scale(0.995);
 }
@@ -239,6 +604,11 @@ button {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
+[data-theme="dark"] .trace-slider-button:hover {
+  background: #22243a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
 .trace-slider-button:active {
   transform: scale(0.96);
 }
@@ -309,12 +679,12 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d1d6;
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #aeaeb2;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* =========================================================
@@ -325,43 +695,6 @@ button {
   .trace-card:hover {
     transform: none;
   }
-}
-
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
-@import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
-
-:root {
-  font-family:
-    "Plus Jakarta Sans",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  color: #1c1c1e;
-  background: #f8f9fa;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-
-* {
-  box-sizing: border-box;
-}
-html,
-body,
-#root {
-  min-height: 100%;
-  margin: 0;
-}
-body {
-  background: #f8f9fa;
-  overflow-x: hidden;
-}
-button,
-input,
-select {
-  font: inherit;
-  cursor: pointer;
 }
 
 /* =========================================================
@@ -506,4 +839,45 @@ select {
 
 .trace-live-dot {
   animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* =========================================================
+   THEME TOGGLE BUTTON
+   ========================================================= */
+
+.theme-toggle-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-card-hover);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .theme-toggle-btn:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* =========================================================
+   DARK MODE - RECHARTS CHART TOOLTIPS
+   ========================================================= */
+
+[data-theme="dark"] .bg-white\/95 {
+  background-color: rgba(26, 28, 46, 0.95) !important;
 }
