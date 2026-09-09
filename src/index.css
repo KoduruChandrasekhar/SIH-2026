@@ -115,9 +115,12 @@ select {
 
 /* Cards and panels */
 [data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/95,
+[data-theme="dark"] .bg-white\/90,
 [data-theme="dark"] .bg-white\/80,
 [data-theme="dark"] .bg-white\/70,
-[data-theme="dark"] .bg-white\/60 {
+[data-theme="dark"] .bg-white\/60,
+[data-theme="dark"] .bg-white\/50 {
   background-color: var(--bg-card-solid) !important;
 }
 
@@ -130,6 +133,15 @@ select {
 
 [data-theme="dark"] .bg-gray-100 {
   background-color: #1e2030 !important;
+}
+
+[data-theme="dark"] .bg-gray-100\/80,
+[data-theme="dark"] .bg-gray-200 {
+  background-color: #25283a !important;
+}
+
+[data-theme="dark"] .bg-\[\#f0f4f8\]\/80 {
+  background-color: #171a28 !important;
 }
 
 /* Text overrides */
@@ -155,6 +167,10 @@ select {
 
 [data-theme="dark"] .text-gray-400 {
   color: #6b7280 !important;
+}
+
+[data-theme="dark"] .text-gray-300 {
+  color: #b8becb !important;
 }
 
 [data-theme="dark"] .text-\[\\#1c1c1e\] {
@@ -183,6 +199,11 @@ select {
 
 [data-theme="dark"] .border-gray-300 {
   border-color: rgba(75, 85, 99, 0.5) !important;
+}
+
+[data-theme="dark"] .border-white\/20,
+[data-theme="dark"] .border-white\/10 {
+  border-color: rgba(148, 163, 184, 0.22) !important;
 }
 
 /* Shadows */
@@ -288,7 +309,7 @@ select {
 }
 
 [data-theme="dark"] .hover\:bg-gray-100:hover {
-  background-color: #22243a !important;
+  background-color: #2a2d40 !important;
 }
 
 [data-theme="dark"] .hover\:bg-gray-50:hover {
