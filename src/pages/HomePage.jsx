@@ -1,451 +1,372 @@
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
   Activity,
+  ArrowRight,
   Bell,
-  ChevronLeft,
-  ChevronRight,
-  Gauge,
+  ChevronDown,
   LayoutDashboard,
-  Map,
   Navigation,
   Radar,
   Route,
   ShieldAlert,
   TrafficCone,
-  ArrowRight,
+  Zap,
+  Camera,
+  Globe,
 } from "lucide-react";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import Navbar from "../components/Navbar";
-import { slides, cameras } from "../data";
+import { slides } from "../data";
 
+// Lazy load Earth globe for smooth rendering
+const EarthGlobe = lazy(() => import("../components/EarthGlobe"));
+
+/* ──────────────────────────────────────────
+   Animated Counter Component
+   ────────────────────────────────────────── */
+function AnimatedCounter({ target, suffix = "", prefix = "", duration = 2000 }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated.current) {
+          hasAnimated.current = true;
+          const startTime = Date.now();
+          const tick = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setCount(Math.round(target * eased));
+            if (progress < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+      },
+      { threshold: 0.3 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [target, duration]);
+
+  return (
+    <span ref={ref}>
+      {prefix}{count.toLocaleString()}{suffix}
+    </span>
+  );
+}
+
+/* ──────────────────────────────────────────
+   Loading fallback for Earth globe
+   ────────────────────────────────────────── */
+function GlobeLoader() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="relative">
+        <div className="w-32 h-32 rounded-full border border-blue-500/20 animate-pulse" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Globe size={32} className="text-blue-500/40 animate-spin" style={{ animationDuration: "3s" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+   Feature Card
+   ────────────────────────────────────────── */
+function FeatureCard({ icon: Icon, title, description, onClick, accentColor, delay, liveBadge }) {
+  return (
+    <div
+      onClick={onClick}
+      className="feature-card fade-up group"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      {/* Gradient border glow on hover */}
+      <div
+        className="absolute inset-0 rounded-[20px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"
+        style={{
+          background: `radial-gradient(600px circle at 50% 50%, ${accentColor}15, transparent 70%)`,
+        }}
+      />
+
+      <div className="flex items-start justify-between mb-4">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+          style={{
+            background: `${accentColor}15`,
+            color: accentColor,
+          }}
+        >
+          <Icon size={20} strokeWidth={2} />
+        </div>
+
+        {liveBadge && (
+          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold"
+            style={{
+              background: `${accentColor}12`,
+              color: accentColor,
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{
+                background: accentColor,
+                boxShadow: `0 0 6px ${accentColor}`,
+                animation: "pulse-glow 2s ease-in-out infinite",
+              }}
+            />
+            {liveBadge}
+          </div>
+        )}
+      </div>
+
+      <h3 className="text-base font-bold text-[var(--text-primary)] mb-2">{title}</h3>
+      <p className="text-[13px] leading-relaxed text-[var(--text-secondary)] mb-5 min-h-[40px]">
+        {description}
+      </p>
+
+      <button
+        className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-300"
+        style={{
+          background: `${accentColor}10`,
+          color: accentColor,
+          border: `1px solid ${accentColor}20`,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = `${accentColor}20`;
+          e.currentTarget.style.borderColor = `${accentColor}40`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = `${accentColor}10`;
+          e.currentTarget.style.borderColor = `${accentColor}20`;
+        }}
+      >
+        Launch <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+      </button>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+   Stat Item
+   ────────────────────────────────────────── */
+function StatItem({ value, label, suffix = "", prefix = "" }) {
+  return (
+    <div className="text-center px-6">
+      <div className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
+        <AnimatedCounter target={value} suffix={suffix} prefix={prefix} />
+      </div>
+      <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-widest mt-1">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+   Status Item
+   ────────────────────────────────────────── */
+function StatusItem({ icon: Icon, text }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+      <Icon size={14} className="text-[var(--text-dim)]" />
+      {text}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+   Main HomePage Component
+   ────────────────────────────────────────── */
 export default function HomePage({ navigate, openModal }) {
-  const [slide, setSlide] = useState(0);
-  const currentSlide = slides[slide];
+  const [scrollY, setScrollY] = useState(0);
+  const heroRef = useRef(null);
 
-  // Live animated telemetry tickers
+  // Track scroll for parallax effects
+  useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Calculate hero opacity and transform based on scroll
+  const heroOpacity = Math.max(0, 1 - scrollY / 600);
+  const heroScale = Math.max(0.6, 1 - scrollY / 2000);
+  const heroTranslateY = scrollY * 0.4;
+
+  // Live telemetry tickers
   const [liveSpeed, setLiveSpeed] = useState(42);
   const [activeFeeds, setActiveFeeds] = useState(254);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLiveSpeed((prev) => (Math.random() > 0.5 ? prev + 1 : prev - 1));
+      setLiveSpeed(prev => Math.max(30, Math.min(55, prev + (Math.random() > 0.5 ? 1 : -1))));
       setActiveFeeds(250 + Math.floor(Math.random() * 8));
     }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // Mouse position tracker for interactive lighting
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const containerRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setMousePos({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
-  };
-
-  const previousSlide = useCallback(() => {
-    setSlide((current) => (current === 0 ? slides.length - 1 : current - 1));
-  }, []);
-
-  const nextSlide = useCallback(() => {
-    setSlide((current) => (current === slides.length - 1 ? 0 : current + 1));
-  }, []);
-
   return (
-    <div
-      ref={containerRef}
-      onMouseMove={handleMouseMove}
-      className="relative flex w-full flex-col gap-6 pb-10 overflow-hidden"
-    >
-      {/* Interactive Cursor Spotlight */}
-      <div
-        className="pointer-events-none absolute -inset-px rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 z-30"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(59,130,246,0.12), transparent 80%)`,
-        }}
-      />
+    <div className="relative w-full">
+      {/* ═══════════════════════════════════════
+          SECTION 1: HERO — Full-Screen Earth Globe
+          ═══════════════════════════════════════ */}
+      <section ref={heroRef} className="relative h-screen w-full overflow-hidden">
+        {/* Radial gradient backdrop */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.12),transparent_70%)]" />
 
-      {/* Background Blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-blue-300/30 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-purple-300/30 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-4000 absolute bottom-[-10%] left-[20%] h-[500px] w-[500px] rounded-full bg-cyan-300/30 mix-blend-multiply blur-[100px] filter" />
-      </div>
+        {/* 3D Earth Globe */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            opacity: heroOpacity,
+            transform: `scale(${heroScale}) translateY(${heroTranslateY}px)`,
+            transition: "transform 0.1s linear",
+          }}
+        >
+          <Suspense fallback={<GlobeLoader />}>
+            {EarthGlobe && <EarthGlobe />}
+          </Suspense>
+        </div>
 
-      {/* Navbar */}
-      <div className="fade-up w-full">
-        <Navbar page="home" navigate={navigate} openModal={openModal} />
-      </div>
-
-      {/* About Slider */}
-      <section className="fade-up delay-100 group relative w-full overflow-hidden rounded-[24px] border border-white/60 bg-white/60 px-5 py-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)] sm:px-7 sm:py-6">
-        <img
-          src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1200&auto=format&fit=crop"
-          alt="City Intelligence"
-          className="absolute inset-0 z-0 h-full w-full object-cover opacity-0 transition-all duration-700 group-hover:scale-105 group-hover:opacity-100"
-        />
-        <div className="absolute inset-0 z-10 bg-gradient-to-r from-gray-900/95 via-gray-900/80 to-gray-900/60 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-
-        <div className="relative z-20 flex items-center gap-5">
-          <button
-            onClick={previousSlide}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/80 text-blue-600 shadow-md backdrop-blur-md transition-all hover:scale-110 group-hover:bg-white/10 group-hover:text-white group-hover:border-white/30"
-          >
-            <ChevronLeft size={18} />
-          </button>
-
-          <div key={slide} className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-extrabold tracking-tight text-gray-900 transition-colors duration-500 group-hover:text-white sm:text-xl">
-                {currentSlide.title}
-              </h2>
-              <span className="rounded-full border border-blue-200 bg-blue-100/80 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-700 shadow-sm transition-colors duration-500 group-hover:bg-white/20 group-hover:text-blue-200 group-hover:border-white/20">
-                {slide + 1}/{slides.length}
-              </span>
-            </div>
-            <p className="mt-2 min-h-[44px] max-w-[900px] text-[13px] leading-relaxed text-gray-700 transition-colors duration-500 group-hover:text-gray-200 sm:text-sm">
-              <TypewriterText text={currentSlide.desc} onComplete={nextSlide} />
-            </p>
+        {/* Hero overlay content */}
+        <div className="relative z-10 flex h-full flex-col">
+          {/* Navbar */}
+          <div className="fade-up px-4 pt-4 sm:px-6 lg:px-8">
+            <Navbar page="home" navigate={navigate} openModal={openModal} />
           </div>
 
-          <button
-            onClick={nextSlide}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/80 text-blue-600 shadow-md backdrop-blur-md transition-all hover:scale-110 group-hover:bg-white/10 group-hover:text-white group-hover:border-white/30"
+          {/* Hero text */}
+          <div className="flex flex-1 flex-col items-center justify-center px-4 text-center"
+            style={{ opacity: heroOpacity }}
           >
-            <ChevronRight size={18} />
-          </button>
+            <div className="fade-up delay-200">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-glass)] px-4 py-1.5 backdrop-blur-xl">
+                <span className="live-dot" style={{ width: 6, height: 6 }} />
+                <span className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                  AI Traffic Intelligence Platform
+                </span>
+              </div>
+            </div>
+
+            <h1 className="fade-up delay-300 text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter text-[var(--text-primary)] mb-4">
+              <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(59,130,246,0.4)]">
+                TraceNet
+              </span>
+            </h1>
+
+            <p className="fade-up delay-400 max-w-2xl text-base sm:text-lg text-[var(--text-secondary)] leading-relaxed mb-8">
+              City-Wide AI Engine for Multi-Camera ANPR Trajectory Tracking & Urban Traffic Analytics
+            </p>
+
+            <div className="fade-up delay-500 flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={() => navigate("dashboard")}
+                className="btn-primary text-sm px-6 py-3"
+              >
+                <Zap size={16} /> Launch Dashboard
+              </button>
+              <button
+                onClick={() => navigate("tracking")}
+                className="btn-glass text-sm px-6 py-3"
+              >
+                <Navigation size={16} /> Track Vehicle
+              </button>
+            </div>
+          </div>
+
+          {/* Scroll indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+            style={{ opacity: Math.max(0, 1 - scrollY / 200) }}
+          >
+            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Scroll to explore</span>
+            <ChevronDown size={20} className="text-[var(--text-muted)] animate-scroll-hint" />
+          </div>
         </div>
       </section>
 
-      {/* Main Feature Cards & GIS Map */}
-      <section className="grid w-full gap-5 lg:grid-cols-[1.1fr_1fr] xl:grid-cols-[1.2fr_1fr]">
-        {/* 2x2 Feature Grid */}
-        <div className="grid gap-5 sm:grid-cols-2 overflow-hidden py-2 px-2 -mx-2">
+      {/* ═══════════════════════════════════════
+          SECTION 2: Feature Cards
+          ═══════════════════════════════════════ */}
+      <section className="relative z-10 mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 -mt-20">
+        {/* Gradient fade from hero */}
+        <div className="absolute -top-40 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-[var(--bg-void)] pointer-events-none" />
+
+        <div className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <FeatureCard
-            direction="slide-left"
-            delay="delay-100"
             icon={LayoutDashboard}
             title="Dashboard"
-            description="Real-Time City Overview. View centralized performance metrics and average network speeds."
-            button="View Dashboard"
+            description="Real-time city overview. Centralized performance metrics and network speeds."
             onClick={() => navigate("dashboard")}
-            theme="purple"
-            bgImage="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=800&auto=format&fit=crop"
+            accentColor="#8b5cf6"
+            delay={0}
             liveBadge={`${liveSpeed} km/h avg`}
-            liveStatusColor="bg-purple-500"
           />
-
           <FeatureCard
-            direction="slide-right"
-            delay="delay-200"
             icon={Navigation}
             title="Tracking"
-            description="Spatial-Temporal Vehicle Tracking. Reconstruct complete paths from multiple ANPR feeds."
-            button="Launch Tracking"
+            description="Spatial-temporal vehicle tracking. Reconstruct complete paths from ANPR feeds."
             onClick={() => navigate("tracking")}
-            theme="blue"
-            bgImage="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=800&auto=format&fit=crop"
-            liveBadge={`${activeFeeds} Feeds Active`}
-            liveStatusColor="bg-blue-500"
+            accentColor="#3b82f6"
+            delay={100}
+            liveBadge={`${activeFeeds} Feeds`}
           />
-
           <FeatureCard
-            direction="slide-left"
-            delay="delay-200"
             icon={TrafficCone}
-            title="Traffic"
-            description="City-Wide Traffic Analytics. Visualize origin-destination patterns and congestion bottlenecks."
-            button="Analyze Traffic"
+            title="Traffic Analytics"
+            description="City-wide flow analysis. Visualize origin-destination patterns and congestion."
             onClick={() => navigate("traffic")}
-            theme="orange"
-            bgImage="https://images.unsplash.com/photo-1506146332389-18140dc7b2fb?q=80&w=800&auto=format&fit=crop"
-            liveBadge="3 Congestion Zones"
-            liveStatusColor="bg-amber-500"
+            accentColor="#f59e0b"
+            delay={200}
+            liveBadge="3 Zones Active"
           />
-
           <FeatureCard
-            direction="slide-right"
-            delay="delay-300"
             icon={Bell}
-            title="Alerts"
-            description="Anomalous Route & Blacklist Alerts. Instant notifications for high-interest vehicles."
-            button="View Alerts"
+            title="Alert Center"
+            description="Blacklist detection and anomaly alerts. Real-time threat monitoring system."
             onClick={() => navigate("alerts")}
-            theme="red"
-            bgImage="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=800&auto=format&fit=crop"
-            liveBadge="3 Priority Flags"
-            liveStatusColor="bg-red-500"
-            isPulse={true}
+            accentColor="#ef4444"
+            delay={300}
+            liveBadge="3 Priority"
           />
         </div>
+      </section>
 
-        {/* Real Interactive Leaflet GIS Map with Solid Hover Effect */}
-        <div 
-          onClick={() => navigate("tracking")}
-          className="fade-up delay-400 group cursor-pointer flex h-full min-h-[420px] w-full flex-col rounded-[28px] border-2 border-white/80 bg-white/70 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-blue-500 hover:bg-white hover:shadow-[8px_8px_0px_0px_rgba(37,99,235,1)]"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-600 shadow-[inset_0_0_0_1px_rgba(34,197,94,0.2)] transition-colors group-hover:bg-blue-500/10 group-hover:text-blue-600 group-hover:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.3)]">
-                <Map size={20} strokeWidth={2.5} />
-              </div>
-              <h3 className="text-xl font-extrabold text-gray-900">Network Overview</h3>
-            </div>
+      {/* ═══════════════════════════════════════
+          SECTION 3: Live Stats Strip
+          ═══════════════════════════════════════ */}
+      <section className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 mt-12 mb-6">
+        <div className="glass-card-static flex flex-wrap items-center justify-around py-8 px-6 gap-6">
+          <StatItem value={254} label="Camera Nodes" />
+          <div className="hidden sm:block w-px h-10 bg-[var(--border-subtle)]" />
+          <StatItem value={99} suffix=".98%" label="Uptime" />
+          <div className="hidden sm:block w-px h-10 bg-[var(--border-subtle)]" />
+          <StatItem value={14} suffix="ms" label="Inference Latency" />
+          <div className="hidden sm:block w-px h-10 bg-[var(--border-subtle)]" />
+          <StatItem value={1428910} label="Plates Indexed Today" />
+        </div>
+      </section>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("tracking");
-              }}
-              className="group/btn relative overflow-hidden rounded-xl bg-gray-900 px-5 py-2.5 text-xs font-bold text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)] transition-transform hover:scale-105 active:scale-95"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-700 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" />
-              <span className="relative z-10">Open GIS Tracking</span>
-            </button>
-          </div>
-
-          <div className="relative mt-5 flex-1 w-full overflow-hidden rounded-[20px] border border-gray-200/60 bg-[#f0f4f8]/80 shadow-inner z-10 min-h-[300px]">
-            <MapContainer
-              center={[17.4850, 78.4100]}
-              zoom={12}
-              scrollWheelZoom={false}
-              style={{ width: "100%", height: "100%" }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              {cameras.map((cam, idx) => (
-                <Marker key={idx} position={[cam.latitude, cam.longitude]}>
-                  <Popup>
-                    <div className="p-1">
-                      <span className="text-[10px] font-extrabold text-blue-600 uppercase">{cam.id}</span>
-                      <h4 className="text-xs font-bold text-gray-900">{cam.location}</h4>
-                      <p className="text-[10px] text-gray-500 mt-1">Status: {cam.status} | Speed: {cam.speed}</p>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-
-            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 rounded-xl border border-white/60 bg-white/90 px-3.5 py-2 text-[10px] font-bold text-gray-800 shadow-xl backdrop-blur-md pointer-events-none transition-colors group-hover:border-blue-200">
-              <span className="trace-live-dot h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" /> LIVE ANPR MESH
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <Radar size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-              <span className="text-xs font-bold text-gray-500 group-hover:text-gray-700 transition-colors">254 camera nodes synchronized</span>
-            </div>
-            <span className="group/link flex items-center gap-1.5 text-xs font-extrabold text-blue-600 transition hover:text-blue-800">
-              Full Trajectory Mode <ChevronRight size={14} className="transition-transform group-hover/link:translate-x-1" />
+      {/* ═══════════════════════════════════════
+          SECTION 4: System Status
+          ═══════════════════════════════════════ */}
+      <section className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 mb-16">
+        <div className="glass-card-static flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="live-dot" />
+            <span className="text-xs font-bold text-[var(--text-primary)]">
+              All core AI systems operational
             </span>
           </div>
-        </div>
-      </section>
-
-      {/* System Status Strip */}
-      <section className="fade-up delay-400 flex w-full flex-col gap-4 rounded-[20px] border border-white/60 bg-white/70 px-6 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="trace-live-dot h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.8)]" />
-          <span className="text-xs font-extrabold text-gray-800">All core AI systems operational</span>
-        </div>
-        <div className="flex flex-wrap gap-6">
-          <StatusItem icon={Route} text="Trajectory Engine" />
-          <StatusItem icon={Activity} text="Traffic Engine" />
-          <StatusItem icon={ShieldAlert} text="Alert Service" />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function TypewriterText({ text, onComplete }) {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  useEffect(() => {
-    setDisplayedText("");
-    setIsDeleting(false);
-  }, [text]);
-
-  useEffect(() => {
-    let timeout;
-    if (!isDeleting && displayedText.length < text.length) {
-      timeout = setTimeout(() => setDisplayedText(text.slice(0, displayedText.length + 1)), 30);
-    } else if (!isDeleting && displayedText.length === text.length) {
-      timeout = setTimeout(() => setIsDeleting(true), 4000);
-    } else if (isDeleting && displayedText.length > 0) {
-      timeout = setTimeout(() => setDisplayedText(text.slice(0, displayedText.length - 1)), 15);
-    } else if (isDeleting && displayedText.length === 0) {
-      setIsDeleting(false);
-      onComplete();
-    }
-    return () => clearTimeout(timeout);
-  }, [displayedText, isDeleting, text, onComplete]);
-
-  return (
-    <span>
-      {displayedText}
-      <span className="animate-pulse text-[15px] font-bold text-blue-500 group-hover:text-blue-300">|</span>
-    </span>
-  );
-}
-
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-  button,
-  onClick,
-  direction,
-  delay,
-  theme,
-  bgImage,
-  liveBadge,
-  liveStatusColor,
-  isPulse = false,
-}) {
-  const [coord, setCoord] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setCoord({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
-  };
-
-  const styles = {
-    blue: {
-      hoverOverlay: "from-blue-900/95 to-blue-600/80",
-      iconBox: "bg-blue-50 text-blue-600 group-hover:bg-blue-500/40 group-hover:text-white group-hover:backdrop-blur-md",
-      titleText: "text-gray-900 group-hover:text-white",
-      descText: "text-gray-500 group-hover:text-blue-50",
-      btn: "bg-blue-50 text-blue-700 border-transparent group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30 group-hover:backdrop-blur-md",
-    },
-    orange: {
-      hoverOverlay: "from-orange-900/95 to-orange-600/80",
-      iconBox: "bg-orange-50 text-orange-600 group-hover:bg-orange-500/40 group-hover:text-white group-hover:backdrop-blur-md",
-      titleText: "text-gray-900 group-hover:text-white",
-      descText: "text-gray-500 group-hover:text-orange-50",
-      btn: "bg-orange-50 text-orange-700 border-transparent group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30 group-hover:backdrop-blur-md",
-    },
-    purple: {
-      hoverOverlay: "from-purple-900/95 to-purple-600/80",
-      iconBox: "bg-purple-50 text-purple-600 group-hover:bg-purple-500/40 group-hover:text-white group-hover:backdrop-blur-md",
-      titleText: "text-gray-900 group-hover:text-white",
-      descText: "text-gray-500 group-hover:text-purple-50",
-      btn: "bg-purple-50 text-purple-700 border-transparent group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30 group-hover:backdrop-blur-md",
-    },
-    red: {
-      hoverOverlay: "from-red-900/95 to-red-600/80",
-      iconBox: "bg-red-50 text-red-600 group-hover:bg-red-500/40 group-hover:text-white group-hover:backdrop-blur-md",
-      titleText: "text-gray-900 group-hover:text-white",
-      descText: "text-gray-500 group-hover:text-red-50",
-      btn: "bg-red-50 text-red-700 border-transparent group-hover:bg-white/20 group-hover:text-white group-hover:border-white/30 group-hover:backdrop-blur-md",
-    },
-  };
-
-  const t = styles[theme];
-
-  return (
-    <div
-      onClick={onClick}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`
-        ${direction}
-        ${delay}
-        group
-        cursor-pointer
-        relative
-        flex
-        min-h-[200px]
-        flex-col
-        overflow-hidden
-        rounded-[24px]
-        border
-        border-white/60
-        bg-white/60
-        p-5
-        shadow-[0_8px_32px_rgba(0,0,0,0.04)]
-        transition-all
-        duration-500
-        hover:-translate-y-2
-        hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)]
-      `}
-    >
-      {isHovered && (
-        <div
-          className="pointer-events-none absolute -inset-px z-30 transition duration-300 rounded-[24px]"
-          style={{
-            background: `radial-gradient(350px circle at ${coord.x}px ${coord.y}px, rgba(255,255,255,0.25), transparent 80%)`,
-          }}
-        />
-      )}
-
-      <img
-        src={bgImage}
-        alt={title}
-        className="absolute inset-0 z-0 h-full w-full object-cover opacity-0 transition-all duration-700 group-hover:scale-110 group-hover:opacity-100"
-      />
-
-      <div className={`absolute inset-0 z-10 bg-gradient-to-br opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${t.hoverOverlay}`} />
-
-      <div className="relative z-20 flex h-full flex-col">
-        <div className="flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className={`text-base font-extrabold transition-colors duration-500 ${t.titleText}`}>
-              {title}
-            </h3>
-            {liveBadge && (
-              <div className="flex items-center gap-1.5 rounded-full bg-gray-100/80 px-2.5 py-0.5 text-[10px] font-bold text-gray-600 backdrop-blur-sm w-fit transition-all duration-300 group-hover:bg-white/20 group-hover:text-white">
-                <span className={`h-1.5 w-1.5 rounded-full ${liveStatusColor} ${isPulse ? 'trace-live-dot' : ''}`} />
-                {liveBadge}
-              </div>
-            )}
-          </div>
-
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-500 group-hover:rotate-12 group-hover:scale-110 ${t.iconBox}`}>
-            <Icon size={18} />
+          <div className="flex flex-wrap gap-6">
+            <StatusItem icon={Route} text="Trajectory Engine" />
+            <StatusItem icon={Activity} text="Traffic Engine" />
+            <StatusItem icon={ShieldAlert} text="Alert Service" />
           </div>
         </div>
-
-        <p className={`mt-2.5 max-w-[260px] text-[11.5px] leading-relaxed transition-colors duration-500 min-h-[44px] ${t.descText}`}>
-          {description}
-        </p>
-
-        <div className="mt-auto pt-5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick();
-            }}
-            className={`flex w-full items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-[13px] font-extrabold transition-all duration-500 ${t.btn}`}
-          >
-            {button} <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusItem({ icon: Icon, text }) {
-  return (
-    <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[1px] text-gray-500">
-      <Icon size={14} className="text-gray-400" />
-      {text}
+      </section>
     </div>
   );
 }

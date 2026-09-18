@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Activity,
   BarChart3,
   Gauge,
-  Map,
+  Map as MapIcon,
   MapPin,
   Search,
   TrafficCone,
@@ -11,13 +11,14 @@ import {
   Zap,
   AlertTriangle,
   ArrowRight,
-  Filter
+  Filter,
 } from "lucide-react";
-import { MapContainer, TileLayer, Circle, Popup } from "react-leaflet";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import Navbar from "../components/Navbar";
+import DeckGLMap from "../components/DeckGLMap";
 import { fetchTrafficCorridors, fetchTrafficOD } from "../api";
 
-// Mock Traffic Corridor Data with enhanced details
+// Mock Traffic Corridor Data
 const localCorridors = [
   {
     id: "COR-01",
@@ -28,7 +29,8 @@ const localCorridors = [
     trend: "+15%",
     lat: 17.4947,
     lng: 78.3996,
-    color: "#ef4444", // Red
+    color: "#ef4444",
+    rgb: [239, 68, 68],
     bottleneck: "Active Signal Jam",
     length: "1.4 km",
     duration: "45 mins",
@@ -42,7 +44,8 @@ const localCorridors = [
     trend: "+5%",
     lat: 17.4485,
     lng: 78.3742,
-    color: "#f97316", // Orange
+    color: "#f97316",
+    rgb: [249, 115, 22],
     bottleneck: "Peak Tech Outflow",
     length: "2.8 km",
     duration: "30 mins",
@@ -56,7 +59,8 @@ const localCorridors = [
     trend: "-2%",
     lat: 17.4682,
     lng: 78.4357,
-    color: "#eab308", // Yellow
+    color: "#eab308",
+    rgb: [234, 179, 8],
     bottleneck: "Heavy Transit Merging",
     length: "0.9 km",
     duration: "15 mins",
@@ -70,7 +74,8 @@ const localCorridors = [
     trend: "Stable",
     lat: 17.4985,
     lng: 78.3912,
-    color: "#22c55e", // Green
+    color: "#22c55e",
+    rgb: [34, 197, 94],
     bottleneck: "None",
     length: "0 km",
     duration: "0 mins",
@@ -89,14 +94,18 @@ export default function TrafficPage({ navigate, openModal }) {
   const [corridors, setCorridors] = useState(localCorridors);
   const [odRoutes, setOdRoutes] = useState(localOdRoutes);
   const [selectedCorridor, setSelectedCorridor] = useState(localCorridors[0]);
+  const [hoveredCorridor, setHoveredCorridor] = useState(null);
 
   // Fetch from API with fallback
   useEffect(() => {
     fetchTrafficCorridors().then((data) => {
-      if (data) { setCorridors(data); setSelectedCorridor(data[0]); }
+      if (data && data.length > 0) {
+        setCorridors(data);
+        setSelectedCorridor(data[0]);
+      }
     });
     fetchTrafficOD().then((data) => {
-      if (data) setOdRoutes(data);
+      if (data && data.length > 0) setOdRoutes(data);
     });
   }, []);
 
@@ -123,13 +132,62 @@ export default function TrafficPage({ navigate, openModal }) {
     corridor.status.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Deck.gl layers for corridor density hotspots
+  const layers = useMemo(() => {
+    // Outer halo layer
+    const haloLayer = new ScatterplotLayer({
+      id: "corridor-halo-layer",
+      data: corridors,
+      getPosition: (d) => [d.lng, d.lat],
+      getRadius: (d) => d.density * 16,
+      getFillColor: (d) => {
+        const rgb = d.rgb || [249, 115, 22];
+        return [...rgb, 40];
+      },
+      getLineColor: (d) => {
+        const rgb = d.rgb || [249, 115, 22];
+        return [...rgb, 120];
+      },
+      stroked: true,
+      lineWidthMinPixels: 1.5,
+      radiusMinPixels: 20,
+      radiusMaxPixels: 80,
+      pickable: false,
+    });
+
+    // Core marker layer
+    const coreLayer = new ScatterplotLayer({
+      id: "corridor-core-layer",
+      data: corridors,
+      getPosition: (d) => [d.lng, d.lat],
+      getRadius: (d) => 350,
+      getFillColor: (d) => {
+        const rgb = d.rgb || [249, 115, 22];
+        return [...rgb, 220];
+      },
+      getLineColor: [255, 255, 255, 220],
+      lineWidthMinPixels: 2,
+      stroked: true,
+      radiusMinPixels: 8,
+      radiusMaxPixels: 20,
+      pickable: true,
+      onClick: ({ object }) => {
+        if (object) setSelectedCorridor(object);
+      },
+      onHover: ({ object }) => {
+        setHoveredCorridor(object || null);
+      },
+    });
+
+    return [haloLayer, coreLayer];
+  }, [corridors]);
+
   return (
-    <div className="relative flex w-full flex-col gap-6 pb-10">
-      
-      {/* Background Blobs (Orange/Yellow Theme for Traffic) */}
+    <div className="relative flex w-full flex-col gap-6 pb-12 text-[var(--text-primary)]">
+      {/* Background Ambience */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-orange-300/25 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-yellow-300/25 mix-blend-multiply blur-[100px] filter" />
+        <div className="absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-orange-500/10 blur-[120px]" />
+        <div className="absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-blue-500/10 blur-[120px]" />
       </div>
 
       {/* Navbar */}
@@ -138,188 +196,241 @@ export default function TrafficPage({ navigate, openModal }) {
       </div>
 
       {/* Header Banner */}
-      <div className="fade-up delay-100 rounded-[24px] border border-white/60 bg-white/80 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-        <div className="flex items-center justify-between">
+      <div className="fade-up delay-100 glass-card-static p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-3 w-3 rounded-full bg-orange-500 trace-live-dot" />
-            <span className="text-xs font-extrabold uppercase tracking-widest text-orange-600">
+            <span className="live-dot bg-orange-500" style={{ boxShadow: "0 0 10px #f97316" }} />
+            <span className="text-xs font-black uppercase tracking-widest text-orange-400">
               Module 03: Macro Traffic Flow & Movement Analytics
             </span>
           </div>
           <button
-            onClick={() => openModal("Export Traffic Data", "City-wide traffic telemetry and CSV summary exported successfully.")}
-            className="rounded-xl bg-gray-900 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-gray-800 transition"
+            onClick={() =>
+              openModal(
+                "Export Traffic Telemetry",
+                "City-wide traffic telemetry and corridor CSV data exported successfully."
+              )
+            }
+            className="btn-glass text-xs px-4 py-2 self-start sm:self-auto"
           >
-            Export CSV Report
+            Export Telemetry CSV
           </button>
         </div>
-        <h1 className="text-2xl font-black tracking-tight text-gray-900 mt-1">
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)] mt-3">
           City-Wide Traffic Intelligence
         </h1>
-        <p className="text-xs text-gray-500 mt-1 max-w-[800px]">
-          Aggregated ANPR camera data visualizing city-wide traffic dynamics, density heatmaps, origin-destination patterns, and congestion bottlenecks.
+        <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-[850px] leading-relaxed">
+          Aggregated ANPR camera data visualizing city-wide traffic dynamics, WebGL density heatmaps,
+          origin-destination patterns, and congestion bottlenecks.
         </p>
       </div>
 
       {/* Metrics Row */}
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Network Average Speed" value="32 km/h" trend="-4% vs yesterday" icon={Gauge} color="text-blue-600" />
-        <MetricCard title="Active Bottlenecks" value="2 Severe" trend="Kukatpally & IT Corridor" icon={TrafficCone} color="text-orange-500" />
-        <MetricCard title="Vehicle Volume (1h)" value="14,280" trend="+12% Surge" icon={Activity} color="text-emerald-600" />
-        <MetricCard title="O-D Routes Tracked" value="1,402" trend="Cross-city analysis" icon={TrendingUp} color="text-purple-600" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="Network Average Speed"
+          value="32 km/h"
+          trend="-4% vs yesterday"
+          icon={Gauge}
+          color="text-blue-400"
+          accent="rgba(59,130,246,0.15)"
+        />
+        <MetricCard
+          title="Active Bottlenecks"
+          value="2 Severe"
+          trend="Kukatpally & IT Corridor"
+          icon={TrafficCone}
+          color="text-orange-400"
+          accent="rgba(249,115,22,0.15)"
+        />
+        <MetricCard
+          title="Vehicle Volume (1h)"
+          value="14,280"
+          trend="+12% Surge"
+          icon={Activity}
+          color="text-emerald-400"
+          accent="rgba(16,185,129,0.15)"
+        />
+        <MetricCard
+          title="O-D Routes Tracked"
+          value="1,402"
+          trend="Cross-city analysis"
+          icon={TrendingUp}
+          color="text-purple-400"
+          accent="rgba(139,92,246,0.15)"
+        />
       </div>
 
       {/* Main Grid: GIS Heatmap (Left) + Search & Corridors (Right) */}
       <div className="grid w-full gap-5 lg:grid-cols-[1.4fr_1fr] xl:grid-cols-[1.6fr_1fr]">
-        
-        {/* LEFT COLUMN: GIS Traffic Heatmap */}
-        <div className="fade-up delay-300 flex flex-col gap-5">
-          <div className="flex h-[500px] flex-col rounded-[28px] border border-white/80 bg-white/70 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+        {/* LEFT COLUMN: deck.gl Traffic Heatmap */}
+        <div className="fade-up delay-200 flex flex-col gap-4">
+          <div className="flex h-[520px] flex-col glass-card-static p-4">
             <div className="flex items-center justify-between mb-3 px-2">
               <div className="flex items-center gap-2">
-                <Map size={16} className="text-orange-500" />
-                <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">
-                  Live Density Heatmap
+                <MapIcon size={16} className="text-orange-400" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
+                  Live Corridor GIS Map (deck.gl)
                 </h3>
               </div>
-              <span className="flex items-center gap-1.5 rounded-full bg-orange-100 px-2 py-0.5 text-[9px] font-bold text-orange-600">
-                <Zap size={10} /> Auto-Sync Active
+              <span className="flex items-center gap-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-[10px] font-bold text-orange-400">
+                <Zap size={10} /> WebGL Accelerating
               </span>
             </div>
 
-            <div className="relative flex-1 w-full rounded-[20px] overflow-hidden border border-gray-200/60 shadow-inner z-10">
-              <MapContainer
-                center={[17.475, 78.41]}
-                zoom={12}
-                scrollWheelZoom={false}
-                style={{ width: "100%", height: "100%" }}
+            <div className="relative flex-1 w-full rounded-2xl overflow-hidden border border-[var(--border-subtle)]">
+              <DeckGLMap
+                layers={layers}
+                viewState={{
+                  longitude: 78.41,
+                  latitude: 17.478,
+                  zoom: 11.8,
+                  pitch: 30,
+                  bearing: 0,
+                }}
               >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+                {/* Floating Map Legend & Overlay */}
+                <div className="absolute top-4 left-4 p-3 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 max-w-xs pointer-events-auto">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: selectedCorridor.color }}
+                    />
+                    <span className="text-[11px] font-bold text-white truncate">
+                      {selectedCorridor.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-gray-300 gap-4 mt-1">
+                    <span>Speed: <strong className="text-white">{selectedCorridor.speed} km/h</strong></span>
+                    <span>Density: <strong className="text-white">{selectedCorridor.density}%</strong></span>
+                    <span className="text-orange-400 font-bold">{selectedCorridor.status}</span>
+                  </div>
+                </div>
 
-                {corridors.map((corridor) => (
-                  <Circle
-                    key={corridor.id}
-                    center={[corridor.lat, corridor.lng]}
-                    radius={corridor.density * 15} // Radius based on density
-                    pathOptions={{
-                      color: corridor.color,
-                      fillColor: corridor.color,
-                      fillOpacity: 0.4,
-                      weight: 2,
-                    }}
-                    eventHandlers={{
-                      click: () => setSelectedCorridor(corridor),
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-1">
-                        <h4 className="text-[11px] font-bold text-gray-900">{corridor.name}</h4>
-                        <p className="text-[10px] text-gray-500 mt-0.5">Speed: {corridor.speed} km/h</p>
-                        <p className="text-[10px] font-semibold" style={{ color: corridor.color }}>
-                          Status: {corridor.status}
-                        </p>
-                      </div>
-                    </Popup>
-                  </Circle>
-                ))}
-              </MapContainer>
+                {hoveredCorridor && hoveredCorridor.id !== selectedCorridor.id && (
+                  <div className="absolute bottom-4 left-4 p-2.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/15 pointer-events-none">
+                    <p className="text-[10px] font-bold text-white">{hoveredCorridor.name}</p>
+                    <p className="text-[9px] text-gray-400">Click to select corridor</p>
+                  </div>
+                )}
+              </DeckGLMap>
             </div>
           </div>
         </div>
 
         {/* RIGHT COLUMN: Search Bar & Corridor List */}
-        <div className="fade-up delay-200 flex flex-col gap-4">
-          
+        <div className="fade-up delay-300 flex flex-col gap-4">
           {/* Controls Bar - Search Bar */}
-          <div className="flex items-center gap-3 rounded-[20px] border border-white/80 bg-white/80 p-3 shadow-sm backdrop-blur-xl">
+          <div className="glass-card-static p-3">
             <div className="relative w-full">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
                 type="text"
                 placeholder="Search sector, corridor, or status..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-gray-200/80 bg-gray-50/50 pl-10 pr-4 py-2.5 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 transition-all"
+                className="glass-input w-full pl-10 pr-4 py-2.5 text-xs font-semibold"
               />
             </div>
           </div>
 
           {/* Corridor Cards List */}
-          <div className="flex flex-col gap-3.5 overflow-y-auto pr-1 pb-4" style={{ maxHeight: "440px" }}>
+          <div className="flex flex-col gap-3 overflow-y-auto pr-1 pb-2 custom-scrollbar" style={{ maxHeight: "440px" }}>
             {filteredCorridors.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-gray-300 bg-white/60 p-12 text-center text-xs font-bold text-gray-400">
+              <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-glass)] p-12 text-center text-xs font-bold text-[var(--text-muted)]">
                 No corridors match your search.
               </div>
             ) : (
-              filteredCorridors.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setSelectedCorridor(item)}
-                  className={`group relative flex flex-col gap-3 rounded-[24px] border bg-white/70 p-5 transition-all duration-300 cursor-pointer backdrop-blur-xl hover:bg-white hover:shadow-md ${selectedCorridor.id === item.id ? 'border-orange-500 ring-1 ring-orange-500' : 'border-white/80'}`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-sm font-black text-gray-900 tracking-tight">{item.name}</h4>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <MapPin size={12} className="text-gray-400" />
-                        <span className="text-[10px] font-bold text-gray-500">{item.id}</span>
+              filteredCorridors.map((item) => {
+                const isSelected = selectedCorridor.id === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedCorridor(item)}
+                    className={`glass-card p-4 flex flex-col gap-3 cursor-pointer transition-all duration-300 ${
+                      isSelected
+                        ? "border-orange-500/80 bg-orange-500/[0.06] shadow-[0_0_20px_rgba(249,115,22,0.15)]"
+                        : "hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="text-sm font-black text-[var(--text-primary)] tracking-tight">
+                          {item.name}
+                        </h4>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <MapPin size={12} className="text-[var(--text-muted)]" />
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)]">{item.id}</span>
+                        </div>
                       </div>
+                      <span
+                        className="rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white shadow-sm"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {item.status}
+                      </span>
                     </div>
-                    <span
-                      className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white shadow-sm"
-                      style={{ backgroundColor: item.color }}
-                    >
-                      {item.status}
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-extrabold text-gray-400 uppercase">Avg Speed</span>
-                      <span className="text-lg font-black text-gray-900">{item.speed} <span className="text-[10px] text-gray-500">km/h</span></span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-extrabold text-gray-400 uppercase">Density Index</span>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-lg font-black text-gray-900">{item.density}%</span>
-                        <span className={`text-[10px] font-bold ${item.trend.includes('+') ? 'text-red-500' : 'text-emerald-500'}`}>
-                          {item.trend}
+                    <div className="grid grid-cols-2 gap-2 border-t border-[var(--border-subtle)] pt-3">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-extrabold text-[var(--text-muted)] uppercase">
+                          Avg Speed
+                        </span>
+                        <span className="text-base font-black text-[var(--text-primary)]">
+                          {item.speed} <span className="text-[10px] text-[var(--text-secondary)]">km/h</span>
                         </span>
                       </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-extrabold text-[var(--text-muted)] uppercase">
+                          Density Index
+                        </span>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-base font-black text-[var(--text-primary)]">{item.density}%</span>
+                          <span
+                            className={`text-[10px] font-bold ${
+                              item.trend.includes("+") ? "text-red-400" : "text-emerald-400"
+                            }`}
+                          >
+                            {item.trend}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
-
       </div>
 
-      {/* NEW SECTION: Origin-Destination & Corridor Analysis Breakdown */}
+      {/* Origin-Destination & Corridor Analysis Breakdown */}
       <div className="grid w-full gap-5 lg:grid-cols-2">
-        
         {/* Origin-Destination Patterns */}
-        <div className="rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+        <div className="glass-card-static p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <TrendingUp size={18} className="text-purple-600" />
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">Origin–Destination (O-D) Flows</h3>
+              <TrendingUp size={18} className="text-purple-400" />
+              <h3 className="text-sm font-black uppercase tracking-wide text-[var(--text-primary)]">
+                Origin–Destination (O-D) Flows
+              </h3>
             </div>
-            <span className="text-[10px] font-bold text-gray-400">Sector-to-Sector Movement</span>
+            <span className="text-[10px] font-bold text-[var(--text-muted)]">
+              Sector-to-Sector Movement
+            </span>
           </div>
           <div className="flex flex-col gap-3">
             {odRoutes.map((route, idx) => (
-              <div key={idx} className="flex items-center justify-between rounded-2xl bg-white/80 p-4 border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-2 font-bold text-xs text-gray-800">
+              <div
+                key={idx}
+                className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-[var(--border-subtle)] p-3.5 transition-colors hover:bg-white/[0.04]"
+              >
+                <div className="flex items-center gap-2 font-bold text-xs text-[var(--text-primary)]">
                   <span>{route.origin}</span>
-                  <ArrowRight size={14} className="text-purple-500" />
+                  <ArrowRight size={14} className="text-purple-400" />
                   <span>{route.destination}</span>
                 </div>
-                <span className="font-mono text-xs font-black text-purple-600 bg-purple-50 px-3 py-1 rounded-lg">
+                <span className="font-mono text-xs font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-lg">
                   {route.count}
                 </span>
               </div>
@@ -328,59 +439,66 @@ export default function TrafficPage({ navigate, openModal }) {
         </div>
 
         {/* Selected Corridor Deep-Dive Analysis */}
-        <div className="rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+        <div className="glass-card-static p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <TrafficCone size={18} className="text-orange-500" />
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">Corridor Bottleneck Analysis</h3>
+              <TrafficCone size={18} className="text-orange-400" />
+              <h3 className="text-sm font-black uppercase tracking-wide text-[var(--text-primary)]">
+                Corridor Bottleneck Analysis
+              </h3>
             </div>
-            <span className="font-mono text-xs font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md">{selectedCorridor.id}</span>
+            <span className="font-mono text-xs font-black text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-md">
+              {selectedCorridor.id}
+            </span>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between rounded-2xl bg-white/80 p-4 border border-gray-100 shadow-sm">
-              <span className="text-xs font-bold text-gray-500">Selected Corridor Name:</span>
-              <span className="text-xs font-black text-gray-900">{selectedCorridor.name}</span>
+          <div className="flex flex-col gap-3.5">
+            <div className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-[var(--border-subtle)] p-3.5">
+              <span className="text-xs font-bold text-[var(--text-secondary)]">Corridor Name:</span>
+              <span className="text-xs font-black text-[var(--text-primary)]">{selectedCorridor.name}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col rounded-2xl bg-white/80 p-3.5 border border-gray-100 shadow-sm">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Bottleneck Status</span>
-                <span className="text-xs font-black text-red-600 mt-1 flex items-center gap-1">
+              <div className="flex flex-col rounded-xl bg-white/[0.02] border border-[var(--border-subtle)] p-3.5">
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Bottleneck Status</span>
+                <span className="text-xs font-black text-red-400 mt-1 flex items-center gap-1">
                   <AlertTriangle size={14} /> {selectedCorridor.bottleneck}
                 </span>
               </div>
-              <div className="flex flex-col rounded-2xl bg-white/80 p-3.5 border border-gray-100 shadow-sm">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Congested Road Length</span>
-                <span className="text-xs font-black text-gray-900 mt-1">{selectedCorridor.length}</span>
+              <div className="flex flex-col rounded-xl bg-white/[0.02] border border-[var(--border-subtle)] p-3.5">
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Congested Length</span>
+                <span className="text-xs font-black text-[var(--text-primary)] mt-1">{selectedCorridor.length}</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl bg-white/80 p-4 border border-gray-100 shadow-sm">
-              <span className="text-xs font-bold text-gray-500">Estimated Delay Duration:</span>
-              <span className="text-xs font-black text-orange-600">{selectedCorridor.duration} peak delay</span>
+            <div className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-[var(--border-subtle)] p-3.5">
+              <span className="text-xs font-bold text-[var(--text-secondary)]">Estimated Delay Duration:</span>
+              <span className="text-xs font-black text-orange-400">{selectedCorridor.duration} peak delay</span>
             </div>
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }
 
-function MetricCard({ title, value, trend, icon: Icon, color }) {
+function MetricCard({ title, value, trend, icon: Icon, color, accent }) {
   return (
-    <div className="rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-transform hover:-translate-y-1">
+    <div className="glass-card p-5 flex flex-col justify-between">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">{title}</span>
-        <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 ${color}`}>
+        <span className="text-[11px] font-extrabold text-[var(--text-muted)] uppercase tracking-wider">
+          {title}
+        </span>
+        <div
+          className={`flex h-8 w-8 items-center justify-center rounded-xl ${color}`}
+          style={{ background: accent }}
+        >
           <Icon size={16} />
         </div>
       </div>
       <div className="mt-3 flex items-baseline justify-between">
-        <h2 className="text-xl font-black text-gray-900 tracking-tight">{value}</h2>
-        <span className="text-[10px] font-bold text-gray-500 truncate ml-2">{trend}</span>
+        <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">{value}</h2>
+        <span className="text-[10px] font-bold text-[var(--text-secondary)] truncate ml-2">{trend}</span>
       </div>
     </div>
   );

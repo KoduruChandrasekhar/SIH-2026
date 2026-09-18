@@ -18,18 +18,11 @@ import {
   X,
   Zap,
   Network,
-  Play
+  Play,
 } from "lucide-react";
-import {
-  MapContainer,
-  Marker,
-  Polyline,
-  Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
-import L from "leaflet";
+import { ScatterplotLayer, PathLayer } from "@deck.gl/layers";
 import Navbar from "../components/Navbar";
+import DeckGLMap from "../components/DeckGLMap";
 import { fetchVehicles } from "../api";
 
 // Import demo data
@@ -43,7 +36,7 @@ import {
   DEMO_OCR_EVIDENCE,
   CAMERA_NETWORK_NODES,
   DEMO_ROUTE_PATH,
-  formatConfidence
+  formatConfidence,
 } from "../demoData";
 
 // Import new components
@@ -63,7 +56,7 @@ const localVehicles = {
     color: DEMO_VEHICLE.vehicleColor,
     confidence: formatConfidence(DEMO_VEHICLE.ocrConfidence),
     status: DEMO_VEHICLE.status,
-    badge: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     expected: "Kukatpally → Balanagar → Madhapur",
     actual: "Kukatpally → Begumpet → Madhapur",
     deviation: "Yes (+3.2 km detour via Begumpet)",
@@ -72,7 +65,7 @@ const localVehicles = {
     transitions: "3",
     fastest: "48 km/h",
     slowest: "28 km/h",
-    hops: DEMO_OBSERVATIONS.map(obs => [
+    hops: DEMO_OBSERVATIONS.map((obs) => [
       obs.camera,
       obs.name,
       obs.time,
@@ -81,7 +74,7 @@ const localVehicles = {
       obs.direction,
       obs.distance,
       obs.lat,
-      obs.lng
+      obs.lng,
     ]),
   },
   TS08EJ4892: {
@@ -90,7 +83,7 @@ const localVehicles = {
     color: "Black",
     confidence: "96.4%",
     status: "STALE",
-    badge: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    badge: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     expected: "Balanagar → Kukatpally",
     actual: "Balanagar → Kukatpally",
     deviation: "None (Standard Corridor)",
@@ -98,92 +91,34 @@ const localVehicles = {
     reid: "95.6%",
     transitions: "2",
     fastest: "48 km/h",
-    slowest: "28 km/h",
+    slowest: "24 km/h",
     hops: [
-      ["CAM #403", "Balanagar Main Road Circle", "16:15:20", "48 km/h", "96.4%", "South", "0 km", 17.4682, 78.4357],
-      ["CAM #402", "Kukatpally Metro Station", "16:32:45", "28 km/h", "94.2%", "North", "3.8 km", 17.4947, 78.3996],
-      ["CAM #401", "Kukatpally Flyover Junction", "16:50:10", "34 km/h", "95.1%", "North-West", "4.6 km", 17.4985, 78.3912],
+      ["CAM-05", "Balanagar Industrial", "10:15 PM", "48 km/h", "98.1%", "North-West", "0.0 km", 17.4682, 78.4357],
+      ["CAM-03", "KPHB Colony Phase 1", "10:32 PM", "36 km/h", "95.4%", "West", "4.8 km", 17.4855, 78.3895],
+      ["CAM-01", "Kukatpally Y-Junction", "10:50 PM", "24 km/h", "96.4%", "North", "3.6 km", 17.4947, 78.3996],
     ],
   },
-  TS09EE9911: {
-    plate: "TS09EE9911",
-    type: "SUV",
-    color: "White",
-    confidence: "98.1%",
-    status: "ALERT",
-    badge: "bg-red-500/10 text-red-600 border-red-500/20",
-    expected: "Cyberabad → Miyapur",
-    actual: "Cyberabad → JNTU → Miyapur",
-    deviation: "Suspected Evasion Route",
-    stats: ["3", "15.2 km", "70 min", "62 km/h"],
-    reid: "96.9%",
-    transitions: "2",
-    fastest: "70 km/h",
-    slowest: "52 km/h",
-    hops: [
-      ["CAM #101", "Cyberabad IT Corridor", "14:10:05", "65 km/h", "98.1%", "West", "0 km", 17.4485, 78.3742],
-      ["CAM #105", "JNTU Junction", "14:45:20", "52 km/h", "97.5%", "North", "6.1 km", 17.4925, 78.393],
-      ["CAM #112", "Miyapur Metro Station", "15:20:00", "70 km/h", "96.8%", "North-West", "9.1 km", 17.4968, 78.3522],
-    ],
-  },
-  AP28BY5521: {
-    plate: "AP28BY5521",
-    type: "Sports Coupe",
+  AP09CP2034: {
+    plate: "AP09CP2034",
+    type: "Truck",
     color: "Red",
-    confidence: "99.0%",
-    status: "COMPLETED",
-    badge: "bg-gray-500/10 text-gray-600 border-gray-500/20",
-    expected: "Begumpet → Ameerpet",
-    actual: "Begumpet → Ameerpet",
-    deviation: "None",
-    stats: ["2", "4.5 km", "17 min", "88 km/h"],
-    reid: "98.4%",
+    confidence: "94.8%",
+    status: "ACTIVE",
+    badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    expected: "Miyapur → Kukatpally",
+    actual: "Miyapur → Kukatpally",
+    deviation: "None (Direct Route)",
+    stats: ["2", "5.1 km", "18 min", "32 km/h"],
+    reid: "93.2%",
     transitions: "1",
-    fastest: "92 km/h",
-    slowest: "84 km/h",
+    fastest: "38 km/h",
+    slowest: "26 km/h",
     hops: [
-      ["CAM #201", "Begumpet Flyover North", "11:05:12", "92 km/h", "99.0%", "South", "0 km", 17.4439, 78.4684],
-      ["CAM #204", "Ameerpet Crossroads", "11:22:40", "84 km/h", "97.2%", "West", "4.5 km", 17.4375, 78.4482],
+      ["CAM-04", "Miyapur X-Roads", "10:20 PM", "38 km/h", "94.8%", "South-East", "0.0 km", 17.4968, 78.3614],
+      ["CAM-02", "JNTU Main Road", "10:38 PM", "26 km/h", "95.1%", "East", "5.1 km", 17.4985, 78.3912],
     ],
   },
 };
-
-function FitRoute({ points, trigger }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!points.length) return;
-    map.fitBounds(L.latLngBounds(points), { padding: [35, 35], maxZoom: 14, animate: true });
-  }, [map, points, trigger]);
-  return null;
-}
-
-function cameraMarkerIcon(status) {
-  let bg = status === 'active' ? '#06b6d4' : status === 'visited' ? '#3b82f6' : '#6b7280';
-  let size = status === 'active' ? 24 : status === 'visited' ? 16 : 12;
-  let pulseHtml = status === 'active' ? `<div style="position:absolute;width:100%;height:100%;border-radius:50%;background:#06b6d4;animation:tracePulse 1.5s infinite"></div>` : '';
-  
-  return L.divIcon({
-    className: "",
-    html: `<div style="position:relative;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;">
-            ${pulseHtml}
-            <div style="position:relative;z-index:10;width:100%;height:100%;border-radius:50%;background:${bg};border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.25);"></div>
-           </div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
-
-function vehicleMarkerIcon() {
-  return L.divIcon({
-    className: "",
-    html: `<div style="position:relative;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">
-            <div style="position:absolute;width:100%;height:100%;border-radius:50%;background:#f59e0b;animation:tracePulse 1s infinite"></div>
-            <div style="position:relative;z-index:10;width:12px;height:12px;border-radius:50%;background:#ea580c;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);"></div>
-           </div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  });
-}
 
 export default function TrackingPage({ navigate, openModal }) {
   const [query, setQuery] = useState(DEMO_PLATE);
@@ -191,18 +126,17 @@ export default function TrackingPage({ navigate, openModal }) {
   const [selected, setSelected] = useState(null);
   const [live, setLive] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [fit, setFit] = useState(0);
   const [vehicles, setVehiclesData] = useState(localVehicles);
   const apiLoaded = useRef(false);
 
-  // New states for advanced tracking
-  const [playbackState, setPlaybackState] = useState('idle'); // idle | playing | paused | complete
+  // States for advanced tracking
+  const [playbackState, setPlaybackState] = useState("idle"); // idle | playing | paused | complete
   const [currentHopIndex, setCurrentHopIndex] = useState(-1);
   const [segmentProgress, setSegmentProgress] = useState(0);
   const [visiblePolyline, setVisiblePolyline] = useState([]);
   const [vehiclePosition, setVehiclePosition] = useState(null);
   const [activePanel, setActivePanel] = useState(null); // 'reid' | 'ocr' | 'handoff' | null
-  const [handoffStage, setHandoffStage] = useState('idle');
+  const [handoffStage, setHandoffStage] = useState("idle");
   const [reidActive, setReidActive] = useState(false);
   const [ocrActive, setOcrActive] = useState(false);
   const [parallelActive, setParallelActive] = useState(false);
@@ -211,7 +145,7 @@ export default function TrackingPage({ navigate, openModal }) {
   const [showGraph, setShowGraph] = useState(false);
   const [isDemoVehicle, setIsDemoVehicle] = useState(true);
 
-  // Refs for animation timers
+  // Animation timers
   const playbackTimer = useRef(null);
   const animationTimer = useRef(null);
 
@@ -225,8 +159,13 @@ export default function TrackingPage({ navigate, openModal }) {
     });
   }, []);
 
-  const vehicle = vehicles[plate];
-  const points = useMemo(() => vehicle.hops.map((h) => [h[7], h[8]]), [vehicle]);
+  const vehicle = vehicles[plate] || localVehicles[DEMO_PLATE];
+
+  // deck.gl uses [lng, lat] coordinate format
+  const deckPoints = useMemo(
+    () => vehicle.hops.map((h) => [h[8], h[7]]),
+    [vehicle]
+  );
 
   const search = (e) => {
     e.preventDefault();
@@ -242,7 +181,6 @@ export default function TrackingPage({ navigate, openModal }) {
     setSelected(null);
     setIsDemoVehicle(key === DEMO_PLATE);
     resetPlayback();
-    setFit((v) => v + 1);
   };
 
   const selectVehicle = (p) => {
@@ -251,17 +189,16 @@ export default function TrackingPage({ navigate, openModal }) {
     setSelected(null);
     setIsDemoVehicle(p === DEMO_PLATE);
     resetPlayback();
-    setFit((v) => v + 1);
   };
 
   const resetPlayback = useCallback(() => {
-    setPlaybackState('idle');
+    setPlaybackState("idle");
     setCurrentHopIndex(-1);
     setSegmentProgress(0);
     setVisiblePolyline([]);
     setVehiclePosition(null);
     setActivePanel(null);
-    setHandoffStage('idle');
+    setHandoffStage("idle");
     setReidActive(false);
     setOcrActive(false);
     setParallelActive(false);
@@ -276,15 +213,14 @@ export default function TrackingPage({ navigate, openModal }) {
       setLive(!live);
       return;
     }
-    if (playbackState === 'complete') {
+    if (playbackState === "complete") {
       resetPlayback();
     }
-    setPlaybackState('playing');
-    setFit(v => v + 1); // Reset map view
+    setPlaybackState("playing");
   };
 
   const pausePlayback = () => {
-    setPlaybackState('paused');
+    setPlaybackState("paused");
     clearTimeout(playbackTimer.current);
     clearInterval(animationTimer.current);
   };
@@ -293,20 +229,20 @@ export default function TrackingPage({ navigate, openModal }) {
     resetPlayback();
     setCurrentHopIndex(index);
     setSegmentProgress(0);
-    setVisiblePolyline(points.slice(0, index + 1));
-    setVehiclePosition(points[index]);
-    setPlaybackState('paused');
+    setVisiblePolyline(deckPoints.slice(0, index + 1));
+    setVehiclePosition(deckPoints[index]);
+    setPlaybackState("paused");
   };
 
   // Main playback logic loop
   useEffect(() => {
-    if (playbackState !== 'playing' || !isDemoVehicle) return;
+    if (playbackState !== "playing" || !isDemoVehicle) return;
 
     const playNextHop = () => {
       let nextIndex = currentHopIndex + 1;
-      
+
       if (nextIndex >= DEMO_OBSERVATIONS.length) {
-        setPlaybackState('complete');
+        setPlaybackState("complete");
         setParallelActive(false);
         setActivePanel(null);
         return;
@@ -314,24 +250,24 @@ export default function TrackingPage({ navigate, openModal }) {
 
       const isFirstHop = nextIndex === 0;
 
-      // Phase 1: Camera Handoff (if not first)
+      // Camera Handoff if not first hop
       if (!isFirstHop) {
-        setActivePanel('handoff');
-        setHandoffStage('leaving');
+        setActivePanel("handoff");
+        setHandoffStage("leaving");
         setParallelActive(true);
         setIdentityProgress(0);
         setMacroProgress(1);
 
         playbackTimer.current = setTimeout(() => {
-          setHandoffStage('searching');
+          setHandoffStage("searching");
           setMacroProgress(2);
-          
+
           playbackTimer.current = setTimeout(() => {
-            setHandoffStage('found');
-            
+            setHandoffStage("found");
+
             playbackTimer.current = setTimeout(() => {
-              setHandoffStage('confirmed');
-              
+              setHandoffStage("confirmed");
+
               playbackTimer.current = setTimeout(() => {
                 startReIDPhase(nextIndex);
               }, 1000);
@@ -341,12 +277,12 @@ export default function TrackingPage({ navigate, openModal }) {
       } else {
         // First hop setup
         setCurrentHopIndex(0);
-        setVisiblePolyline([points[0]]);
-        setVehiclePosition(points[0]);
+        setVisiblePolyline([deckPoints[0]]);
+        setVehiclePosition(deckPoints[0]);
         setParallelActive(true);
         setIdentityProgress(1);
         setMacroProgress(1);
-        setActivePanel('ocr');
+        setActivePanel("ocr");
         setOcrActive(true);
 
         playbackTimer.current = setTimeout(() => {
@@ -356,7 +292,7 @@ export default function TrackingPage({ navigate, openModal }) {
             setIdentityProgress(3);
             setMacroProgress(3);
             playbackTimer.current = setTimeout(() => {
-               playNextHop();
+              playNextHop();
             }, 2000);
           }, 1500);
         }, 3000);
@@ -364,7 +300,7 @@ export default function TrackingPage({ navigate, openModal }) {
     };
 
     const startReIDPhase = (nextIndex) => {
-      setActivePanel('reid');
+      setActivePanel("reid");
       setReidActive(true);
       setIdentityProgress(2);
       setMacroProgress(3);
@@ -372,18 +308,16 @@ export default function TrackingPage({ navigate, openModal }) {
       playbackTimer.current = setTimeout(() => {
         setIdentityProgress(3);
         setMacroProgress(4);
-        
-        // Start movement animation
         animateMovement(currentHopIndex, nextIndex);
-      }, 3000); // ReID takes about 3s
+      }, 3000);
     };
 
     const animateMovement = (fromIdx, toIdx) => {
       setActivePanel(null);
       setCurrentHopIndex(toIdx);
-      
-      const startPt = points[fromIdx];
-      const endPt = points[toIdx];
+
+      const startPt = deckPoints[fromIdx];
+      const endPt = deckPoints[toIdx];
       let startTime = Date.now();
       const duration = 2000;
 
@@ -391,30 +325,27 @@ export default function TrackingPage({ navigate, openModal }) {
       animationTimer.current = setInterval(() => {
         const elapsed = Date.now() - startTime;
         let progress = elapsed / duration;
-        
+
         if (progress >= 1) {
           progress = 1;
           clearInterval(animationTimer.current);
           setSegmentProgress(0);
-          setVisiblePolyline(points.slice(0, toIdx + 1));
+          setVisiblePolyline(deckPoints.slice(0, toIdx + 1));
           setVehiclePosition(endPt);
-          
+
           playbackTimer.current = setTimeout(() => {
             playNextHop();
           }, 1000);
         } else {
           setSegmentProgress(progress);
-          const currentLat = startPt[0] + (endPt[0] - startPt[0]) * progress;
-          const currentLng = startPt[1] + (endPt[1] - startPt[1]) * progress;
-          setVehiclePosition([currentLat, currentLng]);
-          
-          // Progressive polyline
-          setVisiblePolyline([...points.slice(0, fromIdx + 1), [currentLat, currentLng]]);
+          const currentLng = startPt[0] + (endPt[0] - startPt[0]) * progress;
+          const currentLat = startPt[1] + (endPt[1] - startPt[1]) * progress;
+          setVehiclePosition([currentLng, currentLat]);
+          setVisiblePolyline([...deckPoints.slice(0, fromIdx + 1), [currentLng, currentLat]]);
         }
       }, 20);
     };
 
-    // Kick off if just started
     if (currentHopIndex === -1 && segmentProgress === 0) {
       playNextHop();
     } else if (currentHopIndex >= 0 && currentHopIndex < DEMO_OBSERVATIONS.length - 1 && segmentProgress === 0) {
@@ -425,8 +356,7 @@ export default function TrackingPage({ navigate, openModal }) {
       clearTimeout(playbackTimer.current);
       clearInterval(animationTimer.current);
     };
-  }, [playbackState, currentHopIndex, isDemoVehicle, points]);
-
+  }, [playbackState, currentHopIndex, isDemoVehicle, deckPoints]);
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -448,7 +378,9 @@ export default function TrackingPage({ navigate, openModal }) {
 
   const exportCSV = () => {
     const header = "Plate,Camera,Location,Time,Speed,OCR,Direction,Distance,Latitude,Longitude";
-    const rows = vehicle.hops.map((h) => `"${vehicle.plate}","${h[0]}","${h[1]}","${h[2]}","${h[3]}","${h[4]}","${h[5]}","${h[6]}",${h[7]},${h[8]}`);
+    const rows = vehicle.hops.map(
+      (h) => `"${vehicle.plate}","${h[0]}","${h[1]}","${h[2]}","${h[3]}","${h[4]}","${h[5]}","${h[6]}",${h[7]},${h[8]}`
+    );
     const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -458,65 +390,156 @@ export default function TrackingPage({ navigate, openModal }) {
     URL.revokeObjectURL(url);
   };
 
-  // Helper for tracking page map markers
+  // Status helper for camera markers
   const getCameraStatus = (camId) => {
-    if (!isDemoVehicle) return vehicle.hops.some(h => h[0] === camId) ? 'visited' : 'unvisited';
-    
-    const obsIndex = DEMO_OBSERVATIONS.findIndex(o => o.camera === camId);
-    if (obsIndex === -1) return 'unvisited';
-    
-    if (obsIndex === currentHopIndex) return 'active';
-    if (obsIndex < currentHopIndex || playbackState === 'complete') return 'visited';
-    return 'unvisited';
+    if (!isDemoVehicle) return vehicle.hops.some((h) => h[0] === camId) ? "visited" : "unvisited";
+    const obsIndex = DEMO_OBSERVATIONS.findIndex((o) => o.camera === camId);
+    if (obsIndex === -1) return "unvisited";
+    if (obsIndex === currentHopIndex) return "active";
+    if (obsIndex < currentHopIndex || playbackState === "complete") return "visited";
+    return "unvisited";
   };
 
+  // deck.gl Layers for GIS Trajectory Map
+  const mapLayers = useMemo(() => {
+    // 1. Full Planned Route (subdued line)
+    const plannedRouteLayer = new PathLayer({
+      id: "tracking-planned-route",
+      data: deckPoints.length > 1 ? [{ path: deckPoints }] : [],
+      getPath: (d) => d.path,
+      getColor: [148, 163, 184, 100],
+      getWidth: 3,
+      widthMinPixels: 2,
+    });
+
+    // 2. Active Animated Route
+    const activeRoutePoints = isDemoVehicle ? visiblePolyline : deckPoints;
+    const activeRouteLayer = new PathLayer({
+      id: "tracking-active-route",
+      data: activeRoutePoints.length > 1 ? [{ path: activeRoutePoints }] : [],
+      getPath: (d) => d.path,
+      getColor: [59, 130, 246, 240],
+      getWidth: 4.5,
+      widthMinPixels: 3,
+    });
+
+    // 3. Camera Nodes
+    const relevantCameraNodes = CAMERA_NETWORK_NODES.filter((node) => {
+      const status = getCameraStatus(node.id);
+      if (status === "unvisited" && !isDemoVehicle) return false;
+      return true;
+    });
+
+    const cameraHalos = new ScatterplotLayer({
+      id: "tracking-cam-halos",
+      data: relevantCameraNodes.filter((n) => getCameraStatus(n.id) === "active"),
+      getPosition: (d) => [d.lng, d.lat],
+      getRadius: 450,
+      getFillColor: [6, 182, 212, 60],
+      getLineColor: [6, 182, 212, 180],
+      stroked: true,
+      lineWidthMinPixels: 2,
+      radiusMinPixels: 18,
+      radiusMaxPixels: 35,
+      pickable: false,
+    });
+
+    const cameraNodes = new ScatterplotLayer({
+      id: "tracking-cam-nodes",
+      data: relevantCameraNodes,
+      getPosition: (d) => [d.lng, d.lat],
+      getRadius: 280,
+      getFillColor: (d) => {
+        const s = getCameraStatus(d.id);
+        if (s === "active") return [6, 182, 212, 255];
+        if (s === "visited") return [59, 130, 246, 240];
+        return [75, 85, 99, 180];
+      },
+      getLineColor: [255, 255, 255, 240],
+      lineWidthMinPixels: 2,
+      stroked: true,
+      radiusMinPixels: 7,
+      radiusMaxPixels: 15,
+      pickable: true,
+    });
+
+    // 4. Vehicle Marker
+    const vehicleMarker = vehiclePosition
+      ? new ScatterplotLayer({
+          id: "tracking-vehicle-marker",
+          data: [{ position: vehiclePosition }],
+          getPosition: (d) => d.position,
+          getRadius: 400,
+          getFillColor: [245, 158, 11, 255],
+          getLineColor: [255, 255, 255, 255],
+          lineWidthMinPixels: 2.5,
+          stroked: true,
+          radiusMinPixels: 10,
+          radiusMaxPixels: 20,
+          pickable: true,
+        })
+      : null;
+
+    return [plannedRouteLayer, activeRouteLayer, cameraHalos, cameraNodes, vehicleMarker].filter(Boolean);
+  }, [deckPoints, visiblePolyline, isDemoVehicle, vehiclePosition, currentHopIndex, playbackState]);
+
   return (
-    <div className="tracking-page flex w-full flex-col gap-5 pb-10">
+    <div className="tracking-page flex w-full flex-col gap-6 pb-12 text-[var(--text-primary)]">
       <div className="fade-up">
         <Navbar page="tracking" navigate={navigate} openModal={openModal} />
       </div>
 
       {/* 1. Vehicle / Plate Search Header */}
-      <section className="fade-up delay-100 rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl">
+      <section className="fade-up delay-100 glass-card-static p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <div className="mb-1 flex items-center gap-2">
-              <span className="trace-live-dot h-2.5 w-2.5 rounded-full bg-blue-600" />
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-blue-600">
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="live-dot bg-blue-500" style={{ boxShadow: "0 0 10px #3b82f6" }} />
+              <span className="text-[11px] font-black uppercase tracking-widest text-blue-400">
                 Module 02 · Spatial-Temporal Trajectory Tracking
               </span>
             </div>
-            <h1 className="text-2xl font-black tracking-tight">Single Plate Trajectory Reconstructor</h1>
-            <p className="mt-1 text-xs text-gray-500">Search plates, view camera hops, and verify multi-camera re-identification.</p>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
+              Single Plate Trajectory Reconstructor
+            </h1>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Search plates, view camera hops, and verify multi-camera re-identification.
+            </p>
           </div>
 
           <form onSubmit={search} className="flex gap-2">
             <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="License plate..."
-                className="w-[210px] rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-xs font-bold font-mono outline-none focus:border-blue-500"
+                className="glass-input w-[210px] pl-9 pr-8 text-xs font-bold font-mono"
               />
               {query && (
-                <button type="button" onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-white"
+                >
                   <X size={13} />
                 </button>
               )}
             </div>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={startPlayback}
-              className={`rounded-xl px-5 py-2.5 text-xs font-bold text-white transition-all flex items-center gap-2 ${
-                playbackState === 'playing' ? 'bg-amber-500 hover:bg-amber-600 animate-pulse' :
-                playbackState === 'complete' ? 'bg-emerald-600 hover:bg-emerald-700' :
-                'bg-blue-600 hover:bg-blue-700'
+              className={`rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white transition-all flex items-center gap-2 shadow-lg ${
+                playbackState === "playing"
+                  ? "bg-amber-500 hover:bg-amber-600 animate-pulse shadow-amber-500/25"
+                  : playbackState === "complete"
+                  ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/25"
+                  : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/25"
               }`}
             >
-              {playbackState === 'playing' ? (
+              {playbackState === "playing" ? (
                 <>TRACING...</>
-              ) : playbackState === 'complete' ? (
+              ) : playbackState === "complete" ? (
                 <>REPLAY JOURNEY</>
               ) : (
                 <>TRACE VEHICLE</>
@@ -526,13 +549,19 @@ export default function TrackingPage({ navigate, openModal }) {
         </div>
 
         {/* Quick Sample Plates */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-400">Sample Plates:</span>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
+            Sample Plates:
+          </span>
           {Object.keys(vehicles).map((p) => (
             <button
               key={p}
               onClick={() => selectVehicle(p)}
-              className={`rounded-lg px-2.5 py-1 font-mono text-[10px] font-bold ${plate === p ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              className={`rounded-lg px-2.5 py-1 font-mono text-[10px] font-bold transition-all ${
+                plate === p
+                  ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                  : "bg-white/[0.04] text-[var(--text-secondary)] hover:bg-white/[0.08] hover:text-white"
+              }`}
             >
               {p}
             </button>
@@ -551,105 +580,99 @@ export default function TrackingPage({ navigate, openModal }) {
 
       {/* Main Map & Side Panel */}
       <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-        <section className="fade-up delay-200 flex h-[640px] flex-col rounded-[26px] border border-white/80 bg-white/70 p-3 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl">
+        <section className="fade-up delay-200 flex h-[640px] flex-col glass-card-static p-4">
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
-              <MapPin size={15} className="text-blue-600" />
-              <h3 className="text-[10px] font-extrabold uppercase tracking-wider">GIS Trajectory Map</h3>
+              <MapPin size={15} className="text-blue-400" />
+              <h3 className="text-[11px] font-black uppercase tracking-wider text-[var(--text-primary)]">
+                GIS Trajectory Map (deck.gl)
+              </h3>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setShowGraph(!showGraph)} className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[9px] font-bold text-gray-600 hover:bg-gray-50">
-                <Network size={11} className={showGraph ? "text-blue-600" : ""} /> Graph
-              </button>
-              <button onClick={() => setFit((v) => v + 1)} className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[9px] font-bold text-gray-600 hover:bg-gray-50">
-                <Target size={11} /> Fit
+              <button
+                onClick={() => setShowGraph(!showGraph)}
+                className="btn-glass flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold"
+              >
+                <Network size={11} className={showGraph ? "text-cyan-400" : ""} /> Graph
               </button>
             </div>
           </div>
 
-          <div className="relative flex-1 overflow-hidden rounded-[18px] border border-gray-200">
-            <MapContainer center={points[0]} zoom={13} scrollWheelZoom style={{ width: "100%", height: "100%" }}>
-              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <FitRoute points={points} trigger={fit} />
-              
-              {/* Full planned route (subdued) */}
-              <Polyline positions={points} pathOptions={{ color: "#9ca3af", weight: 3, opacity: 0.5, dashArray: "4 8" }} />
-              
-              {/* Active animated route */}
-              {(isDemoVehicle ? visiblePolyline.length > 0 : true) && (
-                <Polyline 
-                  positions={isDemoVehicle ? visiblePolyline : points} 
-                  pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.9, dashArray: "8 7" }} 
-                />
-              )}
-
-              {/* All Camera Nodes */}
-              {CAMERA_NETWORK_NODES.map((node) => {
-                const status = getCameraStatus(node.id);
-                if (status === 'unvisited' && !isDemoVehicle) return null; // Only show visited for non-demo
-                
-                return (
-                  <Marker 
-                    key={node.id} 
-                    position={[node.lat, node.lng]} 
-                    icon={cameraMarkerIcon(status)}
-                  >
-                    <Popup>
-                      <div className="min-w-[170px] p-1">
-                        <div className="flex justify-between">
-                          <b className="font-mono text-[10px] text-blue-600">{node.id}</b>
-                        </div>
-                        <p className="mt-1 text-xs font-bold">{node.name}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              })}
-
-              {/* Animated Vehicle Marker */}
-              {isDemoVehicle && vehiclePosition && (
-                <Marker position={vehiclePosition} icon={vehicleMarkerIcon()} zIndexOffset={1000} />
-              )}
-            </MapContainer>
+          <div className="relative flex-1 overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
+            <DeckGLMap
+              layers={mapLayers}
+              viewState={{
+                longitude: 78.405,
+                latitude: 17.485,
+                zoom: 12.8,
+                pitch: 30,
+                bearing: 0,
+              }}
+            >
+              {/* Overlay Status Badge */}
+              <div className="absolute top-3 right-3 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 px-3 py-1.5 text-[10px] font-mono text-gray-300 pointer-events-none">
+                Plate: <strong className="text-cyan-400">{vehicle.plate}</strong>
+                {vehiclePosition && (
+                  <span className="ml-2 text-emerald-400 font-bold">● Active Trace</span>
+                )}
+              </div>
+            </DeckGLMap>
           </div>
         </section>
 
         {/* Right Side Panels */}
         <div className="fade-up delay-300 flex flex-col gap-4 h-[640px] overflow-y-auto pr-2 custom-scrollbar">
-          
           {/* Always show Vehicle Identity */}
-          <VehicleIdentityCard 
-            vehicle={isDemoVehicle ? DEMO_VEHICLE : {
-              plate: vehicle.plate,
-              globalId: '---',
-              vehicleType: vehicle.type,
-              vehicleColor: vehicle.color
-            }}
-            currentObservation={isDemoVehicle && currentHopIndex >= 0 ? DEMO_OBSERVATIONS[currentHopIndex] : null}
-            isTracking={playbackState === 'playing'}
+          <VehicleIdentityCard
+            vehicle={
+              isDemoVehicle
+                ? DEMO_VEHICLE
+                : {
+                    plate: vehicle.plate,
+                    globalId: "---",
+                    vehicleType: vehicle.type,
+                    vehicleColor: vehicle.color,
+                  }
+            }
+            currentObservation={
+              isDemoVehicle && currentHopIndex >= 0 ? DEMO_OBSERVATIONS[currentHopIndex] : null
+            }
+            isTracking={playbackState === "playing"}
           />
 
           {/* Dynamic Panels during playback */}
           {isDemoVehicle && (
             <>
-              {activePanel === 'ocr' && (
+              {activePanel === "ocr" && (
                 <OCRPanel ocrData={DEMO_OCR_EVIDENCE} isActive={ocrActive} />
               )}
-              
-              {activePanel === 'handoff' && currentHopIndex > 0 && (
-                <CameraHandoff 
-                  fromCamera={DEMO_OBSERVATIONS[currentHopIndex-1]?.camera}
-                  candidates={DEMO_HANDOFF_CANDIDATES.find(c => c.from === DEMO_OBSERVATIONS[currentHopIndex-1]?.camera)?.candidates || []}
-                  confirmedCamera={DEMO_HANDOFF_CANDIDATES.find(c => c.from === DEMO_OBSERVATIONS[currentHopIndex-1]?.camera)?.confirmed}
+
+              {activePanel === "handoff" && currentHopIndex > 0 && (
+                <CameraHandoff
+                  fromCamera={DEMO_OBSERVATIONS[currentHopIndex - 1]?.camera}
+                  candidates={
+                    DEMO_HANDOFF_CANDIDATES.find(
+                      (c) => c.from === DEMO_OBSERVATIONS[currentHopIndex - 1]?.camera
+                    )?.candidates || []
+                  }
+                  confirmedCamera={
+                    DEMO_HANDOFF_CANDIDATES.find(
+                      (c) => c.from === DEMO_OBSERVATIONS[currentHopIndex - 1]?.camera
+                    )?.confirmed
+                  }
                   stage={handoffStage}
                   isActive={true}
                 />
               )}
 
-              {activePanel === 'reid' && currentHopIndex > 0 && (
-                <ReIDPanel 
-                  matchData={DEMO_REID_TRANSITIONS.find(t => t.from === DEMO_OBSERVATIONS[currentHopIndex-1]?.camera && t.to === DEMO_OBSERVATIONS[currentHopIndex]?.camera)}
-                  fromCamera={DEMO_OBSERVATIONS[currentHopIndex-1]?.camera}
+              {activePanel === "reid" && currentHopIndex > 0 && (
+                <ReIDPanel
+                  matchData={DEMO_REID_TRANSITIONS.find(
+                    (t) =>
+                      t.from === DEMO_OBSERVATIONS[currentHopIndex - 1]?.camera &&
+                      t.to === DEMO_OBSERVATIONS[currentHopIndex]?.camera
+                  )}
+                  fromCamera={DEMO_OBSERVATIONS[currentHopIndex - 1]?.camera}
                   toCamera={DEMO_OBSERVATIONS[currentHopIndex]?.camera}
                   globalId={DEMO_GLOBAL_ID}
                   isActive={reidActive}
@@ -659,63 +682,87 @@ export default function TrackingPage({ navigate, openModal }) {
           )}
 
           {/* Fallback legacy info if not playing or not demo */}
-          {(!isDemoVehicle || (playbackState === 'idle' || playbackState === 'complete')) && (
+          {(!isDemoVehicle || playbackState === "idle" || playbackState === "complete") && (
             <>
-              <section className="rounded-[26px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl">
+              <section className="glass-card-static p-5">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-gray-400">Vehicle Profile</span>
-                  <span className={`rounded-full border px-2.5 py-1 text-[9px] font-extrabold ${vehicle.badge}`}>{vehicle.status}</span>
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-[var(--text-muted)]">
+                    Vehicle Profile
+                  </span>
+                  <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-extrabold ${vehicle.badge}`}>
+                    {vehicle.status}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-black font-mono">{vehicle.plate}</h2>
-                  <button onClick={copyPlate} className="rounded-lg border border-gray-200 p-2 text-gray-400 hover:bg-gray-50">
-                    {copied ? <CheckCircle2 size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                  <h2 className="text-2xl font-black font-mono text-[var(--text-primary)]">{vehicle.plate}</h2>
+                  <button
+                    onClick={copyPlate}
+                    className="btn-glass p-2 text-[var(--text-secondary)] hover:text-white"
+                  >
+                    {copied ? <CheckCircle2 size={15} className="text-emerald-400" /> : <Copy size={15} />}
                   </button>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 border-y border-gray-100 py-3">
+                <div className="mt-3 grid grid-cols-3 gap-2 border-y border-[var(--border-subtle)] py-3">
                   <Info label="Type" value={vehicle.type} />
                   <Info label="Color" value={vehicle.color} />
                   <Info label="OCR" value={vehicle.confidence} blue />
                 </div>
-                <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                <div className="mt-3 rounded-xl bg-white/[0.02] border border-[var(--border-subtle)] p-3">
                   <div className="mb-2 flex items-center gap-2">
-                    <Activity size={13} className="text-blue-600" />
-                    <span className="text-[9px] font-extrabold uppercase text-gray-500">Detection Window</span>
+                    <Activity size={13} className="text-blue-400" />
+                    <span className="text-[9px] font-extrabold uppercase text-[var(--text-muted)]">
+                      Detection Window
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <Info label="First" value={vehicle.hops[0][2]} />
                     <Info label="Latest" value={vehicle.hops.at(-1)[2]} right />
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button onClick={exportCSV} className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-900 py-2.5 text-[10px] font-bold text-white hover:bg-gray-800">
-                    <Download size={13} /> Export CSV
+                <div className="mt-3">
+                  <button onClick={exportCSV} className="btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-1.5">
+                    <Download size={13} /> Export CSV Trajectory
                   </button>
                 </div>
               </section>
 
-              <section className={`rounded-[26px] border p-5 ${vehicle.deviation !== "None" && !vehicle.deviation.includes("Standard") ? "border-amber-200 bg-amber-50/70" : "border-emerald-200 bg-emerald-50/60"}`}>
+              <section
+                className={`glass-card-static p-5 ${
+                  vehicle.deviation !== "None" && !vehicle.deviation.includes("Standard")
+                    ? "border-amber-500/30 bg-amber-500/[0.04]"
+                    : "border-emerald-500/30 bg-emerald-500/[0.04]"
+                }`}
+              >
                 <div className="mb-3 flex items-center gap-2">
-                  {vehicle.deviation !== "None" && !vehicle.deviation.includes("Standard") ? <ShieldAlert size={15} className="text-amber-600" /> : <CheckCircle2 size={15} className="text-emerald-600" />}
-                  <h3 className="text-[10px] font-extrabold uppercase tracking-wider">Route Analysis</h3>
+                  {vehicle.deviation !== "None" && !vehicle.deviation.includes("Standard") ? (
+                    <ShieldAlert size={15} className="text-amber-400" />
+                  ) : (
+                    <CheckCircle2 size={15} className="text-emerald-400" />
+                  )}
+                  <h3 className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-primary)]">
+                    Route Analysis
+                  </h3>
                 </div>
                 <Info label="Expected Route" value={vehicle.expected} />
-                <div className="mt-3"><Info label="Actual Route" value={vehicle.actual} blue /></div>
-                <div className="mt-3 border-t border-gray-200/70 pt-3"><Info label="Deviation Analysis" value={vehicle.deviation} /></div>
+                <div className="mt-3">
+                  <Info label="Actual Route" value={vehicle.actual} blue />
+                </div>
+                <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
+                  <Info label="Deviation Analysis" value={vehicle.deviation} />
+                </div>
               </section>
             </>
           )}
-
         </div>
       </div>
 
       {isDemoVehicle && (
-        <JourneyTimeline 
+        <JourneyTimeline
           observations={DEMO_OBSERVATIONS}
           currentIndex={currentHopIndex}
           segmentProgress={segmentProgress}
-          isPlaying={playbackState === 'playing'}
-          isComplete={playbackState === 'complete'}
+          isPlaying={playbackState === "playing"}
+          isComplete={playbackState === "complete"}
           onSeek={seekToHop}
           onPlay={startPlayback}
           onPause={pausePlayback}
@@ -724,30 +771,36 @@ export default function TrackingPage({ navigate, openModal }) {
       )}
 
       {showGraph && (
-        <CameraGraph 
-          activeRoute={isDemoVehicle ? DEMO_ROUTE_PATH.slice(0, Math.max(1, currentHopIndex + 1)) : vehicle.hops.map(h => h[0])} 
+        <CameraGraph
+          activeRoute={
+            isDemoVehicle
+              ? DEMO_ROUTE_PATH.slice(0, Math.max(1, currentHopIndex + 1))
+              : vehicle.hops.map((h) => h[0])
+          }
           currentCamera={isDemoVehicle && currentHopIndex >= 0 ? DEMO_OBSERVATIONS[currentHopIndex].camera : null}
         />
       )}
 
       {isDemoVehicle && parallelActive && (
-        <ParallelProcessing 
-          isActive={true} 
-          identityProgress={identityProgress} 
-          macroProgress={macroProgress} 
+        <ParallelProcessing
+          isActive={true}
+          identityProgress={identityProgress}
+          macroProgress={macroProgress}
         />
       )}
 
-      {/* 5. Chronological Movement Timeline (Static view for non-demo or completed demo) */}
-      {(!isDemoVehicle || playbackState === 'complete') && (
-        <section className="fade-up rounded-[26px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl mt-5">
+      {/* 5. Chronological Movement Timeline */}
+      {(!isDemoVehicle || playbackState === "complete") && (
+        <section className="fade-up glass-card-static p-6 mt-4">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <Clock size={15} className="text-blue-600" />
-                <h3 className="text-sm font-black">Movement Timeline</h3>
+                <Clock size={15} className="text-blue-400" />
+                <h3 className="text-sm font-black text-[var(--text-primary)]">Movement Timeline</h3>
               </div>
-              <p className="mt-1 text-[10px] text-gray-400">Chronological camera detections across the vehicle journey</p>
+              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                Chronological camera detections across the vehicle journey
+              </p>
             </div>
           </div>
 
@@ -756,20 +809,30 @@ export default function TrackingPage({ navigate, openModal }) {
               <button
                 key={h[0]}
                 onClick={() => setSelected(h)}
-                className={`relative rounded-2xl border p-4 text-left transition-all ${selected?.[0] === h[0] ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50/70 hover:bg-white"}`}
+                className={`glass-card p-4 text-left transition-all ${
+                  selected?.[0] === h[0]
+                    ? "border-blue-500/80 bg-blue-500/[0.08] shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                    : "hover:border-white/20"
+                }`}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${i === 0 ? "bg-green-500" : i === vehicle.hops.length - 1 ? "bg-red-500" : "bg-blue-600"}`} />
-                    <span className="font-mono text-[10px] font-black text-blue-600">{h[0]}</span>
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        i === 0 ? "bg-emerald-400" : i === vehicle.hops.length - 1 ? "bg-red-400" : "bg-blue-400"
+                      }`}
+                    />
+                    <span className="font-mono text-[10px] font-black text-blue-400">{h[0]}</span>
                   </div>
-                  <span className="text-[9px] font-bold text-gray-400">{h[2]}</span>
+                  <span className="text-[9px] font-bold text-[var(--text-muted)]">{h[2]}</span>
                 </div>
-                <h4 className="text-xs font-black text-gray-800">{h[1]}</h4>
-                <div className="mt-3 grid grid-cols-3 border-t border-gray-200/60 pt-3 text-[8px] font-bold text-gray-500">
+                <h4 className="text-xs font-black text-[var(--text-primary)]">{h[1]}</h4>
+                <div className="mt-3 grid grid-cols-3 border-t border-[var(--border-subtle)] pt-3 text-[9px] font-bold text-[var(--text-secondary)]">
                   <span>{h[3]}</span>
                   <span>{h[5]}</span>
-                  <span>OCR <b className="text-emerald-600">{h[4]}</b></span>
+                  <span>
+                    OCR <b className="text-emerald-400">{h[4]}</b>
+                  </span>
                 </div>
               </button>
             ))}
@@ -778,15 +841,15 @@ export default function TrackingPage({ navigate, openModal }) {
       )}
 
       {/* 6. Selected Detection Details */}
-      {selected && (!isDemoVehicle || playbackState === 'complete') && (
-        <section className="fade-up rounded-[22px] border border-blue-100 bg-blue-50/70 p-5 mt-5">
+      {selected && (!isDemoVehicle || playbackState === "complete") && (
+        <section className="fade-up glass-card-static p-6 mt-2 border-blue-500/30 bg-blue-500/[0.04]">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
             <div>
-              <div className="flex items-center gap-2 text-[9px] font-extrabold uppercase tracking-widest text-blue-600">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-400">
                 <Target size={13} /> Selected Detection Details
               </div>
-              <h3 className="mt-1 text-lg font-black">{selected[0]}</h3>
-              <p className="text-[10px] font-semibold text-gray-500">{selected[1]}</p>
+              <h3 className="mt-1 text-lg font-black text-[var(--text-primary)]">{selected[0]}</h3>
+              <p className="text-[11px] font-semibold text-[var(--text-secondary)]">{selected[1]}</p>
             </div>
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-5">
               <Info label="Time" value={selected[2]} />
@@ -800,32 +863,40 @@ export default function TrackingPage({ navigate, openModal }) {
       )}
 
       {/* 8. Tracking Intelligence & Multi-Camera Re-Identification */}
-      {(!isDemoVehicle || playbackState === 'complete') && (
-        <section className="fade-up rounded-[26px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl mt-5">
+      {(!isDemoVehicle || playbackState === "complete") && (
+        <section className="fade-up glass-card-static p-6 mt-2">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Zap size={15} className="text-blue-600" />
-              <h2 className="text-sm font-black">Tracking Intelligence & Re-ID</h2>
+              <Zap size={15} className="text-blue-400" />
+              <h2 className="text-sm font-black text-[var(--text-primary)]">Tracking Intelligence &amp; Re-ID</h2>
             </div>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-[9px] font-extrabold text-blue-600">AI ANALYSIS</span>
+            <span className="rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-[9px] font-extrabold text-blue-400">
+              AI ANALYSIS
+            </span>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+            <div className="glass-card p-4">
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">Re-ID Confidence</span>
-                <span className="text-lg font-black text-blue-600">{vehicle.reid}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
+                  Re-ID Confidence
+                </span>
+                <span className="text-lg font-black text-blue-400">{vehicle.reid}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-                <div className="h-full rounded-full bg-blue-600" style={{ width: vehicle.reid }} />
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: vehicle.reid }} />
               </div>
-              <p className="mt-3 text-[9px] leading-4 text-gray-500">Vehicle identity verified across <b className="text-gray-700">{vehicle.stats[0]} camera nodes</b>.</p>
+              <p className="mt-3 text-[10px] leading-4 text-[var(--text-secondary)]">
+                Vehicle identity verified across <b className="text-[var(--text-primary)]">{vehicle.stats[0]} camera nodes</b>.
+              </p>
             </div>
 
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+            <div className="glass-card p-4">
               <div className="mb-4 flex items-center gap-2">
-                <Activity size={14} className="text-blue-600" />
-                <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">Movement Metrics</span>
+                <Activity size={14} className="text-blue-400" />
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
+                  Movement Metrics
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Mini label="Transitions" value={vehicle.transitions} />
@@ -835,10 +906,12 @@ export default function TrackingPage({ navigate, openModal }) {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+            <div className="glass-card p-4">
               <div className="mb-4 flex items-center gap-2">
-                <ShieldAlert size={14} className="text-blue-600" />
-                <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">AI Findings</span>
+                <ShieldAlert size={14} className="text-blue-400" />
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">
+                  AI Findings
+                </span>
               </div>
               <div className="space-y-2">
                 <Check text="Multi-camera re-ID verified successfully" />
@@ -855,13 +928,17 @@ export default function TrackingPage({ navigate, openModal }) {
 
 function Stat({ icon: Icon, label, value, blue }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/80 p-3.5 shadow-[0_6px_20px_rgba(0,0,0,.03)]">
-      <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${blue ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-600"}`}>
-        <Icon size={15} />
+    <div className="glass-card p-4 flex items-center gap-3">
+      <div
+        className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+          blue ? "bg-blue-500/10 text-blue-400" : "bg-white/[0.04] text-[var(--text-secondary)]"
+        }`}
+      >
+        <Icon size={16} />
       </div>
       <div>
-        <p className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400">{label}</p>
-        <p className={`text-sm font-black ${blue ? "text-blue-600" : ""}`}>{value}</p>
+        <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+        <p className={`text-base font-black ${blue ? "text-blue-400" : "text-[var(--text-primary)]"}`}>{value}</p>
       </div>
     </div>
   );
@@ -870,8 +947,8 @@ function Stat({ icon: Icon, label, value, blue }) {
 function Info({ label, value, blue, right }) {
   return (
     <div className={right ? "text-right" : ""}>
-      <p className="text-[8px] font-extrabold uppercase tracking-wider text-gray-400">{label}</p>
-      <p className={`mt-0.5 text-[10px] font-bold ${blue ? "text-blue-600" : "text-gray-800"}`}>{value}</p>
+      <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+      <p className={`mt-0.5 text-xs font-bold ${blue ? "text-blue-400" : "text-[var(--text-primary)]"}`}>{value}</p>
     </div>
   );
 }
@@ -879,16 +956,16 @@ function Info({ label, value, blue, right }) {
 function Mini({ label, value }) {
   return (
     <div>
-      <p className="text-[8px] font-extrabold uppercase text-gray-400">{label}</p>
-      <p className="mt-0.5 text-xs font-black text-gray-800">{value}</p>
+      <p className="text-[9px] font-extrabold uppercase text-[var(--text-muted)]">{label}</p>
+      <p className="mt-0.5 text-xs font-black text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }
 
 function Check({ text }) {
   return (
-    <div className="flex items-start gap-2 text-[9px] font-bold text-emerald-600">
-      <CheckCircle2 size={12} className="mt-0.5 shrink-0" />
+    <div className="flex items-start gap-2 text-[10px] font-bold text-emerald-400">
+      <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald-400" />
       <span>{text}</span>
     </div>
   );

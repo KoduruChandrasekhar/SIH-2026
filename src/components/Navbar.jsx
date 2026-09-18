@@ -3,244 +3,99 @@ import {
   Home,
   LayoutDashboard,
   LogIn,
-  Moon,
   Navigation,
-  Route,
-  Sun,
   TrafficCone,
 } from "lucide-react";
 
-import tracenetLogo from "../assets/tracenet-logo.jpg"; 
-import { useTheme } from "../ThemeContext";
+import tracenetLogo from "../assets/traceforce-logo.png";
 
 export default function Navbar({ page, navigate, openModal }) {
-  const { theme, toggleTheme } = useTheme();
-
-  const item = (label, icon, target) => {
+  const navItem = (label, icon, target) => {
     const Icon = icon;
-    
-    // BULLETPROOF ACTIVE CHECK: ignores capitals, spaces, and undefined errors
-    const isActive = String(page).toLowerCase().trim() === String(target).toLowerCase().trim();
+    const isActive =
+      String(page).toLowerCase().trim() === String(target).toLowerCase().trim();
 
     return (
       <button
         key={label}
         onClick={() => navigate(target)}
-        className={`
-          group
-          relative
-          flex
-          items-center
-          gap-2
-          rounded-xl
-          px-3.5
-          py-2
-          text-xs
-          sm:text-sm
-          font-bold
-          transition-all
-          duration-300
-          overflow-hidden
-          ${
-            isActive
-              ? "bg-blue-600/10 text-blue-700 shadow-[inset_0_0_0_1px_rgba(37,99,235,0.2)] scale-[1.02]"
-              : "text-[#636366] hover:bg-blue-50 hover:text-blue-600 hover:scale-105"
-          }
-        `}
+        className={`nav-link ${isActive ? "active" : ""}`}
       >
         <Icon
-          size={16}
-          className={`
-            transition-all
-            duration-300
-            group-hover:rotate-12
-            group-hover:scale-125
-            ${isActive ? "text-blue-600" : "group-hover:text-blue-600"}
-          `}
+          size={15}
+          className={`transition-all duration-300 ${
+            isActive
+              ? "text-[var(--accent-blue)]"
+              : "group-hover:text-[var(--text-primary)]"
+          }`}
         />
-        <span className="relative z-10">{label}</span>
-
-        {/* Hover Indicator Slide Bar */}
-        <span 
-          className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-600 origin-left transition-transform duration-300 ${
-            isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-          }`} 
-        />
+        <span>{label}</span>
       </button>
     );
   };
 
-  const isAlertsActive = String(page).toLowerCase().trim() === "alerts";
+  const isAlertsActive =
+    String(page).toLowerCase().trim() === "alerts";
 
   return (
-    <header
-      className="
-        relative
-        flex
-        flex-col
-        gap-4
-        rounded-[24px]
-        border
-        border-white/80
-        bg-white/80
-        px-5
-        py-3.5
-        shadow-[0_8px_32px_rgba(0,0,0,0.06)]
-        backdrop-blur-2xl
-        lg:flex-row
-        lg:items-center
-        lg:justify-between
-        transition-all
-      "
-    >
-      {/* BRAND LOGO & TITLE */}
+    <header className="nav-glass flex flex-col gap-4 px-5 py-3.5 lg:flex-row lg:items-center lg:justify-between">
+      {/* BRAND */}
       <div className="flex items-center justify-between lg:justify-start gap-4">
         <button
           onClick={() => navigate("home")}
           className="group flex items-center gap-3 text-left transition-transform active:scale-95"
         >
-          {/* Logo Image */}
-          <img 
-            src={tracenetLogo} 
-            alt="TraceNet Icon" 
-            className="h-10 w-10 sm:h-12 sm:w-12 object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-md"
-          />
-
+          <div className="relative flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.1] p-1 shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-500 group-hover:scale-105 group-hover:border-blue-500/50 group-hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]">
+            <img
+              src={tracenetLogo}
+              alt="Trace Force Logo"
+              className="h-full w-full object-contain rounded-lg"
+            />
+          </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1
-                className="
-                  text-2xl
-                  sm:text-3xl
-                  font-black
-                  tracking-tighter
-                  text-transparent
-                  bg-clip-text
-                  bg-gradient-to-r
-                  from-blue-500
-                  via-cyan-400
-                  to-blue-600
-                  drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]
-                  transition-all
-                  duration-300
-                  group-hover:drop-shadow-[0_0_25px_rgba(59,130,246,1)]
-                "
-              >
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">
                 TraceNet
               </h1>
             </div>
-            <p
-              className="
-                hidden
-                text-[10px]
-                font-extrabold
-                uppercase
-                tracking-[2px]
-                text-blue-500
-                drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]
-                md:block
-              "
-            >
-              AI Traffic Intelligence
+            <p className="hidden md:block text-[9px] font-extrabold uppercase tracking-[1.5px] text-[var(--text-muted)]">
+              by <span className="text-cyan-400 font-bold">Trace Force</span>
             </p>
           </div>
         </button>
       </div>
 
-      {/* NAVIGATION LINKS & CONTROLS */}
-      <nav
-        className="
-          flex
-          flex-wrap
-          items-center
-          gap-1
-          sm:gap-1.5
-          lg:flex-nowrap
-        "
-      >
-        {item("Home", Home, "home")}
-        {item("Dashboard", LayoutDashboard, "dashboard")}
-        {item("Tracking", Navigation, "tracking")}
-        {item("Traffic", TrafficCone, "traffic")}
+      {/* NAV LINKS */}
+      <nav className="flex flex-wrap items-center gap-1 sm:gap-1.5 lg:flex-nowrap">
+        {navItem("Home", Home, "home")}
+        {navItem("Dashboard", LayoutDashboard, "dashboard")}
+        {navItem("Tracking", Navigation, "tracking")}
+        {navItem("Traffic", TrafficCone, "traffic")}
 
-        {/* Alerts Route Button with Red FX */}
+        {/* Alerts — red accent */}
         <button
           onClick={() => navigate("alerts")}
-          className={`
-            group
-            relative
-            flex
-            items-center
-            gap-1.5
-            rounded-xl
-            px-3.5
-            py-2
-            text-xs
-            font-bold
-            transition-all
-            duration-300
-            sm:text-sm
-            overflow-hidden
-            ${
-              isAlertsActive
-                ? "bg-red-500/10 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)] scale-[1.02]"
-                : "text-[#636366] hover:bg-red-500/10 hover:text-red-600 hover:scale-105 hover:shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
-            }
-          `}
+          className={`nav-link-alert ${isAlertsActive ? "active" : ""}`}
         >
-          <Bell 
-            size={16} 
-            className={`transition-transform duration-300 group-hover:rotate-12 group-hover:scale-125 ${isAlertsActive ? "text-red-500" : "text-red-500"}`} 
+          <Bell
+            size={15}
+            className={`transition-all duration-300 ${
+              isAlertsActive ? "text-[var(--accent-red)]" : ""
+            }`}
           />
-          <span className="relative z-10">Alerts</span>
-          <span 
-            className={`absolute bottom-0 left-0 h-[2px] w-full bg-red-500 origin-left transition-transform duration-300 ${isAlertsActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} 
-          />
+          <span>Alerts</span>
         </button>
 
-        <div className="mx-1.5 hidden h-5 w-[1px] rounded-full bg-gray-200 sm:block" />
+        <div className="mx-1.5 hidden h-5 w-px rounded-full bg-[var(--border-subtle)] sm:block" />
 
-        {/* Theme Toggle Button */}
-        <button
-          onClick={toggleTheme}
-          className="theme-toggle-btn"
-          title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
-          aria-label="Toggle theme"
-        >
-          {theme === "light" ? (
-            <Moon size={16} className="transition-transform duration-300 hover:rotate-12" />
-          ) : (
-            <Sun size={16} className="text-amber-400 transition-transform duration-300 hover:rotate-45" />
-          )}
-        </button>
-
-        {/* Operator Login Button */}
+        {/* Operator Login */}
         <button
           onClick={() => navigate("login")}
-          className="
-            group
-            relative
-            flex
-            items-center
-            gap-2
-            overflow-hidden
-            rounded-xl
-            bg-gray-900
-            px-4
-            py-2
-            text-xs
-            font-bold
-            text-white
-            shadow-[0_4px_14px_rgba(0,0,0,0.15)]
-            transition-all
-            duration-300
-            hover:scale-105
-            hover:shadow-[0_6px_20px_rgba(37,99,235,0.3)]
-            active:scale-95
-            sm:text-sm
-          "
+          className="group relative flex items-center gap-2 overflow-hidden rounded-xl px-4 py-2 text-xs font-bold text-white shadow-[0_4px_14px_rgba(59,130,246,0.2)] transition-all duration-300 hover:scale-105 hover:shadow-[0_6px_20px_rgba(59,130,246,0.35)] active:scale-95 sm:text-sm"
+          style={{
+            background: "linear-gradient(135deg, var(--accent-blue), #6366f1)",
+          }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           <span className="relative z-10 hidden sm:inline">Login</span>
           <LogIn
             size={16}
