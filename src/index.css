@@ -881,3 +881,214 @@ select {
 [data-theme="dark"] .bg-white\/95 {
   background-color: rgba(26, 28, 46, 0.95) !important;
 }
+
+/* =========================================================
+   CAMERA FEED CARDS — AI CCTV SIMULATION OVERLAYS
+   ========================================================= */
+
+/* ── Card Container ── */
+.cam-feed-card {
+  background: var(--bg-card-solid);
+  cursor: pointer;
+}
+
+/* ── Static Placeholder ── */
+.cam-feed-placeholder {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 60%, #1e1b4b 100%);
+}
+
+.cam-feed-icon {
+  color: rgba(148, 163, 184, 0.5);
+}
+
+.cam-feed-cam-id {
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.cam-feed-location {
+  color: rgba(148, 163, 184, 0.7);
+}
+
+/* ── Card Footer ── */
+.cam-feed-footer {
+  background: var(--bg-card-solid);
+  border-top: 1px solid var(--border-primary);
+}
+
+.cam-feed-footer-id {
+  color: var(--text-primary);
+}
+
+.cam-feed-footer-loc {
+  color: var(--text-tertiary);
+}
+
+.cam-feed-footer-status {
+  color: var(--text-secondary);
+}
+
+/* ── Overlay Badges ── */
+.cam-overlay-badge {
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+}
+
+.cam-overlay-live-dot {
+  background: #22c55e;
+  animation: cam-pulse 1.8s ease-in-out infinite;
+}
+
+.cam-overlay-live-label {
+  background: rgba(220, 38, 38, 0.7);
+  color: #ffffff;
+  backdrop-filter: blur(4px);
+}
+
+.cam-overlay-ai-status {
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(96, 165, 250, 0.95);
+  backdrop-filter: blur(4px);
+}
+
+.cam-overlay-ai-dot {
+  background: #3b82f6;
+  animation: cam-pulse 2s ease-in-out infinite;
+}
+
+/* ── Plate Detection Labels ── */
+.cam-overlay-plate-label {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cam-overlay-plate-info {
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+/* ── FPS/Resolution Meta ── */
+.cam-overlay-meta {
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+/* ── Bounding Boxes ── */
+.cam-bbox {
+  pointer-events: none;
+}
+
+.cam-bbox-vehicle {
+  /* Subtle border using box-shadow so we can animate without layout shift */
+}
+
+.cam-bbox-corner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+}
+
+/* Vehicle bbox corners — cyan/green accent */
+.cam-bbox-vehicle > .cam-bbox-corner {
+  border-color: rgba(34, 211, 238, 0.7);
+}
+
+.cam-bbox-vehicle > .cam-bbox-corner-tl {
+  top: 0; left: 0;
+  border-top: 2px solid rgba(34, 211, 238, 0.7);
+  border-left: 2px solid rgba(34, 211, 238, 0.7);
+}
+.cam-bbox-vehicle > .cam-bbox-corner-tr {
+  top: 0; right: 0;
+  border-top: 2px solid rgba(34, 211, 238, 0.7);
+  border-right: 2px solid rgba(34, 211, 238, 0.7);
+}
+.cam-bbox-vehicle > .cam-bbox-corner-bl {
+  bottom: 0; left: 0;
+  border-bottom: 2px solid rgba(34, 211, 238, 0.7);
+  border-left: 2px solid rgba(34, 211, 238, 0.7);
+}
+.cam-bbox-vehicle > .cam-bbox-corner-br {
+  bottom: 0; right: 0;
+  border-bottom: 2px solid rgba(34, 211, 238, 0.7);
+  border-right: 2px solid rgba(34, 211, 238, 0.7);
+}
+
+/* Plate bbox corners — green accent */
+.cam-bbox-plate > .cam-bbox-corner-tl {
+  top: 0; left: 0;
+  border-top: 2px solid rgba(74, 222, 128, 0.8);
+  border-left: 2px solid rgba(74, 222, 128, 0.8);
+}
+.cam-bbox-plate > .cam-bbox-corner-tr {
+  top: 0; right: 0;
+  border-top: 2px solid rgba(74, 222, 128, 0.8);
+  border-right: 2px solid rgba(74, 222, 128, 0.8);
+}
+.cam-bbox-plate > .cam-bbox-corner-bl {
+  bottom: 0; left: 0;
+  border-bottom: 2px solid rgba(74, 222, 128, 0.8);
+  border-left: 2px solid rgba(74, 222, 128, 0.8);
+}
+.cam-bbox-plate > .cam-bbox-corner-br {
+  bottom: 0; right: 0;
+  border-bottom: 2px solid rgba(74, 222, 128, 0.8);
+  border-right: 2px solid rgba(74, 222, 128, 0.8);
+}
+
+/* ── Track Labels ── */
+.cam-track-label {
+  background: rgba(34, 211, 238, 0.2);
+  color: rgba(34, 211, 238, 0.95);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  white-space: nowrap;
+}
+
+/* ── Scanline Effect ── */
+.cam-scanline {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.015) 2px,
+    rgba(255, 255, 255, 0.015) 4px
+  );
+  animation: cam-scanline-scroll 8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes cam-scanline-scroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 200px; }
+}
+
+@keyframes cam-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Hover entrance animation for overlays ── */
+.cam-feed-card:hover .cam-bbox {
+  animation: cam-bbox-fade-in 0.4s ease-out both;
+}
+
+.cam-feed-card:hover .cam-bbox:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+@keyframes cam-bbox-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
