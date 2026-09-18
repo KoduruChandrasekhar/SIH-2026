@@ -173,11 +173,11 @@ select {
   color: #b8becb !important;
 }
 
-[data-theme="dark"] .text-\[\\#1c1c1e\] {
+[data-theme="dark"] .text-\[\#1c1c1e\] {
   color: #e8eaed !important;
 }
 
-[data-theme="dark"] .text-\[\\#636366\] {
+[data-theme="dark"] .text-\[\#636366\] {
   color: #9ba1b0 !important;
 }
 
@@ -359,6 +359,101 @@ select {
   border-color: rgba(55, 65, 81, 0.5) !important;
 }
 
+.tracking-page .leaflet-popup-content-wrapper {
+  background: #090b10 !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 14px !important;
+}
+
+.tracking-page .leaflet-popup-content-wrapper * {
+  color: #e5e7eb !important;
+}
+
+.tracking-page .leaflet-popup-tip {
+  background: #090b10 !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+}
+
+.tracking-page .leaflet-popup-close-button {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.tracking-page {
+  position: relative;
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 20%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.12), transparent 22%),
+    linear-gradient(180deg, #040b14 0%, #0a1220 100%);
+  border-radius: 28px;
+  padding: 0.5rem 0 0;
+}
+
+.tracking-page .bg-white,
+.tracking-page .bg-white\/80,
+.tracking-page .bg-white\/70,
+.tracking-page .bg-white\/90,
+.tracking-page .bg-gray-50,
+.tracking-page .bg-gray-50\/70,
+.tracking-page .bg-gray-50\/60,
+.tracking-page .bg-gray-100,
+.tracking-page .bg-blue-50,
+.tracking-page .bg-emerald-50,
+.tracking-page .bg-amber-50\/70,
+.tracking-page .bg-amber-50,
+.tracking-page .bg-emerald-50\/60 {
+  background: linear-gradient(180deg, rgba(12, 18, 28, 0.96), rgba(15, 20, 31, 0.92)) !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+.tracking-page .border-white\/80,
+.tracking-page .border-gray-100,
+.tracking-page .border-gray-200,
+.tracking-page .border-gray-200\/60,
+.tracking-page .border-emerald-200,
+.tracking-page .border-amber-200,
+.tracking-page .border-blue-100,
+.tracking-page .border-blue-200 {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+.tracking-page .text-gray-800,
+.tracking-page .text-gray-700,
+.tracking-page .text-gray-900 {
+  color: #ebf2ff !important;
+}
+
+.tracking-page .text-gray-500,
+.tracking-page .text-gray-400,
+.tracking-page .text-gray-600 {
+  color: #9aa8ba !important;
+}
+
+.tracking-page .text-blue-600,
+.tracking-page .text-blue-500,
+.tracking-page .text-emerald-600,
+.tracking-page .text-amber-600 {
+  filter: brightness(1.1);
+}
+
+.tracking-page .shadow-\[0_8px_32px_rgba\(0\,0\,0\,\.04\)\],
+.tracking-page .shadow-\[0_6px_20px_rgba\(0\,0\,0\,\.03\)\] {
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.45) !important;
+}
+
+.tracking-page .bg-gray-900,
+.tracking-page .hover\:bg-gray-800:hover,
+.tracking-page .hover\:bg-gray-50:hover,
+.tracking-page .hover\:bg-white:hover {
+  background: rgba(29, 78, 216, 0.95) !important;
+}
+
+.tracking-page input,
+.tracking-page button {
+  transition: all 0.2s ease;
+}
+
 /* Leaflet popup dark mode */
 [data-theme="dark"] .leaflet-popup-content-wrapper {
   background: #1a1c2e !important;
@@ -425,6 +520,78 @@ select {
 
 [data-theme="dark"] .ring-2.ring-amber-500\/20 {
   --tw-ring-color: rgba(245, 158, 11, 0.3);
+}
+
+/* =========================================================
+   PREMIUM DASHBOARD UI ENHANCEMENTS
+   ========================================================= */
+
+.premium-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.68));
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(18px);
+  border-radius: 24px;
+}
+
+.premium-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(140deg, rgba(96, 165, 250, 0.08), rgba(168, 85, 247, 0.05), transparent 60%);
+  pointer-events: none;
+}
+
+.premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.metric-tile {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(248,250,252,0.72));
+}
+
+.metric-tile::after {
+  content: "";
+  position: absolute;
+  inset: auto -10% -45% auto;
+  height: 90px;
+  width: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59,130,246,0.14), transparent 70%);
+}
+
+[data-theme="dark"] .premium-panel {
+  background: linear-gradient(135deg, rgba(22, 24, 38, 0.92), rgba(31, 34, 48, 0.8));
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 20px 42px rgba(2, 6, 23, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .premium-panel::before {
+  background: linear-gradient(140deg, rgba(59,130,246,0.12), rgba(168,85,247,0.08), transparent 60%);
+}
+
+[data-theme="dark"] .premium-badge {
+  background: rgba(96, 165, 250, 0.08);
+  border-color: rgba(96, 165, 250, 0.15);
+}
+
+[data-theme="dark"] .metric-tile {
+  background: linear-gradient(180deg, rgba(26, 28, 46, 0.96), rgba(20, 23, 36, 0.8));
+}
+
+[data-theme="dark"] .metric-tile::after {
+  background: radial-gradient(circle, rgba(96,165,250,0.15), transparent 70%);
 }
 
 /* =========================================================
@@ -1111,5 +1278,514 @@ select {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* =========================================================
+   TRACENET SIH-2026 — NEW TRACKING COMPONENT STYLES
+   ========================================================= */
+
+/* ── Re-ID Matching Panel ── */
+.reid-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.15);
+  overflow: hidden;
+}
+
+.reid-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
+}
+
+.reid-bar-fill.high {
+  background: linear-gradient(90deg, #16a34a, #22d3ee);
+}
+
+.reid-overall-glow {
+  animation: reid-glow-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes reid-glow-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(37, 99, 235, 0.2); }
+  50% { box-shadow: 0 0 24px rgba(37, 99, 235, 0.45); }
+}
+
+.reid-confirmed {
+  animation: reid-confirm 0.5s ease-out forwards;
+}
+
+@keyframes reid-confirm {
+  0% { transform: scale(0.9); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── OCR Evidence Panel ── */
+.ocr-frame {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 60%, #1e1b4b 100%);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.ocr-frame.selected {
+  border-color: rgba(37, 99, 235, 0.6);
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.2);
+}
+
+.ocr-plate-crop {
+  background: linear-gradient(135deg, #1a1a2e, #0d1117);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+  color: #f0f0f0;
+  text-align: center;
+  padding: 6px 12px;
+  font-weight: 900;
+}
+
+.ocr-consensus-arrow {
+  animation: ocr-merge 0.6s ease-out forwards;
+}
+
+@keyframes ocr-merge {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.ocr-verified-badge {
+  animation: ocr-verify-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes ocr-verify-pop {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+
+/* ── Camera Handoff ── */
+.handoff-radar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+
+.handoff-radar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(37, 99, 235, 0.4);
+  animation: handoff-ping 1.5s ease-out infinite;
+}
+
+.handoff-radar-ring:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.handoff-radar-ring:nth-child(3) {
+  animation-delay: 1s;
+}
+
+@keyframes handoff-ping {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.handoff-candidate {
+  transition: all 0.3s ease;
+}
+
+.handoff-candidate.confirmed {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+.handoff-confirmed-banner {
+  animation: handoff-slide-in 0.4s ease-out forwards;
+}
+
+@keyframes handoff-slide-in {
+  0% { transform: translateY(-10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Parallel Processing ── */
+.parallel-node {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 10px;
+  padding: 6px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.parallel-node.inactive {
+  background: rgba(148, 163, 184, 0.08);
+  color: rgba(148, 163, 184, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.parallel-node.active {
+  background: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.15);
+}
+
+.parallel-node.complete {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.parallel-branch-line {
+  stroke: rgba(148, 163, 184, 0.2);
+  stroke-width: 2;
+  fill: none;
+  transition: stroke 0.4s ease;
+}
+
+.parallel-branch-line.active {
+  stroke: rgba(37, 99, 235, 0.5);
+  stroke-dasharray: 6 4;
+  animation: parallel-flow 1s linear infinite;
+}
+
+@keyframes parallel-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -10; }
+}
+
+.parallel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ── Journey Timeline ── */
+.timeline-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.timeline-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  transition: width 0.5s ease;
+}
+
+.timeline-node {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  background: transparent;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+
+.timeline-node.visited {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.timeline-node.active {
+  background: #2563eb;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+  animation: timeline-node-pulse 1.5s ease-in-out infinite;
+}
+
+.timeline-node.future {
+  background: transparent;
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+@keyframes timeline-node-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.1); }
+}
+
+/* ── Vehicle Identity Card ── */
+.identity-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.identity-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #2563eb, #06b6d4, #2563eb);
+  background-size: 200% 100%;
+  animation: identity-gradient-sweep 3s linear infinite;
+}
+
+@keyframes identity-gradient-sweep {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.identity-value-update {
+  animation: identity-flash 0.5s ease-out;
+}
+
+@keyframes identity-flash {
+  0% { background-color: rgba(37, 99, 235, 0.15); }
+  100% { background-color: transparent; }
+}
+
+.identity-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: identity-status-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes identity-status-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+/* ── Camera Graph ── */
+.camera-graph-node {
+  transition: all 0.4s ease;
+}
+
+.camera-graph-node.active {
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.5));
+}
+
+.camera-graph-node.active circle {
+  animation: graph-node-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes graph-node-pulse {
+  0%, 100% { r: 12; }
+  50% { r: 14; }
+}
+
+.camera-graph-edge {
+  transition: all 0.4s ease;
+}
+
+.camera-graph-edge.active {
+  stroke: #2563eb !important;
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 4px rgba(37, 99, 235, 0.4));
+  animation: graph-edge-flow 1.5s linear infinite;
+}
+
+@keyframes graph-edge-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -20; }
+}
+
+/* ── Watchlist Propagation ── */
+.watchlist-camera-row {
+  animation: watchlist-row-in 0.3s ease-out forwards;
+  opacity: 0;
+  transform: translateX(-8px);
+}
+
+@keyframes watchlist-row-in {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.watchlist-match-alert {
+  animation: watchlist-alert-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes watchlist-alert-in {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── City Heartbeat / Dashboard ── */
+.heartbeat-dot {
+  animation: heartbeat 2s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  25% { transform: scale(1.15); opacity: 0.8; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+.live-flow-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Vehicle Marker on Map ── */
+.vehicle-marker-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 3px solid white;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: vehicle-marker-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vehicle-marker-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3); }
+}
+
+/* ── Active Camera Marker ── */
+.camera-marker-active {
+  animation: camera-active-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes camera-active-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
+}
+
+/* ── Tracking-page specific dark overrides for new components ── */
+.tracking-page .reid-bar-track {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.tracking-page .ocr-frame {
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.tracking-page .timeline-track {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.tracking-page .parallel-node.inactive {
+  background: rgba(148, 163, 184, 0.05);
+  border-color: rgba(148, 163, 184, 0.1);
+}
+
+/* ── Smooth state label transitions ── */
+.status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all 0.3s ease;
+}
+
+.status-label.calculating {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.status-label.active {
+  background: rgba(37, 99, 235, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.status-label.confirmed {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* ── Stagger animation utility ── */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+.stagger-7 { animation-delay: 0.7s; }
+.stagger-8 { animation-delay: 0.8s; }
+
+/* =========================================================
+   DASHBOARD — CITY HEARTBEAT / LIVE TRAFFIC FLOW
+   ========================================================= */
+
+/* Camera node breathing pulse on the Leaflet map */
+@keyframes camera-node-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+.leaflet-interactive.cam-node-pulse {
+  animation: camera-node-pulse 3s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Animated flow-line dash offset for traffic flow polylines */
+@keyframes flow-line-dash {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -24; }
+}
+
+.dashboard-flow-line {
+  stroke-dasharray: 8 12;
+  animation: flow-line-dash 1.6s linear infinite;
+}
+
+/* Heartbeat breathing for stat card icon containers */
+@keyframes heartbeat-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.82; }
+}
+
+.heartbeat-icon {
+  animation: heartbeat-breathe 3.5s ease-in-out infinite;
+}
+
+/* Smooth congestion color transitions */
+.congestion-transition {
+  transition: background-color 0.8s ease, color 0.8s ease, border-color 0.8s ease;
+}
+
+/* Live city flow badge blink */
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.live-flow-dot {
+  animation: live-blink 1.4s ease-in-out infinite;
 }
 

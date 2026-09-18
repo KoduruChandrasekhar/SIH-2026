@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Gauge,
   Map as MapIcon,
   TrendingUp,
+  Radio,
 } from "lucide-react";
 import {
   Area,
@@ -21,12 +22,13 @@ import {
   YAxis,
   Cell
 } from "recharts";
-import { MapContainer, TileLayer, Popup, CircleMarker, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Popup, CircleMarker, Circle, Polyline } from "react-leaflet";
 import Navbar from "../components/Navbar";
 import CameraFeedCard from "../components/CameraFeedCard";
 import { useTheme } from "../ThemeContext";
 import { fetchDashboard, fetchCameras } from "../api";
 import { cameras as localCameraFeeds } from "../data";
+import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../demoData";
 
 // --- LOCAL MOCK DATA (fallback) ---
 
@@ -103,6 +105,32 @@ const localCongestionTrendsData = [
   { time: "6 PM", delay: 35 }, { time: "9 PM", delay: 5 },
 ];
 
+// --- Helpers ---
+
+/** Clamp a number between min and max */
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+
+/** Small random delta within ±range */
+const jitter = (range) => (Math.random() - 0.5) * 2 * range;
+
+/** Determine color from density value */
+const densityColor = (d) => d > 80 ? "#ef4444" : d > 50 ? "#f97316" : "#10b981";
+
+/** Build a lookup of camera positions for flow-line rendering */
+const buildCameraPositionMap = (cameras) => {
+  const map = {};
+  cameras.forEach(c => { map[c.id] = [c.lat, c.lng]; });
+  return map;
+};
+
+// Build flow-line edges from CAMERA_NETWORK_EDGES using the dashboard camera nodes
+const flowLineEdges = CAMERA_NETWORK_EDGES.map(([fromId, toId]) => {
+  const from = CAMERA_NETWORK_NODES.find(n => n.id === fromId);
+  const to = CAMERA_NETWORK_NODES.find(n => n.id === toId);
+  if (from && to) return [[from.lat, from.lng], [to.lat, to.lng]];
+  return null;
+}).filter(Boolean);
+
 // Custom Tooltip for Recharts
 const CustomTooltip = ({ active, payload, label, suffix = "" }) => {
   const { theme } = useTheme();
@@ -135,6 +163,22 @@ export default function DashboardPage({ navigate, openModal }) {
   const [selectedCam, setSelectedCam] = useState(localCamerasData[0]);
   const [cameraFeeds, setCameraFeeds] = useState(localCameraFeeds);
 
+  // --- Live City Flow: current timestamp ---
+  const [liveTime, setLiveTime] = useState(() => new Date());
+
+  // --- Live data pulse: mutable live values for cameras ---
+  const [liveCameras, setLiveCameras] = useState(() =>
+    localCamerasData.map(c => ({
+      ...c,
+      liveSpeed: parseInt(c.speed, 10),
+      liveDensity: c.densityValue,
+      liveTrafficChange: parseFloat(c.trafficChange),
+    }))
+  );
+
+  // Keep a ref to track whether API data has been loaded
+  const apiLoaded = useRef(false);
+
   // Fetch from API with fallback
   useEffect(() => {
     fetchDashboard().then((data) => {
@@ -143,6 +187,7 @@ export default function DashboardPage({ navigate, openModal }) {
         if (data.flowTrends) setFlowTrendsData(data.flowTrends);
         if (data.densityTrends) setDensityTrendsData(data.densityTrends);
         if (data.congestionTrends) setCongestionTrendsData(data.congestionTrends);
+        apiLoaded.current = true;
       }
     });
     fetchCameras().then((data) => {
@@ -150,12 +195,65 @@ export default function DashboardPage({ navigate, openModal }) {
     });
   }, []);
 
-  const camId = selectedCam.id.split(' ')[0];
-  const camName = selectedCam.id.replace(camId, '').trim().replace(/[()]/g, '');
+  // Sync liveCameras when camerasData changes (e.g. from API)
+  useEffect(() => {
+    setLiveCameras(
+      camerasData.map(c => ({
+        ...c,
+        liveSpeed: parseInt(c.speed, 10),
+        liveDensity: c.densityValue,
+        liveTrafficChange: parseFloat(c.trafficChange),
+      }))
+    );
+  }, [camerasData]);
+
+  // --- Live clock (1s) ---
+  useEffect(() => {
+    const id = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // --- Live data pulse tick (every 4 seconds) ---
+  const tickLiveData = useCallback(() => {
+    setLiveCameras(prev =>
+      prev.map(cam => {
+        const newSpeed = clamp(cam.liveSpeed + Math.round(jitter(2)), 5, 80);
+        const newDensity = clamp(cam.liveDensity + Math.round(jitter(3)), 5, 99);
+        const newChange = clamp(cam.liveTrafficChange + jitter(1.5), -30, 60);
+        const newColor = densityColor(newDensity);
+        return {
+          ...cam,
+          liveSpeed: newSpeed,
+          speed: String(newSpeed),
+          liveDensity: newDensity,
+          densityValue: newDensity,
+          density: `${newDensity}%`,
+          liveTrafficChange: Math.round(newChange * 10) / 10,
+          trafficChange: `${newChange >= 0 ? '+' : ''}${Math.round(newChange)}%`,
+          color: newColor,
+          status: newDensity > 80 ? "High" : newDensity > 50 ? "Med" : "Low",
+        };
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(tickLiveData, 4000);
+    return () => clearInterval(id);
+  }, [tickLiveData]);
+
+  // --- Keep selectedCam in sync with liveCameras ---
+  const liveSelectedCam = liveCameras.find(c => c.id === selectedCam.id) || selectedCam;
+
+  const camId = liveSelectedCam.id.split(' ')[0];
+  const camName = liveSelectedCam.id.replace(camId, '').trim().replace(/[()]/g, '');
 
   const gridColor = theme === 'dark' ? '#1e2030' : '#f3f4f6';
   const tickColor = theme === 'dark' ? '#6b7280' : '#9ca3af';
   const cursorFill = theme === 'dark' ? '#1e2030' : '#f9fafb';
+
+  // Format live timestamp
+  const timeStr = liveTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10 min-h-screen">
@@ -172,35 +270,48 @@ export default function DashboardPage({ navigate, openModal }) {
       </div>
 
       {/* Header Banner with Module 01 Badge */}
-      <div className="fade-up delay-100 rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-3 w-3 rounded-full bg-purple-500 trace-live-dot" />
-          <span className="text-xs font-extrabold uppercase tracking-widest text-purple-600">
-            Module 01: Central Command Overview
-          </span>
+      <div className="premium-panel fade-up delay-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-3 w-3 rounded-full bg-purple-500 trace-live-dot shadow-[0_0_18px_rgba(168,85,247,0.9)]" />
+              <span className="premium-badge text-xs font-extrabold uppercase tracking-[0.22em] text-purple-600">
+                Module 01: Central Command Overview
+              </span>
+            </div>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+              Network Dashboard &amp; GIS Intelligence
+            </h1>
+            <p className="mt-2 max-w-[800px] text-xs font-medium text-gray-500 sm:text-sm">
+              Interactive multi-camera ANPR mapping, live density heatmaps, and macro-level urban traffic tracking metrics.
+            </p>
+          </div>
+
+          {/* Live City Flow Badge */}
+          <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 shadow-sm">
+            <span className="live-flow-dot h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-emerald-600">
+              Live City Flow
+            </span>
+            <span className="ml-0.5 font-mono text-[10px] font-bold text-emerald-500">{timeStr}</span>
+          </div>
         </div>
-        <h1 className="text-2xl font-black tracking-tight text-gray-900 mt-1">
-          Network Dashboard & GIS Intelligence
-        </h1>
-        <p className="text-xs text-gray-500 mt-1 max-w-[800px]">
-          Interactive multi-camera ANPR mapping, live density heatmaps, and macro-level urban traffic tracking metrics.
-        </p>
       </div>
 
       {/* TOP SECTION: Map & Analytics Panel */}
       <div className="grid w-full gap-5 lg:grid-cols-[1.6fr_1fr]">
         
         {/* Left: GIS Map with Heatmap */}
-        <div className="fade-up delay-200 flex h-[420px] flex-col rounded-[24px] border border-gray-200/80 bg-white p-4 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-          <div className="flex items-center justify-between mb-3 px-2">
+        <div className="premium-panel fade-up delay-200 flex h-[420px] flex-col p-4">
+          <div className="mb-3 flex items-center justify-between px-2">
             <div>
-              <h3 className="text-sm font-black text-gray-900">Live GIS & Heatmap</h3>
-              <p className="text-[10px] font-bold text-gray-500">Camera Nodes & Density Radars</p>
+              <h3 className="text-sm font-black text-gray-900">Live GIS &amp; Heatmap</h3>
+              <p className="text-[10px] font-bold text-gray-500">Camera Nodes &amp; Density Radars</p>
             </div>
             
             {/* Map Legend */}
-            <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/50 px-3 py-1.5 shadow-sm">
-              <span className="text-[9px] font-extrabold uppercase text-gray-500 tracking-wider">Density:</span>
+            <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-gray-500">Density:</span>
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
                 <span className="h-2 w-2 rounded-full bg-red-500" /> High
               </div>
@@ -224,20 +335,41 @@ export default function DashboardPage({ navigate, openModal }) {
                 attribution='&copy; OpenStreetMap'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+
+              {/* Animated Flow Lines between connected cameras */}
+              {flowLineEdges.map((positions, idx) => (
+                <Polyline
+                  key={`flow-${idx}`}
+                  positions={positions}
+                  pathOptions={{
+                    color: "#3b82f6",
+                    weight: 2,
+                    opacity: 0.35,
+                    dashArray: "8 12",
+                    className: "dashboard-flow-line",
+                  }}
+                />
+              ))}
               
-              {camerasData.map((cam) => (
+              {liveCameras.map((cam) => (
                 <div key={cam.id}>
                   {/* Heatmap Circle */}
                   <Circle
                     center={[cam.lat, cam.lng]}
-                    radius={cam.densityValue * 8} 
+                    radius={cam.liveDensity * 8} 
                     pathOptions={{ color: cam.color, fillColor: cam.color, fillOpacity: 0.2, stroke: false }}
                   />
-                  {/* Clickable Camera Node */}
+                  {/* Clickable Camera Node with pulse animation */}
                   <CircleMarker
                     center={[cam.lat, cam.lng]}
                     radius={8}
-                    pathOptions={{ color: '#fff', weight: 2.5, fillColor: cam.color, fillOpacity: 1 }}
+                    pathOptions={{
+                      color: '#fff',
+                      weight: 2.5,
+                      fillColor: cam.color,
+                      fillOpacity: 1,
+                      className: 'cam-node-pulse',
+                    }}
                     eventHandlers={{ click: () => setSelectedCam(cam) }}
                   >
                     <Popup>
@@ -254,58 +386,58 @@ export default function DashboardPage({ navigate, openModal }) {
         </div>
 
         {/* Right: Selected Node Analytics */}
-        <div className="fade-up delay-300 flex h-[420px] flex-col rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+        <div className="premium-panel fade-up delay-300 flex h-[420px] flex-col p-6">
           <div className="mb-4 flex items-start justify-between">
             <div className="flex flex-col">
-              <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+              <h3 className="flex items-center gap-2 text-xl font-black text-gray-900">
                 Analytics 
-                <span className="text-blue-600 text-[11px] font-extrabold uppercase tracking-wider bg-blue-50 px-2.5 py-1 rounded-lg">
+                <span className="premium-badge bg-blue-50 text-[11px] font-extrabold uppercase tracking-[0.2em] text-blue-600">
                   {camId}
                 </span>
               </h3>
-              <p className="text-xs font-bold text-gray-500 mt-1">({camName})</p>
+              <p className="mt-1 text-xs font-bold text-gray-500">({camName})</p>
             </div>
-            <div className="p-2 rounded-xl bg-gray-50 border border-gray-100">
+            <div className="heartbeat-icon rounded-xl border border-gray-100 bg-gray-50/80 p-2.5 shadow-sm">
               <Camera size={20} className="text-gray-400" />
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 flex-1 justify-center mt-2">
+          <div className="mt-2 flex flex-1 flex-col justify-center gap-4">
             
             {/* Speed & Density Cards */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col rounded-[20px] bg-white p-5 shadow-sm border border-gray-100 transition-all hover:shadow-md hover:border-blue-100">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-2">
-                  <Gauge size={14} className="text-blue-500" /> Avg Speed
+              <div className="metric-tile congestion-transition flex flex-col rounded-[20px] border border-gray-100 bg-white/80 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-[0_16px_30px_rgba(59,130,246,0.12)]">
+                <span className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                  <span className="heartbeat-icon inline-flex"><Gauge size={14} className="text-blue-500" /></span> Avg Speed
                 </span>
-                <span className="text-3xl font-black text-gray-900 tracking-tight">
-                  {selectedCam.speed} <span className="text-sm font-bold text-gray-500">km/h</span>
+                <span className="text-3xl font-black tracking-tight text-gray-900">
+                  {liveSelectedCam.speed} <span className="text-sm font-bold text-gray-500">km/h</span>
                 </span>
               </div>
               
-              <div className="flex flex-col rounded-[20px] bg-white p-5 shadow-sm border border-gray-100 transition-all hover:shadow-md">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-2">
-                  <Activity size={14} style={{ color: selectedCam.color }} /> Density
+              <div className="metric-tile congestion-transition flex flex-col rounded-[20px] border border-gray-100 bg-white/80 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-[0_16px_30px_rgba(59,130,246,0.12)]">
+                <span className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                  <span className="heartbeat-icon inline-flex"><Activity size={14} style={{ color: liveSelectedCam.color }} /></span> Density
                 </span>
-                <span className="text-3xl font-black tracking-tight" style={{ color: selectedCam.color }}>
-                  {selectedCam.density}
+                <span className="congestion-transition text-3xl font-black tracking-tight" style={{ color: liveSelectedCam.color }}>
+                  {liveSelectedCam.density}
                 </span>
               </div>
             </div>
 
             {/* List Details */}
-            <div className="flex flex-col gap-0 rounded-[20px] bg-gray-50/50 border border-gray-100 p-2 overflow-hidden">
+            <div className="flex flex-col gap-0 overflow-hidden rounded-[20px] border border-gray-100 bg-gray-50/70 p-2 shadow-inner">
               <div className="flex items-center justify-between border-b border-gray-100 p-3">
                 <span className="text-xs font-bold text-gray-500">Current Trend:</span>
-                <span className="text-[11px] font-black text-gray-800 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-100">
-                  {selectedCam.trend}
+                <span className="congestion-transition rounded-lg border border-gray-100 bg-white px-3 py-1.5 text-[11px] font-black text-gray-800 shadow-sm">
+                  {liveSelectedCam.trend}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3">
-                <span className="text-xs font-bold text-gray-500">Volume (since {selectedCam.since}):</span>
-                <span className={`text-[11px] font-black flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg shadow-sm border border-gray-100 ${selectedCam.trafficChange.includes('+') ? 'text-red-500' : 'text-emerald-500'}`}>
-                  {selectedCam.trafficChange.includes('+') ? <TrendingUp size={14} /> : <TrendingUp size={14} className="rotate-180" />}
-                  {selectedCam.trafficChange}
+                <span className="text-xs font-bold text-gray-500">Volume (since {liveSelectedCam.since}):</span>
+                <span className={`congestion-transition flex items-center gap-1 rounded-lg border border-gray-100 bg-white px-2.5 py-1.5 text-[11px] font-black shadow-sm ${liveSelectedCam.trafficChange.includes('+') ? 'text-red-500' : 'text-emerald-500'}`}>
+                  {liveSelectedCam.trafficChange.includes('+') ? <TrendingUp size={14} /> : <TrendingUp size={14} className="rotate-180" />}
+                  {liveSelectedCam.trafficChange}
                 </span>
               </div>
             </div>
@@ -316,18 +448,18 @@ export default function DashboardPage({ navigate, openModal }) {
 
       {/* CAMERA FEEDS SECTION — Simulated AI CCTV */}
       <div className="fade-up delay-300">
-        <div className="flex items-center justify-between mb-4 px-1">
+        <div className="mb-4 flex items-center justify-between px-1">
           <div>
-            <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-black text-gray-900">
               <Camera size={16} className="text-blue-500" />
               Live Camera Feeds
-              <span className="text-[9px] font-extrabold uppercase tracking-widest text-gray-400 ml-1">AI Simulation</span>
+              <span className="ml-1 text-[9px] font-extrabold uppercase tracking-[0.2em] text-gray-400">AI Simulation</span>
             </h3>
-            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Hover to view simulated CCTV feed with AI detection overlays</p>
+            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Hover to view simulated CCTV feed with AI detection overlays</p>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50/50 px-2.5 py-1.5 shadow-sm">
+          <div className="flex items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
             <span className="h-2 w-2 rounded-full bg-green-500 trace-live-dot" />
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">{cameraFeeds.length} Feeds Online</span>
+            <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-gray-500">{cameraFeeds.length} Feeds Online</span>
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -341,12 +473,12 @@ export default function DashboardPage({ navigate, openModal }) {
       <div className="grid w-full gap-5 lg:grid-cols-3">
         
         {/* Graph 1: Traffic Flow Trends */}
-        <div className="fade-up delay-400 flex h-[300px] flex-col rounded-[24px] border border-gray-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+        <div className="premium-panel fade-up delay-400 flex h-[300px] flex-col p-5">
           <div className="mb-4">
-            <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
-              <Activity size={16} className="text-blue-500" /> Traffic Flow Trends
+            <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
+              <span className="heartbeat-icon inline-flex"><Activity size={16} className="text-blue-500" /></span> Traffic Flow Trends
             </h3>
-            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Total volume over time</p>
+            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Total volume over time</p>
           </div>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -368,12 +500,12 @@ export default function DashboardPage({ navigate, openModal }) {
         </div>
 
         {/* Graph 2: Traffic Density Trends */}
-        <div className="fade-up delay-500 flex h-[300px] flex-col rounded-[24px] border border-gray-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+        <div className="premium-panel fade-up delay-500 flex h-[300px] flex-col p-5">
           <div className="mb-4">
-            <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
-              <MapIcon size={16} className="text-purple-500" /> Traffic Density Trends
+            <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
+              <span className="heartbeat-icon inline-flex"><MapIcon size={16} className="text-purple-500" /></span> Traffic Density Trends
             </h3>
-            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Road capacity utilization (%)</p>
+            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Road capacity utilization (%)</p>
           </div>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -393,12 +525,12 @@ export default function DashboardPage({ navigate, openModal }) {
         </div>
 
         {/* Graph 3: Congestion Trends */}
-        <div className="fade-up delay-[600ms] flex h-[300px] flex-col rounded-[24px] border border-gray-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+        <div className="premium-panel fade-up delay-[600ms] flex h-[300px] flex-col p-5">
           <div className="mb-4">
-            <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
-              <AlertTriangle size={16} className="text-orange-500" /> Congestion Trends
+            <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
+              <span className="heartbeat-icon inline-flex"><AlertTriangle size={16} className="text-orange-500" /></span> Congestion Trends
             </h3>
-            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Average delay in minutes</p>
+            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Average delay in minutes</p>
           </div>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">

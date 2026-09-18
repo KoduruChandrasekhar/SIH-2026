@@ -100,6 +100,22 @@ export default function TrafficPage({ navigate, openModal }) {
     });
   }, []);
 
+  // Live telemetry pulse effect for corridor speeds and densities
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCorridors((prev) =>
+        prev.map((c) => {
+          const deltaDensity = (Math.random() - 0.5) * 4;
+          const deltaSpeed = (Math.random() - 0.5) * 3;
+          const newDensity = Math.min(99, Math.max(10, Math.round(c.density + deltaDensity)));
+          const newSpeed = Math.min(80, Math.max(5, Math.round(c.speed + deltaSpeed)));
+          return { ...c, density: newDensity, speed: newSpeed };
+        })
+      );
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Filter corridors based on search query
   const filteredCorridors = corridors.filter((corridor) =>
     corridor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

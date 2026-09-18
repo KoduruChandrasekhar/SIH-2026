@@ -34,7 +34,12 @@ export default function CameraFeedCard({ camera, index = 0 }) {
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
     if (videoRef.current && !videoFailed) {
-      videoRef.current.play().catch(() => setVideoFailed(true));
+      videoRef.current.play().catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.error("Video play failed:", err);
+          setVideoFailed(true);
+        }
+      });
     }
   }, [videoFailed]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -13,10 +13,13 @@ import {
   ShieldAlert,
   TrafficCone,
   Zap,
+  Radio,
+  ExternalLink,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import Navbar from "../components/Navbar";
 import { fetchAlerts } from "../api";
+import { WATCHLIST_CAMERAS, cameraDisplayId } from "../demoData";
 
 // Alert data incorporating distinct congestion vs surge, and route anomalies
 const localAlerts = [
@@ -102,6 +105,29 @@ export default function AlertsPage({ navigate, openModal }) {
   const [newPlate, setNewPlate] = useState("");
   const [newReason, setNewReason] = useState("");
 
+  // ── Watchlist Propagation State ──
+  const [propagationState, setPropagationState] = useState('idle'); // idle | propagating | synced | detected
+  const [propagatedCameras, setPropagatedCameras] = useState([]);
+  const [detectedPlate, setDetectedPlate] = useState(null);
+  const timeoutIdsRef = useRef([]);
+
+  // Cleanup all timeouts on unmount or reset
+  const clearAllTimeouts = useCallback(() => {
+    timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+    timeoutIdsRef.current = [];
+  }, []);
+
+  useEffect(() => {
+    return () => clearAllTimeouts();
+  }, [clearAllTimeouts]);
+
+  const resetPropagation = useCallback(() => {
+    clearAllTimeouts();
+    setPropagationState('idle');
+    setPropagatedCameras([]);
+    setDetectedPlate(null);
+  }, [clearAllTimeouts]);
+
   // Fetch from API with fallback
   useEffect(() => {
     fetchAlerts().then((data) => {
@@ -114,7 +140,8 @@ export default function AlertsPage({ navigate, openModal }) {
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    const id = setTimeout(() => setToastMessage(null), 3500);
+    timeoutIdsRef.current.push(id);
   };
 
   const handleResolve = (id) => {
@@ -124,12 +151,61 @@ export default function AlertsPage({ navigate, openModal }) {
     triggerToast(`Alert ${id} marked as Resolved.`);
   };
 
+  // ── Propagation Sequence ──
+  const startPropagation = (plate) => {
+    clearAllTimeouts();
+    setPropagationState('propagating');
+    setPropagatedCameras([]);
+    setDetectedPlate(null);
+
+    // Stagger camera propagation
+    WATCHLIST_CAMERAS.forEach((cam, index) => {
+      const id = setTimeout(() => {
+        setPropagatedCameras((prev) => [...prev, cam]);
+      }, (index + 1) * 300);
+      timeoutIdsRef.current.push(id);
+    });
+
+    // After all cameras propagated → synced
+    const syncId = setTimeout(() => {
+      setPropagationState('synced');
+    }, WATCHLIST_CAMERAS.length * 300 + 400);
+    timeoutIdsRef.current.push(syncId);
+
+    // After sync → detection
+    const detectId = setTimeout(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setPropagationState('detected');
+      setDetectedPlate({
+        plate,
+        camera: "CAM #403",
+        timestamp: timeStr,
+        confidence: "96.8%",
+      });
+    }, WATCHLIST_CAMERAS.length * 300 + 2400);
+    timeoutIdsRef.current.push(detectId);
+
+    // Auto-reset after 15 seconds
+    const resetId = setTimeout(() => {
+      resetPropagation();
+    }, 15000);
+    timeoutIdsRef.current.push(resetId);
+  };
+
   const handleAddWatchlist = (e) => {
     e.preventDefault();
     if (!newPlate) return;
-    triggerToast(`Plate [${newPlate.toUpperCase()}] registered to Central Watchlist.`);
+    const plate = newPlate.toUpperCase();
+    triggerToast(`Plate [${plate}] registered to Central Watchlist.`);
+    startPropagation(plate);
     setNewPlate("");
     setNewReason("");
+  };
+
+  const handleOpenTrajectory = () => {
+    resetPropagation();
+    navigate("tracking");
   };
 
   const filteredAlerts = alerts.filter((item) => {
@@ -277,6 +353,7 @@ export default function AlertsPage({ navigate, openModal }) {
                   value={newPlate}
                   onChange={(e) => setNewPlate(e.target.value.toUpperCase())}
                   className="w-full font-mono rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-bold uppercase text-gray-900 focus:border-red-500 focus:outline-none"
+                  disabled={propagationState !== 'idle'}
                   required
                 />
               </div>
@@ -291,16 +368,128 @@ export default function AlertsPage({ navigate, openModal }) {
                   value={newReason}
                   onChange={(e) => setNewReason(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-800 focus:border-red-500 focus:outline-none"
+                  disabled={propagationState !== 'idle'}
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full rounded-xl bg-red-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-red-600/20 transition hover:bg-red-700 active:scale-95"
+                disabled={propagationState !== 'idle'}
+                className="w-full rounded-xl bg-red-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-red-600/20 transition hover:bg-red-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Register to Watch Mesh
               </button>
             </form>
+
+            {/* ── Watchlist Propagation Panel ── */}
+            {propagationState !== 'idle' && (
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-gray-50/70 p-4 transition-all duration-500">
+                {/* Propagation header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Radio size={14} className={`text-emerald-500 ${propagationState === 'propagating' ? 'animate-pulse' : ''}`} />
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                    {propagationState === 'propagating' && 'Propagating Watchlist...'}
+                    {propagationState === 'synced' && 'Propagating Watchlist...'}
+                    {propagationState === 'detected' && 'Propagation Complete'}
+                  </span>
+                </div>
+
+                {/* Camera list with staggered checks */}
+                <div className="space-y-1.5 mb-3">
+                  {WATCHLIST_CAMERAS.map((cam) => {
+                    const isPropagated = propagatedCameras.includes(cam);
+                    return (
+                      <div
+                        key={cam}
+                        className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 transition-all duration-300 ${
+                          isPropagated
+                            ? 'bg-emerald-50 opacity-100 translate-x-0'
+                            : 'opacity-30 -translate-x-2'
+                        }`}
+                      >
+                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
+                          isPropagated ? 'bg-emerald-500 scale-100' : 'bg-gray-300 scale-75'
+                        }`}>
+                          {isPropagated && (
+                            <CheckCircle2 size={12} className="text-white" />
+                          )}
+                        </div>
+                        <span className={`font-mono text-[11px] font-bold transition-colors duration-300 ${
+                          isPropagated ? 'text-gray-900' : 'text-gray-400'
+                        }`}>
+                          {cameraDisplayId(cam)}
+                        </span>
+                        {isPropagated && (
+                          <span className="ml-auto text-[10px] font-bold text-emerald-600">
+                            Synced
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Network Synchronized badge */}
+                {(propagationState === 'synced' || propagationState === 'detected') && (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 mb-3 transition-all duration-500">
+                    <CheckCircle2 size={14} className="text-emerald-500" />
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                      Network Synchronized
+                    </span>
+                    <span className="ml-auto text-[10px] font-bold text-emerald-500">
+                      {WATCHLIST_CAMERAS.length}/{WATCHLIST_CAMERAS.length} Nodes
+                    </span>
+                  </div>
+                )}
+
+                {/* Detection Alert */}
+                {propagationState === 'detected' && detectedPlate && (
+                  <div className="rounded-xl border border-amber-400/60 bg-gradient-to-r from-amber-50 to-red-50 p-4 shadow-lg shadow-amber-500/10 transition-all duration-500">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Zap size={14} className="text-amber-600" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700">
+                        Watchlist Match Detected
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 mb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Plate</span>
+                        <span className="font-mono text-xs font-black text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
+                          {detectedPlate.plate}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Camera</span>
+                        <span className="font-mono text-xs font-bold text-gray-800">
+                          {cameraDisplayId(detectedPlate.camera)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Timestamp</span>
+                        <span className="font-mono text-xs font-bold text-gray-800">
+                          {detectedPlate.timestamp}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Confidence</span>
+                        <span className="font-mono text-xs font-black text-emerald-600">
+                          {detectedPlate.confidence}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleOpenTrajectory}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95"
+                    >
+                      <ExternalLink size={14} />
+                      Open Trajectory
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
