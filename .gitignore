@@ -39,3 +39,7 @@ __pycache__/
 # Backend AI output artifacts
 backend/output/*.mp4
 backend/output/*.json
+# Generated AI annotated videos
+public/camera-feeds/*_annotated.mp4
+tracenet-camera-viewer.zip
+!public/camera-feeds/CAM-401_annotated.mp4
