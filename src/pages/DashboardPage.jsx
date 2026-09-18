@@ -23,8 +23,10 @@ import {
 } from "recharts";
 import { MapContainer, TileLayer, Popup, CircleMarker, Circle } from "react-leaflet";
 import Navbar from "../components/Navbar";
+import CameraFeedCard from "../components/CameraFeedCard";
 import { useTheme } from "../ThemeContext";
-import { fetchDashboard } from "../api";
+import { fetchDashboard, fetchCameras } from "../api";
+import { cameras as localCameraFeeds } from "../data";
 
 // --- LOCAL MOCK DATA (fallback) ---
 
@@ -131,6 +133,7 @@ export default function DashboardPage({ navigate, openModal }) {
   const [densityTrendsData, setDensityTrendsData] = useState(localDensityTrendsData);
   const [congestionTrendsData, setCongestionTrendsData] = useState(localCongestionTrendsData);
   const [selectedCam, setSelectedCam] = useState(localCamerasData[0]);
+  const [cameraFeeds, setCameraFeeds] = useState(localCameraFeeds);
 
   // Fetch from API with fallback
   useEffect(() => {
@@ -141,6 +144,9 @@ export default function DashboardPage({ navigate, openModal }) {
         if (data.densityTrends) setDensityTrendsData(data.densityTrends);
         if (data.congestionTrends) setCongestionTrendsData(data.congestionTrends);
       }
+    });
+    fetchCameras().then((data) => {
+      if (data && data.cameras) setCameraFeeds(data.cameras);
     });
   }, []);
 
@@ -306,6 +312,29 @@ export default function DashboardPage({ navigate, openModal }) {
           </div>
         </div>
 
+      </div>
+
+      {/* CAMERA FEEDS SECTION — Simulated AI CCTV */}
+      <div className="fade-up delay-300">
+        <div className="flex items-center justify-between mb-4 px-1">
+          <div>
+            <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+              <Camera size={16} className="text-blue-500" />
+              Live Camera Feeds
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-gray-400 ml-1">AI Simulation</span>
+            </h3>
+            <p className="text-[10px] font-bold text-gray-500 mt-0.5">Hover to view simulated CCTV feed with AI detection overlays</p>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50/50 px-2.5 py-1.5 shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-green-500 trace-live-dot" />
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-500">{cameraFeeds.length} Feeds Online</span>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {cameraFeeds.map((cam, i) => (
+            <CameraFeedCard key={cam.id} camera={cam} index={i} />
+          ))}
+        </div>
       </div>
 
       {/* BOTTOM SECTION: The 3 Requested Graphs */}

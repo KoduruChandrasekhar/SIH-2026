@@ -117,6 +117,7 @@ cameras = [
         "flow": [0.4, 0.7, 1.0, 0.8, 0.5, 0.9],
         "vehicleClasses": {"cars": "62%", "bikes": "24%", "trucks": "14%"},
         "lastPlateRead": "TS08EJ4892",
+        "videoFeed": "/camera-feeds/CAM-401.mp4",
     },
     {
         "id": "CAM #402",
@@ -133,6 +134,7 @@ cameras = [
         "flow": [0.5, 0.9, 1.15, 0.85, 0.6, 1.1],
         "vehicleClasses": {"cars": "55%", "bikes": "35%", "trucks": "10%"},
         "lastPlateRead": "TS07FZ1029",
+        "videoFeed": "/camera-feeds/CAM-401.mp4",
     },
     {
         "id": "CAM #403",
@@ -149,6 +151,7 @@ cameras = [
         "flow": [0.3, 0.5, 0.7, 0.6, 0.4, 0.5],
         "vehicleClasses": {"cars": "48%", "bikes": "30%", "trucks": "22%"},
         "lastPlateRead": "TS10UA9921",
+        "videoFeed": "/camera-feeds/CAM-401.mp4",
     },
     {
         "id": "CAM #404",
@@ -165,6 +168,7 @@ cameras = [
         "flow": [0.2, 0.4, 0.5, 0.3, 0.3, 0.25],
         "vehicleClasses": {"cars": "70%", "bikes": "20%", "trucks": "10%"},
         "lastPlateRead": "TS15EX5540",
+        "videoFeed": "/camera-feeds/CAM-401.mp4",
     },
 ]
 
