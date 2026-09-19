@@ -43,3 +43,13 @@ backend/output/*.json
 public/camera-feeds/*_annotated.mp4
 tracenet-camera-viewer.zip
 !public/camera-feeds/CAM-401_annotated.mp4
+
+# TraceNet generated Phase 1 files
+backend/output/*
+!backend/output/.gitkeep
+public/camera-feeds/*_annotated.mp4
+
+# TraceNet generated Phase 1 files
+backend/output/*
+!backend/output/.gitkeep
+public/camera-feeds/*_annotated.mp4

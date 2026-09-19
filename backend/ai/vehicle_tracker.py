@@ -1,113 +1,193 @@
 """
 TraceNet — Single-Camera Vehicle Detection & Tracking (Phase 1)
 
-Uses Ultralytics YOLO for vehicle detection and ByteTrack (built-in)
-for persistent single-camera track IDs.
+Pipeline:
+    Input video
+        ↓
+    YOLO11n vehicle detection
+        ↓
+    ByteTrack single-camera tracking
+        ↓
+    Temporary annotated video
+        ↓
+    FFmpeg H.264 conversion
+        ↓
+    Browser-compatible MP4
+
+Outputs:
+    backend/output/<CAMERA>_detections.json
+    public/camera-feeds/<CAMERA>_annotated.mp4
 
 This module does NOT implement:
-- License plate detection / OCR
-- Cross-camera Re-ID
-- Any database or network functionality
+    - License plate detection / OCR
+    - Cross-camera Re-ID
+    - Database functionality
+    - Network functionality
 """
 
 import json
+import shutil
+import subprocess
 import time
 from pathlib import Path
 
 import cv2
 from ultralytics import YOLO
 
-# COCO class IDs for traffic-relevant vehicles
-VEHICLE_CLASS_IDS = {2, 3, 5, 7}  # car, motorcycle, bus, truck
-VEHICLE_CLASS_NAMES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
-# Annotation colours (BGR) per class for visual clarity
-CLASS_COLORS = {
-    "car": (0, 200, 0),         # green
-    "motorcycle": (0, 165, 255), # orange
-    "bus": (255, 100, 0),        # blue-ish
-    "truck": (0, 0, 220),       # red
+# COCO class IDs for traffic-relevant vehicles
+VEHICLE_CLASS_IDS = {2, 3, 5, 7}
+
+VEHICLE_CLASS_NAMES = {
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    7: "truck",
 }
+
+
+# Annotation colours (BGR)
+CLASS_COLORS = {
+    "car": (0, 200, 0),
+    "motorcycle": (0, 165, 255),
+    "bus": (255, 100, 0),
+    "truck": (0, 0, 220),
+}
+
 DEFAULT_COLOR = (200, 200, 200)
 
 
 class VehicleTracker:
-    """Processes a single camera video: detects vehicles, tracks with
-    ByteTrack, writes an annotated video and structured JSON output."""
+    """Run YOLO + ByteTrack on one camera video."""
 
     def __init__(
         self,
         model_path: str = "yolo11n.pt",
         confidence: float = 0.3,
         output_dir: str = "backend/output",
+        public_dir: str = "public/camera-feeds",
     ):
         self.model_path = model_path
         self.confidence = confidence
         self.output_dir = Path(output_dir)
+        self.public_dir = Path(public_dir)
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.public_dir.mkdir(parents=True, exist_ok=True)
 
-        # Load model — Ultralytics auto-downloads if not present
         print(f"[TraceNet] Loading model: {model_path}")
-        self.model = YOLO(model_path)
-        print(f"[TraceNet] Model loaded successfully")
 
-    # ── public API ──────────────────────────────────────────────────────
+        try:
+            self.model = YOLO(model_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Could not load YOLO model '{model_path}': {exc}"
+            ) from exc
+
+        print("[TraceNet] Model loaded successfully")
 
     def process_video(
         self,
         video_path: str,
         camera_id: str = "UNKNOWN",
     ) -> dict:
-        """Run detection + tracking on *video_path*.
-
-        Returns a summary dict and writes:
-          <output_dir>/<camera_id>_annotated.mp4
-          <output_dir>/<camera_id>_detections.json
         """
-        video_path = Path(video_path)
+        Process one camera video.
+
+        Creates:
+            backend/output/<camera>_detections.json
+            public/camera-feeds/<camera>_annotated.mp4
+        """
+
+        video_path = Path(video_path).resolve()
+
         if not video_path.exists():
-            raise FileNotFoundError(f"Video not found: {video_path}")
+            raise FileNotFoundError(
+                f"Input video not found: {video_path}"
+            )
 
         cap = cv2.VideoCapture(str(video_path))
-        if not cap.isOpened():
-            raise RuntimeError(f"Cannot open video: {video_path}")
 
-        # Video properties
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        if not cap.isOpened():
+            raise RuntimeError(
+                f"Cannot open input video: {video_path}"
+            )
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+
+        if not fps or fps <= 0:
+            fps = 30.0
+
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        print(f"[TraceNet] Input : {video_path}")
-        print(f"[TraceNet] Resolution: {width}x{height} @ {fps:.1f} FPS, ~{total_frames} frames")
+        if width <= 0 or height <= 0:
+            cap.release()
+            raise RuntimeError(
+                f"Invalid video dimensions: {width}x{height}"
+            )
 
-        # Output paths
-        out_video_path = self.output_dir / f"{camera_id}_annotated.mp4"
-        out_json_path = self.output_dir / f"{camera_id}_detections.json"
+        print(f"[TraceNet] Input      : {video_path}")
+        print(
+            f"[TraceNet] Resolution : "
+            f"{width}x{height} @ {fps:.2f} FPS"
+        )
+        print(
+            f"[TraceNet] Frames     : ~{total_frames}"
+        )
 
-        # Video writer — use mp4v codec for broad compatibility
+        camera_id = camera_id.upper()
+
+        final_video_path = (
+            self.public_dir / f"{camera_id}_annotated.mp4"
+        )
+
+        json_path = (
+            self.output_dir / f"{camera_id}_detections.json"
+        )
+
+        # Temporary OpenCV video.
+        # It is NOT the final browser video.
+        temp_video_path = (
+            self.output_dir / f"{camera_id}_temp.mp4"
+        )
+
+        # mp4v is only used as an intermediate format.
+        # FFmpeg converts it to H.264 afterwards.
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(out_video_path), fourcc, fps, (width, height))
+
+        writer = cv2.VideoWriter(
+            str(temp_video_path),
+            fourcc,
+            fps,
+            (width, height),
+        )
+
         if not writer.isOpened():
             cap.release()
-            raise RuntimeError(f"Cannot create video writer: {out_video_path}")
+            raise RuntimeError(
+                f"Cannot create temporary video: "
+                f"{temp_video_path}"
+            )
 
-        # Processing state
-        all_frames: list[dict] = []
-        all_track_ids: set[int] = set()
+        all_frames = []
+        all_track_ids = set()
+
         total_detections = 0
         frame_index = 0
+
         start_time = time.time()
 
-        print(f"[TraceNet] Processing...")
+        print("[TraceNet] Processing video...")
 
         try:
             while True:
                 ret, frame = cap.read()
+
                 if not ret:
                     break
 
-                # Run YOLO detection + ByteTrack tracking
                 results = self.model.track(
                     frame,
                     persist=True,
@@ -117,30 +197,55 @@ class VehicleTracker:
                     verbose=False,
                 )
 
-                frame_detections = self._extract_detections(results)
-                annotated_frame = self._annotate_frame(frame, frame_detections)
+                frame_detections = self._extract_detections(
+                    results
+                )
+
+                annotated_frame = self._annotate_frame(
+                    frame,
+                    frame_detections,
+                )
+
                 writer.write(annotated_frame)
 
-                if frame_detections:
-                    timestamp = frame_index / fps if fps > 0 else 0.0
-                    all_frames.append({
+                timestamp = (
+                    frame_index / fps
+                    if fps > 0
+                    else 0.0
+                )
+
+                all_frames.append(
+                    {
                         "frame_index": frame_index,
                         "timestamp": round(timestamp, 3),
                         "detections": frame_detections,
-                    })
-                    total_detections += len(frame_detections)
-                    for det in frame_detections:
-                        if det["track_id"] is not None:
-                            all_track_ids.add(det["track_id"])
+                    }
+                )
+
+                total_detections += len(frame_detections)
+
+                for detection in frame_detections:
+                    track_id = detection["track_id"]
+
+                    if track_id is not None:
+                        all_track_ids.add(track_id)
 
                 frame_index += 1
 
-                # Progress indicator every 200 frames
                 if frame_index % 200 == 0:
                     elapsed = time.time() - start_time
-                    proc_fps = frame_index / elapsed if elapsed > 0 else 0
-                    print(f"[TraceNet]   Frame {frame_index}/{total_frames}"
-                          f"  ({proc_fps:.1f} proc-fps)")
+
+                    proc_fps = (
+                        frame_index / elapsed
+                        if elapsed > 0
+                        else 0
+                    )
+
+                    print(
+                        f"[TraceNet] Frame "
+                        f"{frame_index}/{total_frames} "
+                        f"({proc_fps:.1f} proc-fps)"
+                    )
 
         finally:
             cap.release()
@@ -148,7 +253,14 @@ class VehicleTracker:
 
         elapsed = time.time() - start_time
 
-        # Write JSON results
+        if frame_index == 0:
+            self._safe_delete(temp_video_path)
+
+            raise RuntimeError(
+                "No frames were processed from the input video."
+            )
+
+        # Write detection JSON.
         json_output = {
             "camera_id": camera_id,
             "video": video_path.name,
@@ -161,10 +273,28 @@ class VehicleTracker:
             "frames": all_frames,
         }
 
-        with open(out_json_path, "w") as f:
-            json.dump(json_output, f, indent=2)
+        with open(
+            json_path,
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(
+                json_output,
+                file,
+                indent=2,
+            )
 
-        # Print summary
+        print("[TraceNet] Detection JSON written.")
+
+        # Convert temporary video to browser-compatible H.264.
+        self._convert_to_browser_mp4(
+            temp_video_path,
+            final_video_path,
+        )
+
+        # Delete temporary intermediate file.
+        self._safe_delete(temp_video_path)
+
         summary = {
             "camera_id": camera_id,
             "input_video": str(video_path),
@@ -173,90 +303,267 @@ class VehicleTracker:
             "total_detections": total_detections,
             "unique_track_ids": len(all_track_ids),
             "processing_time": f"{elapsed:.1f}s",
-            "processing_fps": round(frame_index / elapsed, 1) if elapsed > 0 else 0,
-            "output_video": str(out_video_path),
-            "output_json": str(out_json_path),
+            "processing_fps": (
+                round(frame_index / elapsed, 1)
+                if elapsed > 0
+                else 0
+            ),
+            "output_video": str(final_video_path),
+            "output_json": str(json_path),
         }
 
         print()
-        print("=" * 60)
-        print("  TraceNet — Processing Summary")
-        print("=" * 60)
-        for key, val in summary.items():
+        print("=" * 65)
+        print("  TraceNet — Phase 1 Complete")
+        print("=" * 65)
+
+        for key, value in summary.items():
             label = key.replace("_", " ").title()
-            print(f"  {label:<22}: {val}")
-        print("=" * 60)
+            print(f"  {label:<25}: {value}")
+
+        print("=" * 65)
 
         return summary
 
-    # ── internal helpers ────────────────────────────────────────────────
+    @staticmethod
+    def _convert_to_browser_mp4(
+        input_path: Path,
+        output_path: Path,
+    ) -> None:
+        """
+        Convert intermediate video to browser-compatible MP4.
+
+        Final format:
+            H.264 / AVC
+            yuv420p
+            faststart
+        """
+
+        try:
+            import imageio_ffmpeg
+        except ImportError as exc:
+            raise RuntimeError(
+                "imageio-ffmpeg is not installed. "
+                "Run: python -m pip install -r backend/requirements.txt"
+            ) from exc
+
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+
+        if not ffmpeg:
+            raise RuntimeError(
+                "FFmpeg executable could not be located."
+            )
+
+        output_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        # Remove an old output first.
+        VehicleTracker._safe_delete(output_path)
+
+        command = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(input_path),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-an",
+            str(output_path),
+        ]
+
+        print("[TraceNet] Encoding final browser-compatible MP4...")
+        print("[TraceNet] Codec: H.264 / yuv420p")
+
+        try:
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+        except OSError as exc:
+            raise RuntimeError(
+                f"Could not start FFmpeg: {exc}"
+            ) from exc
+
+        if result.returncode != 0:
+            error_text = result.stderr[-3000:]
+
+            raise RuntimeError(
+                "FFmpeg encoding failed.\n"
+                f"{error_text}"
+            )
+
+        if not output_path.exists():
+            raise RuntimeError(
+                "FFmpeg reported success but the final "
+                f"video was not created: {output_path}"
+            )
+
+        if output_path.stat().st_size == 0:
+            raise RuntimeError(
+                f"Final video is empty: {output_path}"
+            )
+
+        print(
+            f"[TraceNet] Final video: {output_path}"
+        )
+
+    @staticmethod
+    def _safe_delete(path: Path) -> None:
+        """Delete a file if it exists."""
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError:
+            pass
 
     @staticmethod
     def _extract_detections(results) -> list[dict]:
-        """Pull vehicle detections from a YOLO results object."""
-        detections: list[dict] = []
+        """Extract vehicle detections from YOLO results."""
+
+        detections = []
 
         if not results or len(results) == 0:
             return detections
 
-        result = results[0]  # single image
+        result = results[0]
         boxes = result.boxes
+
         if boxes is None or len(boxes) == 0:
             return detections
 
         for i in range(len(boxes)):
             cls_id = int(boxes.cls[i].item())
+
             if cls_id not in VEHICLE_CLASS_IDS:
                 continue
 
-            conf = round(float(boxes.conf[i].item()), 3)
+            confidence = round(
+                float(boxes.conf[i].item()),
+                3,
+            )
+
             x1, y1, x2, y2 = boxes.xyxy[i].tolist()
-            bbox = [round(v, 1) for v in [x1, y1, x2, y2]]
+
+            bbox = [
+                round(x1, 1),
+                round(y1, 1),
+                round(x2, 1),
+                round(y2, 1),
+            ]
 
             track_id = None
-            if boxes.id is not None:
-                track_id = int(boxes.id[i].item())
 
-            detections.append({
-                "track_id": track_id,
-                "class_name": VEHICLE_CLASS_NAMES[cls_id],
-                "confidence": conf,
-                "bbox": bbox,
-            })
+            if boxes.id is not None:
+                track_id = int(
+                    boxes.id[i].item()
+                )
+
+            detections.append(
+                {
+                    "track_id": track_id,
+                    "class_name": VEHICLE_CLASS_NAMES[cls_id],
+                    "confidence": confidence,
+                    "bbox": bbox,
+                }
+            )
 
         return detections
 
     @staticmethod
-    def _annotate_frame(frame, detections: list[dict]):
-        """Draw bounding boxes and labels onto a frame copy."""
+    def _annotate_frame(
+        frame,
+        detections: list[dict],
+    ):
+        """Draw vehicle boxes and track labels."""
+
         annotated = frame.copy()
 
-        for det in detections:
-            x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
-            cls_name = det["class_name"].upper()
-            conf = det["confidence"]
-            track_id = det["track_id"]
-            color = CLASS_COLORS.get(det["class_name"], DEFAULT_COLOR)
+        for detection in detections:
+            x1, y1, x2, y2 = [
+                int(value)
+                for value in detection["bbox"]
+            ]
 
-            # Bounding box
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+            class_name = detection["class_name"].upper()
+            confidence = detection["confidence"]
+            track_id = detection["track_id"]
 
-            # Label text
+            color = CLASS_COLORS.get(
+                detection["class_name"],
+                DEFAULT_COLOR,
+            )
+
+            cv2.rectangle(
+                annotated,
+                (x1, y1),
+                (x2, y2),
+                color,
+                2,
+            )
+
             if track_id is not None:
-                label = f"{cls_name} | ID: {track_id} | {conf:.2f}"
+                label = (
+                    f"{class_name} | "
+                    f"ID: {track_id} | "
+                    f"{confidence:.2f}"
+                )
             else:
-                label = f"{cls_name} | {conf:.2f}"
+                label = (
+                    f"{class_name} | "
+                    f"{confidence:.2f}"
+                )
 
-            # Background rectangle for text readability
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 0.5
             thickness = 1
-            (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
-            cv2.rectangle(annotated, (x1, y1 - th - 8), (x1 + tw + 4, y1), color, -1)
+
+            (text_width, text_height), baseline = (
+                cv2.getTextSize(
+                    label,
+                    font,
+                    font_scale,
+                    thickness,
+                )
+            )
+
+            label_y1 = max(
+                0,
+                y1 - text_height - 8,
+            )
+
+            cv2.rectangle(
+                annotated,
+                (x1, label_y1),
+                (
+                    x1 + text_width + 4,
+                    y1,
+                ),
+                color,
+                -1,
+            )
+
             cv2.putText(
-                annotated, label,
+                annotated,
+                label,
                 (x1 + 2, y1 - 4),
-                font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA,
+                font,
+                font_scale,
+                (255, 255, 255),
+                thickness,
+                cv2.LINE_AA,
             )
 
         return annotated
