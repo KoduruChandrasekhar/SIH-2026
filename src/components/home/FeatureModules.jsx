@@ -3,7 +3,7 @@ import { ArrowRight, Bell, LayoutDashboard, Navigation, TrafficCone } from "luci
 import { areas } from "../../data";
 import { DEMO_ROUTE_PATH, cameraDisplayId } from "../../demoData";
 
-const SEVERITY_DOT = { CRITICAL: "bg-red-500", HIGH: "bg-amber-500", MEDIUM: "bg-yellow-400" };
+const SEVERITY_DOT = { CRITICAL: "bg-red-500", HIGH: "bg-orange-500", MEDIUM: "bg-amber-400" };
 
 // Card shell shared by the four modules
 const Module = forwardRef(function Module(
@@ -74,14 +74,14 @@ function OdBars({ odRoutes }) {
 function ZoneSpeeds() {
   const max = Math.max(...areas.map((a) => parseInt(a.speed, 10)));
   return (
-    <div className="flex h-20 items-end gap-2.5" role="img" aria-label="Average speed by city zone">
+    <div className="flex h-24 items-end gap-2.5" role="img" aria-label="Average speed by city zone, km/h at the evening peak">
       {areas.map((a) => {
         const speed = parseInt(a.speed, 10);
         return (
           <div key={a.name} className="flex flex-1 flex-col items-center gap-1.5" title={`${a.title}: ${a.speed}`}>
             <span className="text-[10px] font-bold tabular-nums text-slate-400">{speed}</span>
             <div className="w-full rounded-t-md" style={{ height: `${(speed / max) * 44}px`, background: a.color, opacity: 0.75 }} />
-            <span className="w-full truncate text-center text-[9.5px] font-semibold text-slate-500">{a.name.split(" ")[0]}</span>
+            <span className="w-full truncate text-center text-[9.5px] font-semibold text-slate-500">{a.name.split(" /")[0]}</span>
           </div>
         );
       })}
@@ -133,27 +133,10 @@ export default function FeatureModules({ activeMode, setModuleRef, onFocusModule
 
   return (
     <div className="tn-module-stack">
-      <div className="tn-module-slot">
-        <Module
-          {...common("flow")}
-          step="01 · Macro flow"
-          icon={TrafficCone}
-          accent="#38bdf8"
-          badge={`${odRoutes.length} OD corridors`}
-          badgeDot="bg-sky-400"
-          title="Macro Traffic Flow & Origin Analytics"
-          description="City-wide analytics that aggregates live feeds to understand corridor density, origin-destination movement patterns and traffic bottlenecks."
-          cta="View Macro Analytics"
-          onCta={() => navigate("traffic")}
-        >
-          <OdBars odRoutes={odRoutes} />
-        </Module>
-      </div>
-
-      <div className="tn-module-slot">
+      <div className="tn-module-slot" data-reveal>
         <Module
           {...common("overview")}
-          step="02 · Overview"
+          step="01 · Dashboard"
           icon={LayoutDashboard}
           accent="#a78bfa"
           badge={`${avgSpeed} avg`}
@@ -167,10 +150,10 @@ export default function FeatureModules({ activeMode, setModuleRef, onFocusModule
         </Module>
       </div>
 
-      <div className="tn-module-slot">
+      <div className="tn-module-slot" data-reveal>
         <Module
           {...common("trajectory")}
-          step="03 · Tracking"
+          step="02 · Tracking"
           icon={Navigation}
           accent="#60a5fa"
           badge={`${nodes} Feeds Active`}
@@ -184,7 +167,24 @@ export default function FeatureModules({ activeMode, setModuleRef, onFocusModule
         </Module>
       </div>
 
-      <div className="tn-module-slot">
+      <div className="tn-module-slot" data-reveal>
+        <Module
+          {...common("flow")}
+          step="03 · Traffic"
+          icon={TrafficCone}
+          accent="#38bdf8"
+          badge={`${odRoutes.length} OD corridors`}
+          badgeDot="bg-sky-400"
+          title="Traffic — Macro Flow & Origin Analytics"
+          description="City-wide analytics that aggregates live feeds to understand corridor density, origin-destination movement patterns and traffic bottlenecks."
+          cta="Analyze Traffic"
+          onCta={() => navigate("traffic")}
+        >
+          <OdBars odRoutes={odRoutes} />
+        </Module>
+      </div>
+
+      <div className="tn-module-slot" data-reveal>
         <Module
           {...common("alerts")}
           step="04 · Alerts"

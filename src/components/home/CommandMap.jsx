@@ -9,13 +9,13 @@ import {
   Tooltip,
   useMap,
 } from "react-leaflet";
-import { areas } from "../../data";
+import { areas, cameraRegistry } from "../../data";
 import { CAMERA_NETWORK_EDGES, CAMERA_NETWORK_NODES, DEMO_PLATE, DEMO_ROUTE_PATH } from "../../demoData";
 
 export const MAP_MODES = [
-  { id: "flow", label: "Flow", title: "Macro traffic flow", hint: "Origin–destination corridors & zone density" },
   { id: "overview", label: "Overview", title: "Network overview", hint: "City zones & synchronized camera nodes" },
   { id: "trajectory", label: "Trajectory", title: "GIS tracking", hint: `Reconstructed trajectory · ${DEMO_PLATE}` },
+  { id: "flow", label: "Traffic", title: "Macro traffic flow", hint: "Origin–destination corridors & zone density" },
   { id: "alerts", label: "Alerts", title: "Alerts & congestion", hint: "Priority flags & congestion zones" },
 ];
 
@@ -26,9 +26,14 @@ const areaPos = (name) => {
   return areas.find((a) => a.name.toLowerCase().includes(key))?.position;
 };
 
-const SEVERITY_COLOR = { CRITICAL: "#ef4444", HIGH: "#f59e0b", MEDIUM: "#eab308" };
+const SEVERITY_COLOR = { CRITICAL: "#ef4444", HIGH: "#f97316", MEDIUM: "#eab308" };
+const NODE_STYLE = {
+  online: { color: "#a5b4fc", fill: "#6366f1" },
+  degraded: { color: "#fde68a", fill: "#f59e0b" },
+  offline: { color: "#fecaca", fill: "#ef4444" },
+};
 const ROUTE_POINTS = DEMO_ROUTE_PATH.map((id) => nodeById[id]).filter(Boolean);
-const CITY_BOUNDS = areas.map((a) => a.position).concat(CAMERA_NETWORK_NODES.map((n) => [n.lat, n.lng]));
+const CITY_BOUNDS = areas.map((a) => a.position).concat(cameraRegistry.map((c) => [c.lat, c.lng]));
 
 // Moves the (single, persistent) map to fit the active layer; never re-creates it.
 function MapViewController({ bounds, reducedMotion, maximized }) {
@@ -53,7 +58,7 @@ function MapViewController({ bounds, reducedMotion, maximized }) {
 export default function CommandMap({ mode, onModeChange, telemetry, navigate, reducedMotion }) {
   const [maximized, setMaximized] = useState(false);
   const { nodes, alerts, odRoutes, source } = telemetry;
-  const activeMode = MAP_MODES.find((m) => m.id === mode) ?? MAP_MODES[1];
+  const activeMode = MAP_MODES.find((m) => m.id === mode) ?? MAP_MODES[0];
 
   // Touch devices: don't let the map swallow page scrolling
   const [coarsePointer] = useState(() => window.matchMedia?.("(pointer: coarse)").matches ?? false);
@@ -256,18 +261,20 @@ export default function CommandMap({ mode, onModeChange, telemetry, navigate, re
                 </CircleMarker>
               ))}
 
-            {/* Camera nodes — always on top */}
-            {CAMERA_NETWORK_NODES.map((n) => {
+            {/* Camera nodes (all registry cameras, coloured by health) — always on top */}
+            {cameraRegistry.map((n) => {
               const onRoute = mode === "trajectory" && DEMO_ROUTE_PATH.includes(n.id);
+              const style = NODE_STYLE[n.status] ?? NODE_STYLE.online;
               return (
                 <CircleMarker
                   key={n.id}
                   center={[n.lat, n.lng]}
                   radius={onRoute ? 6 : 4.5}
-                  pathOptions={{ color: onRoute ? "#dbeafe" : "#a5b4fc", weight: 1.5, fillColor: onRoute ? "#3b82f6" : "#6366f1", fillOpacity: 0.95 }}
+                  pathOptions={{ color: onRoute ? "#dbeafe" : style.color, weight: 1.5, fillColor: onRoute ? "#3b82f6" : style.fill, fillOpacity: 0.95 }}
                 >
                   <Tooltip direction="top" className="tn-map-tip">
-                    <strong>{n.id}</strong> · {n.name}
+                    <strong>{n.code}</strong> · {n.name}
+                    {n.status !== "online" && <> · {n.status}</>}
                   </Tooltip>
                 </CircleMarker>
               );

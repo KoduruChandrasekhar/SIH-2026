@@ -1,222 +1,256 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Navigation, Pause, Play } from "lucide-react";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraRegistry, hourlyTraffic, systemMetrics } from "../../data";
 
-// Hero media sequence: global view (Earth zooming into India) → city view (street-level traffic).
-const CLIPS = {
-  globe: {
-    src: "/hero/globe-india.mp4",
-    poster: "/hero/globe-india-poster.jpg",
-    caption: "Global view · India",
-  },
-  city: {
-    src: "/hero/city-traffic-timelapse.mp4",
-    poster: "/hero/city-traffic-timelapse-poster.jpg",
-    caption: "City view · Street level",
-  },
-};
-
-const CROSSFADE_S = 1.6; // start the crossfade this many seconds before the globe clip ends
-const CITY_HOLD_MS = 9800; // two passes of the ~4.9s traffic loop, then back to the globe
-
-const CAPABILITIES = [
-  "Multi-camera ANPR",
-  "Trajectory reconstruction",
-  "City-wide traffic analytics",
-  "GIS intelligence",
+// ── Hero media sequence ─────────────────────────────────────────────
+// Three story stages, four clips: the street stage shows the cameras, then what they see.
+const CLIPS = [
+  { id: "globe", stage: 0, src: "/hero/globe-india.mp4", poster: "/hero/globe-india-poster.jpg", plays: 1, fallback: 10 },
+  { id: "cctv", stage: 1, src: "/hero/cctv-cameras.mp4", poster: "/hero/cctv-cameras-poster.jpg", plays: 1, fallback: 4.9 },
+  { id: "street", stage: 1, src: "/hero/city-traffic-timelapse.mp4", poster: "/hero/city-traffic-timelapse-poster.jpg", plays: 2, fallback: 4.9 },
+  { id: "aerial", stage: 2, src: "/hero/aerial-city-night.mp4", poster: "/hero/aerial-city-night-poster.jpg", plays: 1, fallback: 14.4 },
 ];
+
+const now = hourlyTraffic[Number(SNAPSHOT_TIME.slice(0, 2))];
+const readsPerHour = cameraRegistry.reduce((s, c) => s + c.lastHour, 0);
+
+const STAGES = [
+  {
+    short: "Global",
+    label: "Global view · India",
+    heading: "City-wide AI engine",
+    body: "One connected intelligence layer over every ANPR camera in the city — built for Indian urban traffic.",
+    ticker: `${systemMetrics.totalNodesActive} ANPR nodes · 5 zones · Hyderabad`,
+  },
+  {
+    short: "Street",
+    label: "Street view · Multi-camera",
+    heading: "Multi-camera vehicle intelligence",
+    body: `ANPR reads linked across cameras to reconstruct each vehicle's path, engineered for a >${OCR_ACCURACY_TARGET}% OCR accuracy target through glare, rain, motion blur and angled or damaged plates.`,
+    ticker: `${readsPerHour.toLocaleString("en-IN")} plate reads / hour · OCR target >${OCR_ACCURACY_TARGET}%`,
+  },
+  {
+    short: "City",
+    label: "Urban flow · Aerial view",
+    heading: "Macro traffic analytics",
+    body: "Density, route volumes, congestion and origin–destination movement across the whole city, on one GIS map.",
+    ticker: `${(now.flow / 1000).toFixed(1)}k veh/h · ${now.density}% capacity · ${now.speed} km/h at ${now.hour}`,
+  },
+];
+
+const FADE_S = 1.4; // crossfade overlap before a clip ends
+
+const firstClipOf = (stage) => CLIPS.findIndex((c) => c.stage === stage);
 
 export default function HeroSection({ navigate, onEnter, reducedMotion }) {
   const heroRef = useRef(null);
-  const globeRef = useRef(null);
-  const cityRef = useRef(null);
-  const cityPrimed = useRef(false);
+  const videoRefs = useRef([]);
+  const barRefs = useRef([]);
+  const playCount = useRef(0);
+  const primed = useRef(new Set([0]));
 
-  const [phase, setPhase] = useState("globe");
+  const [active, setActive] = useState(0);
   const [inView, setInView] = useState(true);
-  // Reduced-motion users start on the still poster and can opt in with the play control
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  // Reduced-motion users start on the still poster; the play control opts in
   const [paused, setPaused] = useState(reducedMotion);
 
-  useEffect(() => {
-    setPaused(reducedMotion);
-  }, [reducedMotion]);
+  useEffect(() => setPaused(reducedMotion), [reducedMotion]);
 
-  // Stop decoding video while the hero is scrolled out of view
+  // Only decode video while the hero is on screen and the tab is visible
   useEffect(() => {
     const el = heroRef.current;
     if (!el) return;
-    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
-      threshold: 0.05,
-    });
+    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { threshold: 0.05 });
     io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  // Browsers defer media in background tabs — resume once the page is visible again
-  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
-  useEffect(() => {
-    const onVisibility = () => setPageVisible(!document.hidden);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
+    const onVis = () => setPageVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   const playing = inView && pageVisible && !paused;
+  const stage = CLIPS[active].stage;
 
-  // Play the visible clip; pause the hidden one once the crossfade has finished
-  useEffect(() => {
-    const globe = globeRef.current;
-    const city = cityRef.current;
-    if (!globe || !city) return;
-    if (!playing) {
-      globe.pause();
-      city.pause();
-      return;
-    }
-    const [current, other] = phase === "globe" ? [globe, city] : [city, globe];
-    current.play().catch((err) => {
-      // Autoplay blocked (e.g. power-saving mode): fall back to the poster + play control
-      if (err?.name === "NotAllowedError") setPaused(true);
-    });
-    const t = setTimeout(() => other.pause(), CROSSFADE_S * 1000);
-    return () => clearTimeout(t);
-  }, [phase, playing]);
-
-  // Hold on the city view, then return to the globe
-  useEffect(() => {
-    if (phase !== "city" || !playing) return;
-    const t = setTimeout(() => {
-      if (globeRef.current) globeRef.current.currentTime = 0;
-      setPhase("globe");
-    }, CITY_HOLD_MS);
-    return () => clearTimeout(t);
-  }, [phase, playing]);
-
-  const goToCity = useCallback(() => {
-    if (cityRef.current) cityRef.current.currentTime = 0;
-    setPhase("city");
+  const goTo = useCallback((index) => {
+    const v = videoRefs.current[index];
+    if (v) v.currentTime = 0;
+    playCount.current = 0;
+    setActive(index);
   }, []);
 
-  // Only fetch the traffic clip once the globe is actually playing
-  const primeCity = () => {
-    const city = cityRef.current;
-    if (cityPrimed.current || !city) return;
-    cityPrimed.current = true;
-    city.preload = "auto";
-    city.load();
+  const advance = useCallback(() => goTo((active + 1) % CLIPS.length), [active, goTo]);
+
+  // Play the active clip; pause the others once the crossfade has finished
+  useEffect(() => {
+    const vids = videoRefs.current;
+    if (!playing) {
+      vids.forEach((v) => v?.pause());
+      return;
+    }
+    vids[active]?.play().catch((err) => {
+      if (err?.name === "NotAllowedError") setPaused(true);
+    });
+    const t = setTimeout(() => vids.forEach((v, i) => i !== active && v?.pause()), FADE_S * 1000 + 200);
+    return () => clearTimeout(t);
+  }, [active, playing]);
+
+  // Fetch the next clip only once the current one is actually playing
+  const primeNext = () => {
+    const next = (active + 1) % CLIPS.length;
+    const v = videoRefs.current[next];
+    if (!v || primed.current.has(next)) return;
+    primed.current.add(next);
+    v.preload = "auto";
+    v.load();
   };
 
-  const onGlobeTime = (e) => {
+  const onTime = (i) => (e) => {
+    if (i !== active) return;
     const v = e.currentTarget;
-    if (phase === "globe" && v.duration && v.duration - v.currentTime <= CROSSFADE_S) goToCity();
+    const clip = CLIPS[i];
+    if (playCount.current >= clip.plays - 1 && v.duration && v.duration - v.currentTime <= FADE_S) advance();
   };
 
-  const clip = CLIPS[phase];
+  const onEnded = (i) => (e) => {
+    if (i !== active) return;
+    playCount.current += 1;
+    if (playCount.current < CLIPS[i].plays) {
+      e.currentTarget.currentTime = 0;
+      e.currentTarget.play().catch(() => {});
+    } else advance();
+  };
+
+  // Stage progress bars — written straight to the DOM (no React re-renders per frame).
+  // Snap them on every stage change (also while paused), then animate while playing.
+  useEffect(() => {
+    barRefs.current.forEach((bar, s) => {
+      if (bar) bar.style.transform = `scaleX(${s < stage ? 1 : 0})`;
+    });
+  }, [stage]);
+
+  useEffect(() => {
+    if (!playing) return;
+    let raf;
+    const tick = () => {
+      const clipsInStage = CLIPS.map((c, i) => ({ ...c, i })).filter((c) => c.stage === stage);
+      const len = (c) => (videoRefs.current[c.i]?.duration || c.fallback) * c.plays;
+      const total = clipsInStage.reduce((s, c) => s + len(c), 0);
+      let done = 0;
+      for (const c of clipsInStage) {
+        if (c.i < active) done += len(c);
+        if (c.i === active) {
+          const v = videoRefs.current[c.i];
+          done += (v?.duration || c.fallback) * playCount.current + (v?.currentTime || 0);
+        }
+      }
+      barRefs.current.forEach((bar, s) => {
+        if (bar) bar.style.transform = `scaleX(${s < stage ? 1 : s > stage ? 0 : Math.min(1, done / total)})`;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, active, stage]);
+
+  const copy = STAGES[stage];
 
   return (
-    <section
-      ref={heroRef}
-      aria-labelledby="tn-hero-title"
-      className="tn-hero relative isolate flex min-h-[88svh] flex-col overflow-hidden lg:min-h-[100svh] lg:pt-[var(--tn-nav-h)]"
-    >
-      <div className="tn-hero-grid" aria-hidden="true" />
-      <div className="tn-hero-glow" aria-hidden="true" />
+    <section ref={heroRef} aria-labelledby="tn-hero-title" className="tn-hero" data-stage={stage}>
+      {/* Media: full-bleed clips, crossfading */}
+      <div className="tn-hero-media" aria-hidden="true">
+        {CLIPS.map((clip, i) => (
+          <video
+            key={clip.id}
+            ref={(el) => (videoRefs.current[i] = el)}
+            className={`tn-hero-clip tn-hero-clip--${clip.id} ${i === active ? "is-active" : ""}`}
+            src={clip.src}
+            poster={clip.poster}
+            muted
+            playsInline
+            autoPlay={i === 0 && !reducedMotion}
+            preload={i === 0 ? "auto" : "none"}
+            disablePictureInPicture
+            onPlaying={i === active ? primeNext : undefined}
+            onTimeUpdate={onTime(i)}
+            onEnded={onEnded(i)}
+          />
+        ))}
+      </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col items-center justify-center px-4 pb-24 pt-6 sm:px-8 lg:pb-28">
-        <h1 id="tn-hero-title" className="sr-only">
-          TraceNet — City-wide AI engine for multi-camera vehicle intelligence
-        </h1>
-
-        {/* TRACE  [ media ]  NET */}
-        <div className="tn-hero-lockup">
-          <span className="tn-hero-word tn-hero-word--left" aria-hidden="true">
-            Trace
-          </span>
-
-          <div className="tn-portal" data-phase={phase}>
-            <div className="tn-portal-ring tn-portal-ring--sweep" aria-hidden="true" />
-            <div className="tn-portal-ring tn-portal-ring--ticks" aria-hidden="true" />
-            <div className="tn-portal-lens" aria-hidden="true">
-              <video
-                ref={globeRef}
-                className={`tn-portal-media tn-portal-media--globe ${phase === "globe" ? "is-active" : ""}`}
-                src={CLIPS.globe.src}
-                poster={CLIPS.globe.poster}
-                autoPlay={!reducedMotion}
-                muted
-                playsInline
-                preload="auto"
-                disablePictureInPicture
-                onPlaying={primeCity}
-                onTimeUpdate={onGlobeTime}
-                onEnded={() => phase === "globe" && goToCity()}
-              />
-              <video
-                ref={cityRef}
-                className={`tn-portal-media tn-portal-media--city ${phase === "city" ? "is-active" : ""}`}
-                src={CLIPS.city.src}
-                poster={CLIPS.city.poster}
-                muted
-                loop
-                playsInline
-                preload="none"
-                disablePictureInPicture
-              />
-              <div className="tn-portal-vignette" />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPaused((p) => !p)}
-              className="tn-portal-control"
-              aria-label={paused ? "Play hero video" : "Pause hero video"}
-            >
-              {paused ? <Play size={14} /> : <Pause size={14} />}
-            </button>
-
-            <div className="tn-portal-caption" aria-live="polite">
-              <span className={`tn-portal-caption-dot ${phase === "city" ? "is-city" : ""}`} />
-              {clip.caption}
-            </div>
-          </div>
-
-          <span className="tn-hero-word tn-hero-word--right" aria-hidden="true">
-            Net
-          </span>
-        </div>
-
-        {/* Supporting message */}
-        <p className="mt-8 max-w-[40rem] text-center text-[13px] font-extrabold uppercase leading-relaxed tracking-[0.28em] text-slate-100 sm:text-sm md:mt-16">
-          City-wide AI engine for
-          <br />
-          <span className="text-blue-300">multi-camera vehicle intelligence</span>
-        </p>
-
-        <ul className="mt-4 flex max-w-[44rem] flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[12px] font-semibold text-slate-400">
-          {CAPABILITIES.map((c, i) => (
-            <li key={c} className="flex items-center gap-3">
-              {i > 0 && <span className="h-1 w-1 rounded-full bg-blue-500/70" aria-hidden="true" />}
-              {c}
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <button type="button" onClick={() => navigate("dashboard")} className="tn-btn-primary">
-            Open Command Center
-            <ArrowRight size={16} className="tn-btn-arrow" />
-          </button>
-          <button type="button" onClick={() => navigate("tracking")} className="tn-btn-secondary">
-            <Navigation size={15} />
-            Track a Vehicle
-          </button>
+      {/* Knockout: navy tint everywhere, white letterforms → the video shows through TRACE NET */}
+      <div className="tn-hero-knockout" aria-hidden="true">
+        <div className="tn-hero-stage">
+          <p className="tn-hero-title">
+            <span>Trace</span> <span>Net</span>
+          </p>
         </div>
       </div>
 
-      <button type="button" onClick={onEnter} className="tn-scroll-cue" aria-label="Scroll to enter the command center">
-        <span>Scroll to enter</span>
-        <ChevronDown size={16} className="tn-scroll-cue-arrow" />
-      </button>
+      {/* Content */}
+      <div className="tn-hero-content">
+        <div className="tn-hero-stage">
+          <h1 id="tn-hero-title" className="tn-hero-title tn-hero-title--outline">
+            <span className="sr-only">TraceNet — city-wide AI engine for multi-camera ANPR trajectory tracking and urban traffic analytics</span>
+            <span aria-hidden="true">Trace</span> <span aria-hidden="true">Net</span>
+          </h1>
 
-      <div className="tn-hero-fade" aria-hidden="true" />
+          <div key={stage} className="tn-hero-copy">
+            <p className="tn-hero-label">
+              <span className="tn-hero-label-dot" aria-hidden="true" />
+              {copy.label}
+            </p>
+            <h2 className="tn-hero-heading">{copy.heading}</h2>
+            <p className="tn-hero-body">{copy.body}</p>
+            <p className="tn-hero-ticker">{copy.ticker}</p>
+          </div>
+
+          <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <button type="button" onClick={() => navigate("dashboard")} className="tn-btn-primary">
+              Open Command Center
+              <ArrowRight size={16} className="tn-btn-arrow" />
+            </button>
+            <button type="button" onClick={() => navigate("tracking")} className="tn-btn-secondary">
+              <Navigation size={15} />
+              Track a Vehicle
+            </button>
+          </div>
+
+          {/* Stage navigation + progress */}
+          <div className="tn-hero-stages" role="group" aria-label="Hero video sequence">
+            {STAGES.map((s, i) => (
+              <button
+                key={s.short}
+                type="button"
+                onClick={() => goTo(firstClipOf(i))}
+                aria-pressed={stage === i}
+                className={`tn-hero-stage-btn ${stage === i ? "is-active" : ""}`}
+              >
+                <span className="tn-hero-stage-num">0{i + 1}</span>
+                {s.short}
+                <span className="tn-hero-stage-track" aria-hidden="true">
+                  <span ref={(el) => (barRefs.current[i] = el)} className="tn-hero-stage-bar" />
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPaused((p) => !p)}
+              className="tn-hero-play"
+              aria-label={paused ? "Play hero video" : "Pause hero video"}
+            >
+              {paused ? <Play size={13} /> : <Pause size={13} />}
+            </button>
+          </div>
+        </div>
+
+        <button type="button" onClick={onEnter} className="tn-scroll-cue" aria-label="Scroll to enter the command center">
+          <span>Scroll to enter</span>
+          <ChevronDown size={16} className="tn-scroll-cue-arrow" />
+        </button>
+      </div>
     </section>
   );
 }

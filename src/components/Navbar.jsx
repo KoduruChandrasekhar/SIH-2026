@@ -1,13 +1,17 @@
+import { useState } from "react";
 import {
   Bell,
+  Cctv,
   Home,
   LayoutDashboard,
   LogIn,
+  Menu,
   Moon,
   Navigation,
   Route,
   Sun,
   TrafficCone,
+  X,
 } from "lucide-react";
 
 import tracenetLogo from "../assets/tracenet-logo.jpg"; 
@@ -15,6 +19,12 @@ import { useTheme } from "../ThemeContext";
 
 export default function Navbar({ page, navigate, openModal }) {
   const { theme, toggleTheme } = useTheme();
+  // Below xl the links collapse behind a menu button
+  const [menuOpen, setMenuOpen] = useState(false);
+  const go = (target) => {
+    setMenuOpen(false);
+    navigate(target);
+  };
 
   const item = (label, icon, target) => {
     const Icon = icon;
@@ -25,7 +35,8 @@ export default function Navbar({ page, navigate, openModal }) {
     return (
       <button
         key={label}
-        onClick={() => navigate(target)}
+        onClick={() => go(target)}
+        aria-current={isActive ? "page" : undefined}
         className={`
           group
           relative
@@ -87,16 +98,16 @@ export default function Navbar({ page, navigate, openModal }) {
         py-3.5
         shadow-[0_8px_32px_rgba(0,0,0,0.06)]
         backdrop-blur-2xl
-        lg:flex-row
-        lg:items-center
-        lg:justify-between
+        xl:flex-row
+        xl:items-center
+        xl:justify-between
         transition-all
       "
     >
       {/* BRAND LOGO & TITLE */}
-      <div className="flex items-center justify-between lg:justify-start gap-4">
+      <div className="flex items-center justify-between xl:justify-start gap-4">
         <button
-          onClick={() => navigate("home")}
+          onClick={() => go("home")}
           className="group flex items-center gap-3 text-left transition-transform active:scale-95"
         >
           {/* Logo Image */}
@@ -145,27 +156,43 @@ export default function Navbar({ page, navigate, openModal }) {
             </p>
           </div>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setMenuOpen((o) => !o)}
+          className="tn-nav-toggle flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-[#636366] transition hover:text-blue-600"
+          aria-expanded={menuOpen}
+          aria-controls="tn-primary-nav"
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+        >
+          {menuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
       </div>
 
       {/* NAVIGATION LINKS & CONTROLS */}
       <nav
-        className="
-          flex
+        id="tn-primary-nav"
+        aria-label="Primary"
+        className={`
+          tn-nav-menu
           flex-wrap
           items-center
           gap-1
           sm:gap-1.5
-          lg:flex-nowrap
-        "
+          xl:flex-nowrap
+          ${menuOpen ? "is-open" : ""}
+        `}
       >
         {item("Home", Home, "home")}
         {item("Dashboard", LayoutDashboard, "dashboard")}
+        {item("Cameras", Cctv, "cameras")}
         {item("Tracking", Navigation, "tracking")}
         {item("Traffic", TrafficCone, "traffic")}
 
         {/* Alerts Route Button with Red FX */}
         <button
-          onClick={() => navigate("alerts")}
+          onClick={() => go("alerts")}
+          aria-current={isAlertsActive ? "page" : undefined}
           className={`
             group
             relative
@@ -216,7 +243,8 @@ export default function Navbar({ page, navigate, openModal }) {
 
         {/* Operator Login Button */}
         <button
-          onClick={() => navigate("login")}
+          onClick={() => go("login")}
+          aria-label="Operator login"
           className="
             group
             relative

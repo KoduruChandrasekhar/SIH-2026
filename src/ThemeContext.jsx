@@ -3,11 +3,12 @@ import { createContext, useContext, useState, useEffect } from "react";
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
+  // Dark is the TraceNet default; a saved preference (light/dark) still wins
   const [theme, setTheme] = useState(() => {
     try {
-      return localStorage.getItem("tracenet-theme") || "light";
+      return localStorage.getItem("tracenet-theme") || "dark";
     } catch {
-      return "light";
+      return "dark";
     }
   });
 

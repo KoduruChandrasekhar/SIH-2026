@@ -16,11 +16,29 @@ import {
   Radio,
   ExternalLink,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Circle, useMap } from "react-leaflet";
 import Navbar from "../components/Navbar";
 import { fetchAlerts } from "../api";
 import { WATCHLIST_CAMERAS, cameraDisplayId } from "../demoData";
 import { alertsFeed as localAlerts } from "../data";
+
+// One severity palette across the app: critical = red, high = orange, medium = amber
+const SEVERITY = {
+  CRITICAL: { color: "#ef4444", badge: "bg-red-500 text-white", icon: "bg-red-100 text-red-600", border: "border-red-500/80", ring: "ring-red-500/20" },
+  HIGH: { color: "#f97316", badge: "bg-orange-500 text-white", icon: "bg-orange-100 text-orange-600", border: "border-orange-500/80", ring: "ring-orange-500/20" },
+  MEDIUM: { color: "#eab308", badge: "bg-amber-500 text-white", icon: "bg-amber-100 text-amber-600", border: "border-amber-500/80", ring: "ring-amber-500/20" },
+};
+const sev = (a) => SEVERITY[a.severity] ?? SEVERITY.MEDIUM;
+const isAnomaly = (a) => a.category === "Trajectory Anomaly" || a.category === "Unusual Stop / Loitering";
+
+// Pans the existing map to the selected alert without re-creating it
+function FocusAlert({ alert }) {
+  const map = useMap();
+  useEffect(() => {
+    if (alert) map.flyTo([alert.lat, alert.lng], 14, { duration: 0.8 });
+  }, [map, alert]);
+  return null;
+}
 
 export default function AlertsPage({ navigate, openModal }) {
   const [alerts, setAlerts] = useState(localAlerts);
@@ -135,6 +153,14 @@ export default function AlertsPage({ navigate, openModal }) {
     navigate("tracking");
   };
 
+  const open = alerts.filter((a) => a.status !== "Resolved");
+  const metrics = {
+    blacklist: open.filter((a) => a.category === "Blacklisted Vehicle").length,
+    congestion: open.filter((a) => a.category === "High-Density Congestion").length,
+    surge: open.find((a) => a.category === "Sudden Traffic Surge"),
+    anomalies: open.filter(isAnomaly).length,
+  };
+
   const filteredAlerts = alerts.filter((item) => {
     const matchesFilter =
       filterCategory === "ALL" ||
@@ -188,12 +214,12 @@ export default function AlertsPage({ navigate, openModal }) {
         </p>
       </div>
 
-      {/* Metrics Row (2x2 on Mobile, 4x1 on Desktop) */}
+      {/* Metrics Row — computed from the alert feed (resolving an alert updates them) */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <AlertMetricCard title="Blacklist Detections" value="3 Active" trend="Action Required" icon={ShieldAlert} color="text-red-600" />
-        <AlertMetricCard title="High-Density Spots" value="2 Sectors" trend="Severe Gridlock" icon={TrafficCone} color="text-amber-500" />
-        <AlertMetricCard title="Sudden Traffic Surge" value="+45% Vol" trend="Cyberabad Corridor" icon={Activity} color="text-orange-500" />
-        <AlertMetricCard title="Trajectory Anomalies" value="4 Detected" trend="Unusual Stops/Routes" icon={Route} color="text-purple-600" />
+        <AlertMetricCard title="Blacklist Detections" value={`${metrics.blacklist} Active`} trend={metrics.blacklist ? "Action required" : "None open"} icon={ShieldAlert} color="text-red-600" />
+        <AlertMetricCard title="High-Density Spots" value={`${metrics.congestion} ${metrics.congestion === 1 ? "Corridor" : "Corridors"}`} trend="≥85% road capacity" icon={TrafficCone} color="text-amber-500" />
+        <AlertMetricCard title="Sudden Traffic Surge" value={metrics.surge ? metrics.surge.confidence : "None"} trend={metrics.surge ? metrics.surge.plateNumber : "No surge open"} icon={Activity} color="text-orange-500" />
+        <AlertMetricCard title="Trajectory Anomalies" value={`${metrics.anomalies} Open`} trend="Route deviations · stops" icon={Route} color="text-purple-600" />
       </div>
 
       {/* Main Content Grid (Map on Left, Alerts on Right) */}
@@ -228,30 +254,34 @@ export default function AlertsPage({ navigate, openModal }) {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                <FocusAlert alert={selectedAlert} />
                 {alerts.map((al) => {
                   const isCongestion = al.type === "traffic";
+                  const color = sev(al).color;
+                  const resolved = al.status === "Resolved";
                   return (
                     <div key={al.id}>
-                      <Marker position={[al.lat, al.lng]}>
+                      <Circle
+                        center={[al.lat, al.lng]}
+                        radius={isCongestion ? 900 : 350}
+                        pathOptions={{ color, weight: 1, fillColor: color, fillOpacity: resolved ? 0.05 : isCongestion ? 0.2 : 0.12, dashArray: isCongestion ? undefined : "4 4" }}
+                      />
+                      <CircleMarker
+                        center={[al.lat, al.lng]}
+                        radius={selectedAlert?.id === al.id ? 9 : 7}
+                        pathOptions={{ color: "#fff", weight: 2, fillColor: resolved ? "#64748b" : color, fillOpacity: 1 }}
+                        eventHandlers={{ click: () => setSelectedAlert(al) }}
+                      >
                         <Popup>
                           <div className="p-1">
-                            <span className={`font-mono text-xs font-black ${isCongestion ? 'text-amber-600' : 'text-red-600'}`}>
+                            <span className="font-mono text-xs font-black" style={{ color }}>
                               {al.plateNumber}
                             </span>
                             <h4 className="text-[11px] font-bold text-gray-900 mt-0.5">{al.category}</h4>
                             <p className="text-[10px] text-gray-500">{al.cameraNode}</p>
                           </div>
                         </Popup>
-                      </Marker>
-                      <Circle
-                        center={[al.lat, al.lng]}
-                        radius={isCongestion ? 1200 : al.severity === "CRITICAL" ? 900 : 500}
-                        pathOptions={{
-                          color: isCongestion ? "#f59e0b" : al.severity === "CRITICAL" ? "#ef4444" : "#3b82f6",
-                          fillColor: isCongestion ? "#f59e0b" : al.severity === "CRITICAL" ? "#ef4444" : "#3b82f6",
-                          fillOpacity: 0.25,
-                        }}
-                      />
+                      </CircleMarker>
                     </div>
                   );
                 })}
@@ -476,24 +506,18 @@ export default function AlertsPage({ navigate, openModal }) {
                     onClick={() => setSelectedAlert(item)}
                     className={`group relative flex flex-col gap-3 rounded-[24px] border p-5 transition-all duration-300 cursor-pointer backdrop-blur-xl ${
                       selectedAlert?.id === item.id
-                        ? isTraffic
-                          ? "border-amber-500/80 bg-white shadow-lg shadow-amber-500/10 ring-2 ring-amber-500/20"
-                          : "border-red-500/80 bg-white shadow-lg shadow-red-500/10 ring-2 ring-red-500/20"
+                        ? `${sev(item).border} bg-white shadow-lg ring-2 ${sev(item).ring}`
                         : "border-white/80 bg-white/70 hover:bg-white hover:shadow-md"
-                    }`}
+                    } ${item.status === "Resolved" ? "opacity-70" : ""}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black ${
-                            isTraffic
-                              ? "bg-amber-100 text-amber-600"
-                              : item.severity === "CRITICAL"
-                              ? "bg-red-100 text-red-600"
-                              : "bg-blue-100 text-blue-600"
+                            isAnomaly(item) ? "bg-purple-100 text-purple-600" : sev(item).icon
                           }`}
                         >
-                          {isTraffic ? <TrafficCone size={18} /> : <AlertTriangle size={18} />}
+                          {isTraffic ? <TrafficCone size={18} /> : isAnomaly(item) ? <Route size={18} /> : <AlertTriangle size={18} />}
                         </div>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -501,16 +525,13 @@ export default function AlertsPage({ navigate, openModal }) {
                               {item.plateNumber}
                             </span>
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                                isTraffic
-                                  ? "bg-amber-500 text-white animate-pulse"
-                                  : item.severity === "CRITICAL"
-                                  ? "bg-red-500 text-white animate-pulse"
-                                  : "bg-blue-500 text-white"
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${sev(item).badge} ${
+                                item.severity === "CRITICAL" && item.status === "Active" ? "live-flow-dot" : ""
                               }`}
                             >
                               {item.severity}
                             </span>
+                            <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-400">{item.status}</span>
                           </div>
                           <span className="text-[11px] font-bold text-gray-600 mt-1 block">{item.category}</span>
                         </div>
@@ -523,7 +544,7 @@ export default function AlertsPage({ navigate, openModal }) {
                       <div className="flex items-center justify-between text-gray-500">
                         <span className="flex items-center gap-1 font-semibold truncate pr-2">
                           <MapPin size={12} className={isTraffic ? "text-amber-500" : "text-red-500"} />
-                          <span className="truncate">{item.cameraNode.split("(")[0]}</span>
+                          <span className="truncate" title={item.cameraNode}>{item.cameraNode}</span>
                         </span>
                         <span className="font-mono font-bold text-emerald-600 whitespace-nowrap">
                           {isTraffic ? `Metric: ${item.confidence}` : `Conf: ${item.confidence}`}
@@ -533,7 +554,7 @@ export default function AlertsPage({ navigate, openModal }) {
                       {/* Actions */}
                       <div className="flex items-center justify-between mt-1">
                         <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
-                          <Clock size={12} /> {item.timestamp.split(" ")[0]}
+                          <Clock size={12} /> {item.timestamp}
                         </span>
                         <div className="flex items-center gap-2">
                           {isTraffic ? (

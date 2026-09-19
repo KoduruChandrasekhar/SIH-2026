@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -7,6 +7,9 @@ import {
   Map as MapIcon,
   TrendingUp,
   Radio,
+  ScanLine,
+  Cctv,
+  ArrowRight,
 } from "lucide-react";
 import {
   Area,
@@ -20,90 +23,48 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  Cell
+  Cell,
+  ReferenceLine,
 } from "recharts";
 import { MapContainer, TileLayer, Popup, CircleMarker, Circle, Polyline } from "react-leaflet";
 import Navbar from "../components/Navbar";
-import CameraFeedCard from "../components/CameraFeedCard";
-import { useTheme } from "../ThemeContext";
-import { fetchDashboard, fetchCameras } from "../api";
-import { cameras as localCameraFeeds } from "../data";
+import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
+import { fetchDashboard } from "../api";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, hourlyTraffic } from "../data";
 import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../demoData";
 
 // --- LOCAL MOCK DATA (fallback) ---
-
-const localCamerasData = [
-  {
-    id: "CAM-01 (Kukatpally Y-Junction)",
-    lat: 17.4947,
-    lng: 78.3996,
-    status: "High",
-    speed: "12",
-    densityValue: 94,
-    density: "94%",
-    trend: "Severe Gridlock",
-    trafficChange: "+45%",
-    since: "4 PM",
-    color: "#ef4444",
-  },
-  {
-    id: "CAM-02 (JNTU Main Road)",
-    lat: 17.4985,
-    lng: 78.3912,
-    status: "Med",
-    speed: "35",
-    densityValue: 65,
-    density: "65%",
-    trend: "Moderate Flow",
-    trafficChange: "+15%",
-    since: "5 PM",
-    color: "#f97316",
-  },
-  {
-    id: "CAM-03 (KPHB Colony Phase 1)",
-    lat: 17.4855,
-    lng: 78.3895,
-    status: "Low",
-    speed: "55",
-    densityValue: 25,
-    density: "25%",
-    trend: "Clear Route",
-    trafficChange: "-10%",
-    since: "3 PM",
-    color: "#10b981",
-  },
-  {
-    id: "CAM-04 (Balanagar Cross)",
-    lat: 17.4682,
-    lng: 78.4357,
-    status: "High",
-    speed: "18",
-    densityValue: 88,
-    density: "88%",
-    trend: "Heavy Congestion",
-    trafficChange: "+30%",
-    since: "4 PM",
-    color: "#ef4444", 
-  },
+// Key junction cameras from the shared registry, with evening-peak (SNAPSHOT_TIME) readings that
+// match the Traffic corridors: denser junctions are slower.
+const NODE_READINGS = [
+  { cam: "CAM #401", speed: 14, density: 91, trend: "Severe gridlock", change: "+18%", since: "5 PM" },
+  { cam: "CAM #402", speed: 16, density: 88, trend: "Heavy congestion", change: "+15%", since: "5 PM" },
+  { cam: "CAM #406", speed: 19, density: 84, trend: "IT outflow surge", change: "+44%", since: "5 PM" },
+  { cam: "CAM #403", speed: 27, density: 68, trend: "Moderate flow", change: "+6%", since: "5 PM" },
+  { cam: "CAM #411", speed: 29, density: 62, trend: "Moderate flow", change: "+4%", since: "5 PM" },
+  { cam: "CAM #407", speed: 33, density: 55, trend: "Steady flow", change: "+3%", since: "5 PM" },
+  { cam: "CAM #405", speed: 39, density: 42, trend: "Free flow", change: "-2%", since: "5 PM" },
 ];
 
-const localFlowTrendsData = [
-  { time: "6 AM", volume: 4000 }, { time: "9 AM", volume: 11000 },
-  { time: "12 PM", volume: 7500 }, { time: "3 PM", volume: 8500 },
-  { time: "6 PM", volume: 13500 }, { time: "9 PM", volume: 5000 },
-];
+const localCamerasData = NODE_READINGS.map((r) => {
+  const c = cameraById[r.cam];
+  return {
+    id: `${c.code} (${c.name})`,
+    lat: c.lat,
+    lng: c.lng,
+    status: r.density > 80 ? "High" : r.density > 50 ? "Med" : "Low",
+    speed: String(r.speed),
+    densityValue: r.density,
+    density: `${r.density}%`,
+    trend: r.trend,
+    trafficChange: r.change,
+    since: r.since,
+    color: r.density > 80 ? "#ef4444" : r.density > 50 ? "#f97316" : "#10b981",
+  };
+});
 
-const localDensityTrendsData = [
-  { time: "6 AM", density: 25 }, { time: "9 AM", density: 92 },
-  { time: "12 PM", density: 55 }, { time: "3 PM", density: 70 },
-  { time: "6 PM", density: 95 }, { time: "9 PM", density: 35 },
-];
-
-const localCongestionTrendsData = [
-  { time: "6 AM", delay: 2 }, { time: "9 AM", delay: 28 },
-  { time: "12 PM", delay: 12 }, { time: "3 PM", delay: 18 },
-  { time: "6 PM", delay: 35 }, { time: "9 PM", delay: 5 },
-];
+// Backend trend series ({time, volume|density|delay}) are normalised to the hourly shape
+const normaliseTrend = (rows, key, target) => rows?.map((r) => ({ hour: r.time ?? r.hour, [target]: r[key] ?? r[target] }));
 
 // --- Helpers ---
 
@@ -131,37 +92,13 @@ const flowLineEdges = CAMERA_NETWORK_EDGES.map(([fromId, toId]) => {
   return null;
 }).filter(Boolean);
 
-// Custom Tooltip for Recharts
-const CustomTooltip = ({ active, payload, label, suffix = "" }) => {
-  const { theme } = useTheme();
-  if (active && payload && payload.length) {
-    return (
-      <div className={`rounded-xl border px-3 py-2 shadow-xl backdrop-blur-md ${
-        theme === 'dark' 
-          ? 'border-gray-700 bg-gray-800/95 text-gray-200' 
-          : 'border-gray-100 bg-white/95'
-      }`}>
-        <p className={`text-[10px] font-extrabold uppercase ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>{label}</p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: payload[0].color || payload[0].payload.color || "#3b82f6" }} />
-          <span className={`text-xs font-black ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
-            {payload[0].value} {suffix}
-          </span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
 export default function DashboardPage({ navigate, openModal }) {
-  const { theme } = useTheme();
   const [camerasData, setCamerasData] = useState(localCamerasData);
-  const [flowTrendsData, setFlowTrendsData] = useState(localFlowTrendsData);
-  const [densityTrendsData, setDensityTrendsData] = useState(localDensityTrendsData);
-  const [congestionTrendsData, setCongestionTrendsData] = useState(localCongestionTrendsData);
+  const [flowTrendsData, setFlowTrendsData] = useState(hourlyTraffic);
+  const [densityTrendsData, setDensityTrendsData] = useState(hourlyTraffic);
+  const [congestionTrendsData, setCongestionTrendsData] = useState(hourlyTraffic);
   const [selectedCam, setSelectedCam] = useState(localCamerasData[0]);
-  const [cameraFeeds, setCameraFeeds] = useState(localCameraFeeds);
+  const chart = useChartTheme();
 
   // --- Live City Flow: current timestamp ---
   const [liveTime, setLiveTime] = useState(() => new Date());
@@ -184,14 +121,11 @@ export default function DashboardPage({ navigate, openModal }) {
     fetchDashboard().then((data) => {
       if (data) {
         if (data.cameras) { setCamerasData(data.cameras); setSelectedCam(data.cameras[0]); }
-        if (data.flowTrends) setFlowTrendsData(data.flowTrends);
-        if (data.densityTrends) setDensityTrendsData(data.densityTrends);
-        if (data.congestionTrends) setCongestionTrendsData(data.congestionTrends);
+        if (data.flowTrends) setFlowTrendsData(normaliseTrend(data.flowTrends, "volume", "flow"));
+        if (data.densityTrends) setDensityTrendsData(normaliseTrend(data.densityTrends, "density", "density"));
+        if (data.congestionTrends) setCongestionTrendsData(normaliseTrend(data.congestionTrends, "delay", "delay"));
         apiLoaded.current = true;
       }
-    });
-    fetchCameras().then((data) => {
-      if (data && data.cameras) setCameraFeeds(data.cameras);
     });
   }, []);
 
@@ -217,19 +151,21 @@ export default function DashboardPage({ navigate, openModal }) {
   const tickLiveData = useCallback(() => {
     setLiveCameras(prev =>
       prev.map(cam => {
-        const newSpeed = clamp(cam.liveSpeed + Math.round(jitter(2)), 5, 80);
-        const newDensity = clamp(cam.liveDensity + Math.round(jitter(3)), 5, 99);
-        const newChange = clamp(cam.liveTrafficChange + jitter(1.5), -30, 60);
+        const baseDensity = cam.densityValue0 ?? cam.liveDensity;
+        const baseSpeed = cam.speed0 ?? cam.liveSpeed;
+        // density drifts ±6 points around its reading; speed responds inversely (≈0.45 km/h per point)
+        const newDensity = clamp(Math.round(cam.liveDensity + jitter(2)), Math.max(5, baseDensity - 6), Math.min(98, baseDensity + 6));
+        const newSpeed = clamp(Math.round(baseSpeed + (baseDensity - newDensity) * 0.45), 5, 60);
         const newColor = densityColor(newDensity);
         return {
           ...cam,
+          densityValue0: baseDensity,
+          speed0: baseSpeed,
           liveSpeed: newSpeed,
           speed: String(newSpeed),
           liveDensity: newDensity,
           densityValue: newDensity,
           density: `${newDensity}%`,
-          liveTrafficChange: Math.round(newChange * 10) / 10,
-          trafficChange: `${newChange >= 0 ? '+' : ''}${Math.round(newChange)}%`,
           color: newColor,
           status: newDensity > 80 ? "High" : newDensity > 50 ? "Med" : "Low",
         };
@@ -248,9 +184,20 @@ export default function DashboardPage({ navigate, openModal }) {
   const camId = liveSelectedCam.id.split(' ')[0];
   const camName = liveSelectedCam.id.replace(camId, '').trim().replace(/[()]/g, '');
 
-  const gridColor = theme === 'dark' ? '#1e2030' : '#f3f4f6';
-  const tickColor = theme === 'dark' ? '#6b7280' : '#9ca3af';
-  const cursorFill = theme === 'dark' ? '#1e2030' : '#f9fafb';
+  // Network KPIs at the snapshot hour, derived from the same series the charts use
+  const kpi = useMemo(() => {
+    const now = hourlyTraffic[Number(SNAPSHOT_TIME.slice(0, 2))];
+    const reads = cameraRegistry.filter((c) => c.ocrRate != null);
+    return {
+      now,
+      online: cameraRegistry.filter((c) => c.status !== "offline").length,
+      offline: cameraRegistry.filter((c) => c.status === "offline").length,
+      readsLastHour: cameraRegistry.reduce((s, c) => s + c.lastHour, 0),
+      ocrMean: (reads.reduce((s, c) => s + c.ocrRate, 0) / reads.length).toFixed(1),
+      activeAlerts: alertsFeed.filter((a) => a.status !== "Resolved").length,
+    };
+  }, []);
+  const nowTick = `${SNAPSHOT_TIME.slice(0, 2)}:00`;
 
   // Format live timestamp
   const timeStr = liveTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -297,6 +244,15 @@ export default function DashboardPage({ navigate, openModal }) {
           </div>
         </div>
       </div>
+
+      {/* Network KPIs (snapshot hour) */}
+      <section aria-label="Network indicators" className="fade-up delay-150 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <Kpi icon={Gauge} label="Network avg speed" value={`${kpi.now.speed} km/h`} sub={`at ${SNAPSHOT_TIME} · 30 km/h 24h avg`} />
+        <Kpi icon={Activity} label="Traffic volume" value={`${(kpi.now.flow / 1000).toFixed(1)}k veh/h`} sub="evening peak hour" />
+        <Kpi icon={MapIcon} label="Road capacity used" value={`${kpi.now.density}%`} sub="≥85% = congested" tone={kpi.now.density >= 85 ? "text-red-500" : "text-gray-900"} />
+        <Kpi icon={AlertTriangle} label="Active alerts" value={kpi.activeAlerts} sub="blacklist · congestion · anomaly" tone="text-amber-500" />
+        <Kpi icon={ScanLine} label={`OCR read rate (target >${OCR_ACCURACY_TARGET}%)`} value={`${kpi.ocrMean}%`} sub="cluster mean · demo data" tone="text-emerald-600" />
+      </section>
 
       {/* TOP SECTION: Map & Analytics Panel */}
       <div className="grid w-full gap-5 lg:grid-cols-[1.6fr_1fr]">
@@ -446,107 +402,105 @@ export default function DashboardPage({ navigate, openModal }) {
 
       </div>
 
-      {/* CAMERA FEEDS SECTION — Simulated AI CCTV */}
-      <div className="fade-up delay-300">
-        <div className="mb-4 flex items-center justify-between px-1">
+      {/* Camera network summary — live feeds now live on the Cameras page */}
+      <section className="premium-panel fade-up delay-300 flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <Cctv size={18} />
+          </div>
           <div>
-            <h3 className="flex items-center gap-2 text-sm font-black text-gray-900">
-              <Camera size={16} className="text-blue-500" />
-              Live Camera Feeds
-              <span className="ml-1 text-[9px] font-extrabold uppercase tracking-[0.2em] text-gray-400">AI Simulation</span>
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Hover to view simulated CCTV feed with AI detection overlays</p>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
-            <span className="h-2 w-2 rounded-full bg-green-500 trace-live-dot" />
-            <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-gray-500">{cameraFeeds.length} Feeds Online</span>
+            <h3 className="text-sm font-black text-gray-900">ANPR camera network</h3>
+            <p className="text-[11px] font-bold text-gray-500">
+              {kpi.online} of {cameraRegistry.length} cluster cameras reporting · {kpi.offline} offline · {kpi.readsLastHour.toLocaleString("en-IN")} plate reads in the last hour
+            </p>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {cameraFeeds.map((cam, i) => (
-            <CameraFeedCard key={cam.id} camera={cam} index={i} />
-          ))}
-        </div>
-      </div>
+        <button
+          type="button"
+          onClick={() => navigate("cameras")}
+          className="flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-gray-800"
+        >
+          Open camera feeds <ArrowRight size={14} />
+        </button>
+      </section>
 
-      {/* BOTTOM SECTION: The 3 Requested Graphs */}
+      {/* BOTTOM SECTION: 24-hour network trends (same series as the KPIs above) */}
       <div className="grid w-full gap-5 lg:grid-cols-3">
-        
-        {/* Graph 1: Traffic Flow Trends */}
-        <div className="premium-panel fade-up delay-400 flex h-[300px] flex-col p-5">
-          <div className="mb-4">
-            <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
-              <span className="heartbeat-icon inline-flex"><Activity size={16} className="text-blue-500" /></span> Traffic Flow Trends
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Total volume over time</p>
-          </div>
-          <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={flowTrendsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} tickFormatter={(val) => `${val / 1000}k`} />
-                <Tooltip content={<CustomTooltip suffix="Vehicles" />} />
-                <Area type="monotone" dataKey="volume" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorFlow)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <TrendCard icon={Activity} iconClass="text-blue-500" title="Traffic Flow Trends" subtitle="Vehicles per hour across the cluster · today">
+          <AreaChart data={flowTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+            <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={hourTicks(4)} interval={0} dy={6} />
+            <YAxis domain={[0, 20000]} ticks={[0, 5000, 10000, 15000, 20000]} axisLine={false} tickLine={false} tick={chart.tick} width={42} tickFormatter={(v) => `${v / 1000}k`} label={{ value: "veh/h", angle: -90, position: "insideLeft", style: chart.axisLabel }} />
+            <Tooltip cursor={chart.cursorLine} content={<ChartTooltip units={{ flow: "veh/h" }} />} />
+            <ReferenceLine x={nowTick} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "now", position: "top", style: chart.axisLabel }} />
+            <Area type="monotone" dataKey="flow" name="Volume" stroke="#3b82f6" strokeWidth={2.5} fill="url(#colorFlow)" activeDot={{ r: 4 }} />
+          </AreaChart>
+        </TrendCard>
 
-        {/* Graph 2: Traffic Density Trends */}
-        <div className="premium-panel fade-up delay-500 flex h-[300px] flex-col p-5">
-          <div className="mb-4">
-            <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
-              <span className="heartbeat-icon inline-flex"><MapIcon size={16} className="text-purple-500" /></span> Traffic Density Trends
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Road capacity utilization (%)</p>
-          </div>
-          <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={densityTrendsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} dy={10} />
-                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} />
-                <Tooltip content={<CustomTooltip suffix="%" />} cursor={{ fill: cursorFill }} />
-                <Bar dataKey="density" radius={[4, 4, 0, 0]} barSize={24}>
-                  {densityTrendsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.density > 85 ? '#ef4444' : entry.density > 50 ? '#f97316' : '#10b981'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <TrendCard icon={MapIcon} iconClass="text-purple-500" title="Traffic Density Trends" subtitle="Road capacity utilisation (%) · today">
+          <BarChart data={densityTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+            <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={hourTicks(4)} interval={0} dy={6} />
+            <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={chart.tick} width={42} tickFormatter={(v) => `${v}%`} />
+            <Tooltip cursor={{ fill: chart.cursor }} content={<ChartTooltip units={{ density: "%" }} />} />
+            <ReferenceLine y={85} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "congested", position: "insideTopLeft", style: { ...chart.axisLabel, fill: "#ef4444" } }} />
+            <Bar dataKey="density" name="Capacity used" radius={[3, 3, 0, 0]} maxBarSize={14}>
+              {densityTrendsData.map((entry) => (
+                <Cell key={entry.hour} fill={entry.density >= 85 ? "#ef4444" : entry.density >= 70 ? "#f97316" : entry.density >= 50 ? "#eab308" : "#10b981"} />
+              ))}
+            </Bar>
+          </BarChart>
+        </TrendCard>
 
-        {/* Graph 3: Congestion Trends */}
-        <div className="premium-panel fade-up delay-[600ms] flex h-[300px] flex-col p-5">
-          <div className="mb-4">
-            <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
-              <span className="heartbeat-icon inline-flex"><AlertTriangle size={16} className="text-orange-500" /></span> Congestion Trends
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-gray-500">Average delay in minutes</p>
-          </div>
-          <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={congestionTrendsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }} />
-                <Tooltip content={<CustomTooltip suffix="mins delay" />} />
-                <Line type="stepAfter" dataKey="delay" stroke="#f97316" strokeWidth={3} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
+        <TrendCard icon={AlertTriangle} iconClass="text-orange-500" title="Congestion Trends" subtitle="Average delay per trip (minutes) · today">
+          <LineChart data={congestionTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+            <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={hourTicks(4)} interval={0} dy={6} />
+            <YAxis axisLine={false} tickLine={false} tick={chart.tick} width={42} label={{ value: "min", angle: -90, position: "insideLeft", style: chart.axisLabel }} />
+            <Tooltip cursor={chart.cursorLine} content={<ChartTooltip units={{ delay: "min delay" }} />} />
+            <ReferenceLine x={nowTick} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "now", position: "top", style: chart.axisLabel }} />
+            <Line type="monotone" dataKey="delay" name="Avg delay" stroke="#f97316" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+          </LineChart>
+        </TrendCard>
       </div>
 
     </div>
+  );
+}
+
+function Kpi({ icon: Icon, label, value, sub, tone = "text-gray-900" }) {
+  return (
+    <div className="premium-panel p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">{label}</span>
+        <Icon size={15} className="shrink-0 text-gray-400" />
+      </div>
+      <p className={`mt-2 text-2xl font-black tabular-nums tracking-tight ${tone}`}>{value}</p>
+      <p className="mt-0.5 text-[10px] font-bold text-gray-500">{sub}</p>
+    </div>
+  );
+}
+
+function TrendCard({ icon: Icon, iconClass, title, subtitle, children }) {
+  return (
+    <section className="premium-panel fade-up delay-400 flex h-[310px] flex-col p-5">
+      <div className="mb-3">
+        <h3 className="flex items-center gap-1.5 text-sm font-black text-gray-900">
+          <Icon size={16} className={iconClass} /> {title}
+        </h3>
+        <p className="mt-0.5 text-[10px] font-bold text-gray-500">{subtitle}</p>
+      </div>
+      <div className="min-h-0 w-full flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+      </div>
+    </section>
   );
 }

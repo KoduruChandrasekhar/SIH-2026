@@ -41,7 +41,7 @@ function useHomeTelemetry() {
 export default function HomePage({ navigate, openModal }) {
   const reducedMotion = usePrefersReducedMotion();
   const telemetry = useHomeTelemetry();
-  const [mapMode, setMapMode] = useState("flow");
+  const [mapMode, setMapMode] = useState("overview");
   const contentRef = useRef(null);
 
   // Stable callback refs for the four feature modules
@@ -71,6 +71,26 @@ export default function HomePage({ navigate, openModal }) {
     return () => io.disconnect();
   }, []);
 
+  // Reveal cards / map as they enter the viewport (class toggled directly — no re-renders)
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root || reducedMotion) return;
+    const targets = root.querySelectorAll("[data-reveal]");
+    root.classList.add("tn-reveal-ready");
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-revealed");
+            io.unobserve(e.target);
+          }
+        }),
+      { rootMargin: "0px 0px -12% 0px", threshold: 0.12 }
+    );
+    targets.forEach((t) => io.observe(t));
+    return () => io.disconnect();
+  }, [reducedMotion]);
+
   const enterCommandCenter = () => {
     contentRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
   };
@@ -96,13 +116,13 @@ export default function HomePage({ navigate, openModal }) {
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
             {/* LEFT — feature modules */}
             <div className="lg:col-span-5">
-              <header className="mb-10 max-w-[30rem]">
+              <header data-reveal className="mb-10 max-w-[30rem]">
                 <p className="text-[11px] font-extrabold uppercase tracking-[0.3em] text-blue-400">Command Center</p>
                 <h2 id="tn-cc-title" className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
                   One intelligence layer across every camera in the city.
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-slate-400">
-                  From corridor-level flow down to a single vehicle's path — each module below drives the live GIS view.
+                  From the city overview down to a single vehicle's path — each module below drives the live GIS view.
                 </p>
               </header>
 
@@ -118,7 +138,7 @@ export default function HomePage({ navigate, openModal }) {
 
             {/* RIGHT — sticky GIS map */}
             <div className="lg:col-span-7">
-              <div className="tn-map-sticky">
+              <div data-reveal className="tn-map-sticky">
                 <CommandMap
                   mode={mapMode}
                   onModeChange={setMapMode}
