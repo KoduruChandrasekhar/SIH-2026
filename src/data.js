@@ -168,3 +168,88 @@ export const systemMetrics = {
   platesIndexedToday: "1,428,910",
   activeAlertsCount: 3,
 };
+
+// Local alert feed (fallback when the API is offline) incorporating distinct congestion vs surge, and route anomalies
+export const alertsFeed = [
+  {
+    id: "ALT-9041",
+    plateNumber: "TS09EA4512",
+    category: "Blacklisted Vehicle",
+    type: "vehicle",
+    severity: "CRITICAL",
+    timestamp: "Just Now (10:45 PM)",
+    cameraNode: "CAM-04 (Kukatpally Y-Junction)",
+    lat: 17.4947,
+    lng: 78.3996,
+    confidence: "98.4%",
+    description: "National Crime Database match: Stolen SUV reported. Trajectory tracking active.",
+    status: "Active",
+  },
+  {
+    id: "TRF-3012",
+    plateNumber: "Kukatpally ⇄ JNTU",
+    category: "High-Density Congestion",
+    type: "traffic",
+    severity: "CRITICAL",
+    timestamp: "2 mins ago (10:43 PM)",
+    cameraNode: "CAM-02 (Main Expressway)",
+    lat: 17.4985,
+    lng: 78.3912,
+    confidence: "Sector 2",
+    description: "Severe urban bottleneck: Traffic density exceeded capacity. Average speed dropped to 5 km/h.",
+    status: "Active",
+  },
+  {
+    id: "TRF-3015",
+    plateNumber: "Cyberabad IT Corridor",
+    category: "Sudden Traffic Surge",
+    type: "traffic",
+    severity: "HIGH",
+    timestamp: "5 mins ago (10:40 PM)",
+    cameraNode: "CAM-07 (Hitec City Flyover)",
+    lat: 17.4485,
+    lng: 78.3742,
+    confidence: "+45% Vol",
+    description: "Unexpected inflow spike. Current count: 1,240 veh/hr (Normal: 850 veh/hr). Signal adjustment advised.",
+    status: "Investigating",
+  },
+  {
+    id: "ALT-9038",
+    plateNumber: "AP28BK8821",
+    category: "Trajectory Anomaly",
+    type: "vehicle",
+    severity: "HIGH",
+    timestamp: "11 mins ago (10:34 PM)",
+    cameraNode: "CAM-12 (Balanagar Industrial)",
+    lat: 17.4682,
+    lng: 78.4357,
+    confidence: "95.1%",
+    description: "Missing expected camera detection sequence. Vehicle deviated >3km from expected standard route.",
+    status: "Active",
+  },
+  {
+    id: "ALT-9029",
+    plateNumber: "MH04EF7710",
+    category: "Unusual Stop / Loitering",
+    type: "vehicle",
+    severity: "MEDIUM",
+    timestamp: "24 mins ago (10:21 PM)",
+    cameraNode: "CAM-19 (Begumpet Airport Rd)",
+    lat: 17.4439,
+    lng: 78.4684,
+    confidence: "94.2%",
+    description: "Vehicle stopped for 18 minutes in restricted no-stopping zone. Repeated loitering detected.",
+    status: "Resolved",
+  },
+];
+
+
+// Network traffic summary (mirrors backend traffic_metrics / od_routes; used when the API is offline)
+export const trafficSummary = {
+  networkAverageSpeed: "32 km/h",
+  odRoutes: [
+    { origin: "Kukatpally", destination: "Balanagar", count: "1,842 vehicles" },
+    { origin: "Balanagar", destination: "Madhapur", count: "1,426 vehicles" },
+    { origin: "Kukatpally", destination: "Cyberabad", count: "2,103 vehicles" },
+  ],
+};
