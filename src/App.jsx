@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
 import CamerasPage from "./pages/CamerasPage";
@@ -10,6 +10,13 @@ import { X } from "lucide-react";
 
 export default function App() {
   const [page, setPage] = useState("home");
+  // Optional context carried between modules, e.g. { plate } → Tracking, { corridor } → Traffic,
+  // { camera } → Cameras. Existing navigate("page") calls keep working unchanged.
+  const [params, setParams] = useState(null);
+  const navigate = useCallback((target, nextParams = null) => {
+    setParams(nextParams);
+    setPage(target);
+  }, []);
   const [modal, setModal] = useState({ isOpen: false, title: "", content: "" });
 
   const openModal = (title, content) => {
@@ -29,30 +36,31 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case "dashboard":
-        return <DashboardPage navigate={setPage} openModal={openModal} />;
+        return <DashboardPage navigate={navigate} openModal={openModal} params={params} />;
       case "cameras":
-        return <CamerasPage navigate={setPage} openModal={openModal} />;
+        return <CamerasPage navigate={navigate} openModal={openModal} params={params} />;
       case "tracking":
-        return <TrackingPage navigate={setPage} openModal={openModal} />;
+        return <TrackingPage navigate={navigate} openModal={openModal} params={params} />;
       case "traffic":
-        return <TrafficPage navigate={setPage} openModal={openModal} />;
+        return <TrafficPage navigate={navigate} openModal={openModal} params={params} />;
       case "alerts":
-        return <AlertsPage navigate={setPage} openModal={openModal} />;
+        return <AlertsPage navigate={navigate} openModal={openModal} params={params} />;
       case "login":
-        return <LoginPage navigate={setPage} openModal={openModal} />;
+        return <LoginPage navigate={navigate} openModal={openModal} params={params} />;
       case "home":
       default:
-        return <HomePage navigate={setPage} openModal={openModal} />;
+        return <HomePage navigate={navigate} openModal={openModal} params={params} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 text-gray-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* The homepage renders full-bleed (cinematic hero); other pages keep the centered container */}
+      {/* keyed wrapper → a short fade/rise on every module change (no full-screen loader) */}
       {page === "home" ? (
-        renderPage()
+        <div key={page} className="tn-page-enter">{renderPage()}</div>
       ) : (
-        <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <div key={page} className="tn-page-enter mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
           {renderPage()}
         </div>
       )}

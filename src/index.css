@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,700..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@700..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 @import "tailwindcss";
 
@@ -1922,25 +1922,35 @@ select {
   width: 100%;
   max-width: 1640px;
   margin: 0 auto;
-  padding: 5svh 1rem 7.5rem;
+  /* Title sits in the upper-middle of the hero, not under the navbar. Both title layers
+     (video knockout + outline) share this exact offset, so they always stay aligned. */
+  padding: 9svh 1rem 7rem;
   text-align: center;
+}
+
+@media (min-width: 768px) {
+  .tn-hero-stage {
+    /* navbar is in normal flow here, above the hero */
+    padding-top: max(3rem, calc(40svh - 5rem - 5.3vw));
+  }
 }
 
 @media (min-width: 1024px) {
   .tn-hero-stage {
-    padding-top: calc(var(--tn-nav-h) + 3.5svh);
+    /* title centre ≈ 40% of the viewport height (≈ 0.9 × 11.8vw tall), never closer than
+       3rem below the fixed navbar */
+    padding-top: max(calc(var(--tn-nav-h) + 3rem), calc(40svh - 5.3vw));
   }
 }
 
-/* Display title — Archivo, expanded + black */
+/* Display title — Unbounded: wide, bold, geometric (7.11em wide for "TRACE NET" at 800) */
 .tn-hero-title {
   margin: 0;
-  font-family: "Archivo", "Plus Jakarta Sans", sans-serif;
-  font-stretch: 125%;
-  font-weight: 900;
-  font-size: clamp(3rem, 19vw, 8rem);
-  line-height: 0.86;
-  letter-spacing: -0.012em;
+  font-family: "Unbounded", "Plus Jakarta Sans", sans-serif;
+  font-weight: 800;
+  font-size: clamp(3rem, 19.5vw, 8rem);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
   text-transform: uppercase;
   user-select: none;
 }
@@ -1951,7 +1961,7 @@ select {
 
 @media (min-width: 768px) {
   .tn-hero-title {
-    font-size: clamp(4rem, 12vw, 14rem);
+    font-size: clamp(3.5rem, 11.8vw, 15rem); /* ≈ 84% of the viewport width */
     white-space: nowrap;
   }
   .tn-hero-title > span:not(.sr-only) {
@@ -2040,7 +2050,7 @@ select {
 
 /* Stage navigation */
 .tn-hero-stages {
-  margin-top: 1.75rem;
+  margin-top: clamp(1rem, 2.6svh, 1.75rem);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -2111,6 +2121,71 @@ select {
   background: rgba(148, 163, 184, 0.15);
 }
 
+/* ---------- TRACE NET title motion ---------- */
+.tn-hero {
+  view-timeline: --tn-hero block;
+}
+
+/* Cinematic reveal on load: fade in, blur → sharp, tracking tightens */
+@keyframes tn-title-reveal {
+  from {
+    opacity: 0;
+    letter-spacing: 0.08em;
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    letter-spacing: -0.01em;
+    filter: blur(0);
+  }
+}
+
+/* Very subtle brightness variation on the letter outline/sheen */
+@keyframes tn-title-breathe {
+  0%, 100% {
+    -webkit-text-stroke-color: rgba(255, 255, 255, 0.32);
+    color: rgba(255, 255, 255, 0.02);
+  }
+  50% {
+    -webkit-text-stroke-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.07);
+  }
+}
+
+/* Parallax: the title lingers while the rest of the hero scrolls away */
+@keyframes tn-title-parallax {
+  to {
+    translate: 0 14vh;
+  }
+}
+
+/* Slow camera drift of the footage inside the letters (uses scale/translate so it composes
+   with the crossfade transition, which animates transform) */
+@keyframes tn-clip-drift {
+  from {
+    scale: 1;
+    translate: 0 0;
+  }
+  to {
+    scale: 1.07;
+    translate: -1.5% -1%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tn-hero-title {
+    animation: tn-title-reveal 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+  }
+  .tn-hero-title--outline {
+    animation:
+      tn-title-reveal 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both,
+      tn-title-breathe 9s ease-in-out 1.8s infinite;
+  }
+  .tn-hero-clip.is-active {
+    animation: tn-clip-drift 22s ease-in-out infinite alternate;
+  }
+}
+
 /* Scroll-linked exit (no scroll-jacking): the hero eases away as it leaves the viewport */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
@@ -2123,6 +2198,21 @@ select {
       animation: tn-hero-media-exit linear both;
       animation-timeline: view();
       animation-range: exit 0% exit 100%;
+    }
+    .tn-hero-title {
+      animation:
+        tn-title-reveal 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both,
+        tn-title-parallax linear both;
+      animation-timeline: auto, --tn-hero;
+      animation-range: normal, exit 0% exit 100%;
+    }
+    .tn-hero-title--outline {
+      animation:
+        tn-title-reveal 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both,
+        tn-title-breathe 9s ease-in-out 1.8s infinite,
+        tn-title-parallax linear both;
+      animation-timeline: auto, auto, --tn-hero;
+      animation-range: normal, normal, exit 0% exit 100%;
     }
   }
 }
@@ -2819,5 +2909,484 @@ select {
   .cam-node-pulse,
   .dashboard-flow-line {
     animation: none !important;
+  }
+}
+
+/* =========================================================
+   MOTION SYSTEM — final polish pass
+   150–250ms: hover / press · 250–450ms: cards & state · 400–800ms: page & hero
+   ========================================================= */
+
+:root {
+  --tn-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tn-fast: 180ms;
+  --tn-mid: 320ms;
+}
+
+/* Page change: short fade + rise (fill "backwards" leaves no transform behind, so
+   position:fixed children such as the home navbar / maximized map keep working) */
+@keyframes tn-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.tn-page-enter {
+  animation: tn-page-in 360ms var(--tn-ease) backwards;
+}
+
+/* Entrance stagger — retuned from the old 40px / 40vw fly-ins to subtle offsets */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-up,
+.slide-left,
+.slide-right {
+  animation-duration: 420ms;
+  animation-timing-function: var(--tn-ease);
+  animation-fill-mode: backwards;
+}
+.delay-100 { animation-delay: 60ms; }
+.delay-150 { animation-delay: 90ms; }
+.delay-200 { animation-delay: 120ms; }
+.delay-300 { animation-delay: 180ms; }
+.delay-400 { animation-delay: 240ms; }
+.delay-500 { animation-delay: 300ms; }
+
+/* ---------- KPI cards ---------- */
+.tn-kpi {
+  transition:
+    transform var(--tn-fast) var(--tn-ease),
+    border-color var(--tn-fast) ease,
+    box-shadow var(--tn-mid) ease;
+}
+.tn-kpi:hover {
+  transform: translateY(-3px);
+  border-color: rgba(96, 165, 250, 0.45) !important;
+}
+.tn-kpi svg {
+  transition: color var(--tn-fast) ease, opacity var(--tn-fast) ease, transform var(--tn-fast) ease;
+}
+.tn-kpi:hover svg {
+  color: #60a5fa;
+  transform: scale(1.08);
+}
+.tn-kpi .tn-kpi-value {
+  transition: letter-spacing var(--tn-fast) ease;
+}
+.tn-kpi:hover .tn-kpi-value {
+  letter-spacing: -0.01em;
+}
+
+/* Change indicators */
+.tn-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+.tn-delta--good { color: #16a34a; background: rgba(34, 197, 94, 0.12); }
+.tn-delta--warn { color: #d97706; background: rgba(245, 158, 11, 0.12); }
+.tn-delta--bad { color: #dc2626; background: rgba(239, 68, 68, 0.12); }
+.tn-delta--neutral { color: #64748b; background: rgba(100, 116, 139, 0.12); }
+[data-theme="dark"] .tn-delta--good { color: #86efac; }
+[data-theme="dark"] .tn-delta--warn { color: #fcd34d; }
+[data-theme="dark"] .tn-delta--bad { color: #fca5a5; }
+[data-theme="dark"] .tn-delta--neutral { color: #94a3b8; }
+
+/* Brief "updated" flash on values / sync badges */
+@keyframes tn-flash {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45); }
+  100% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+}
+.is-flashing {
+  animation: tn-flash 700ms ease-out;
+}
+
+/* ---------- Tooltips (dark, replaces browser-default title bubbles) ---------- */
+/* in a layer so Tailwind's absolute/fixed utilities still win on positioned elements */
+@layer components {
+  [data-tip] {
+    position: relative;
+  }
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 80;
+  transform: translate(-50%, 4px);
+  width: max-content;
+  max-width: 220px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: rgba(7, 12, 23, 0.96);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--tn-fast) ease, transform var(--tn-fast) var(--tn-ease);
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-delay: 250ms;
+}
+[data-tip-pos="bottom"]::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+/* ---------- Buttons ---------- */
+.tn-press {
+  transition:
+    transform var(--tn-fast) var(--tn-ease),
+    filter var(--tn-fast) ease,
+    background-color var(--tn-fast) ease,
+    color var(--tn-fast) ease,
+    box-shadow var(--tn-fast) ease;
+}
+.tn-press:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.tn-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.tn-press:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+@keyframes tn-spin {
+  to { transform: rotate(360deg); }
+}
+.tn-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: tn-spin 700ms linear infinite;
+}
+
+/* ---------- Live indicators ---------- */
+@keyframes tn-live-pulse {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70% { box-shadow: 0 0 0 5px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.tn-pulse {
+  animation: tn-live-pulse 2s ease-out infinite;
+}
+.tn-pulse--red { color: rgba(239, 68, 68, 0.55); }
+.tn-pulse--orange { color: rgba(249, 115, 22, 0.5); }
+.tn-pulse--green { color: rgba(34, 197, 94, 0.55); }
+.tn-pulse--blue { color: rgba(59, 130, 246, 0.55); }
+
+/* ---------- Skeleton shimmer (dark) — also the Leaflet background until tiles paint ---------- */
+@keyframes tn-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.tn-skeleton,
+[data-theme="dark"] .leaflet-container:not(:has(.leaflet-tile-loaded)),
+.tracking-page .leaflet-container:not(:has(.leaflet-tile-loaded)) {
+  background-color: #0b1220;
+  background-image: linear-gradient(90deg, rgba(148, 163, 184, 0) 0%, rgba(148, 163, 184, 0.07) 50%, rgba(148, 163, 184, 0) 100%);
+  background-size: 200% 100%;
+  animation: tn-shimmer 1.6s linear infinite;
+}
+
+/* ---------- Error fallback ---------- */
+.tn-fallback {
+  display: flex;
+  height: 100%;
+  min-height: 220px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(11, 18, 32, 0.8);
+  color: #94a3b8;
+  text-align: center;
+}
+.tn-fallback-title { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #e2e8f0; }
+.tn-fallback-sub { font-size: 11px; }
+.tn-fallback-btn {
+  margin-top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 10px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  padding: 0.35rem 0.8rem;
+  font-size: 11px;
+  font-weight: 700;
+  color: #bfdbfe;
+}
+
+/* ---------- Empty states ---------- */
+.tn-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 20px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  padding: 2.5rem 1rem;
+  text-align: center;
+  animation: fade-in-up 320ms var(--tn-ease) backwards;
+}
+.tn-empty-title { font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-primary); }
+.tn-empty-sub { font-size: 12px; color: var(--text-tertiary); }
+
+/* ---------- List entrance (filtered lists re-key on filter change) ---------- */
+.tn-list-in > * {
+  animation: fade-in-up 300ms var(--tn-ease) backwards;
+}
+.tn-list-in > *:nth-child(2) { animation-delay: 40ms; }
+.tn-list-in > *:nth-child(3) { animation-delay: 80ms; }
+.tn-list-in > *:nth-child(4) { animation-delay: 120ms; }
+.tn-list-in > *:nth-child(n + 5) { animation-delay: 150ms; }
+
+@keyframes tn-new-item {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+.tn-new-item {
+  animation: tn-new-item 450ms var(--tn-ease) backwards;
+}
+
+/* ---------- Interactive cards (corridors, alerts, cameras) ---------- */
+.tn-card-hover {
+  transition:
+    transform var(--tn-fast) var(--tn-ease),
+    border-color var(--tn-fast) ease,
+    box-shadow var(--tn-mid) ease,
+    opacity var(--tn-mid) ease;
+}
+.tn-card-hover:hover {
+  transform: translateY(-2px);
+}
+
+/* Camera wall */
+.cam-feed-card {
+  transition:
+    transform var(--tn-fast) var(--tn-ease),
+    border-color var(--tn-fast) ease,
+    box-shadow var(--tn-mid) ease;
+}
+.cam-feed-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(96, 165, 250, 0.5) !important;
+}
+.cam-feed-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.62) saturate(0.85);
+  transition: filter var(--tn-mid) ease, opacity 500ms ease;
+}
+.cam-feed-card:hover .cam-feed-still {
+  filter: brightness(0.8) saturate(1);
+}
+.cam-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 5px;
+  background: rgba(2, 6, 23, 0.7);
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #fca5a5;
+  transition: background-color var(--tn-fast) ease, color var(--tn-fast) ease;
+}
+.cam-feed-card:hover .cam-live-badge {
+  background: rgba(220, 38, 38, 0.85);
+  color: #fff;
+}
+
+/* ---------- Tracking: hop strip + timeline ---------- */
+.tn-hop {
+  transition:
+    transform var(--tn-mid) var(--tn-ease),
+    border-color var(--tn-mid) ease,
+    background-color var(--tn-mid) ease,
+    box-shadow var(--tn-mid) ease,
+    opacity var(--tn-mid) ease;
+}
+.tn-hop--upcoming { opacity: 0.55; }
+.tn-hop--done { border-color: rgba(16, 185, 129, 0.45) !important; }
+.tn-hop--active {
+  transform: translateY(-2px);
+  border-color: rgba(59, 130, 246, 0.9) !important;
+  box-shadow: 0 6px 18px -6px rgba(59, 130, 246, 0.55);
+}
+
+.tn-route-chip {
+  transition: opacity var(--tn-mid) ease, transform var(--tn-mid) var(--tn-ease);
+}
+.tn-route-chip.is-hidden {
+  opacity: 0.18;
+  transform: translateY(3px);
+}
+.tn-route-chip.is-deviation {
+  color: #f59e0b !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+}
+
+@keyframes tn-flow-dot {
+  from { left: 0%; }
+  to { left: 100%; }
+}
+.tn-flow-dot {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.9);
+  animation: tn-flow-dot 2.4s linear infinite;
+}
+
+/* ---------- Map markers ---------- */
+.tn-marker-ring {
+  animation: tn-marker-ring 1.8s ease-out;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes tn-marker-ring {
+  from { opacity: 0.9; transform: scale(0.6); }
+  to { opacity: 0; transform: scale(2.4); }
+}
+.tn-marker-selected {
+  animation: tn-marker-breathe 2.4s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes tn-marker-breathe {
+  0%, 100% { stroke-opacity: 0.9; stroke-width: 2.5; }
+  50% { stroke-opacity: 0.4; stroke-width: 6; }
+}
+.leaflet-interactive {
+  transition: fill-opacity var(--tn-mid) ease, stroke-opacity var(--tn-mid) ease, stroke-width var(--tn-fast) ease;
+}
+.leaflet-control-zoom a {
+  transition: background-color var(--tn-fast) ease, color var(--tn-fast) ease;
+}
+[data-theme="dark"] .leaflet-control-zoom,
+.tracking-page .leaflet-control-zoom {
+  border: 1px solid rgba(71, 85, 105, 0.55) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+}
+.tracking-page .leaflet-control-zoom a {
+  background-color: #0c1424 !important;
+  color: #e6edf7 !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+}
+[data-theme="dark"] .leaflet-control-zoom a:hover,
+.tracking-page .leaflet-control-zoom a:hover {
+  background-color: #1d4ed8 !important;
+  color: #fff !important;
+}
+.tracking-page .leaflet-control-attribution {
+  background: rgba(5, 10, 20, 0.8) !important;
+  color: #64748b !important;
+}
+
+/* ---------- Navbar ---------- */
+header nav button svg {
+  transition: transform var(--tn-fast) var(--tn-ease), color var(--tn-fast) ease !important;
+}
+header nav button:hover svg {
+  transform: translateY(-1px) scale(1.08) !important;
+}
+header nav button[aria-current="page"] {
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35), 0 0 18px -6px rgba(59, 130, 246, 0.5) !important;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .tn-page-enter,
+  .fade-up,
+  .slide-left,
+  .slide-right,
+  .tn-list-in > *,
+  .tn-new-item,
+  .tn-empty,
+  .is-flashing,
+  .tn-pulse,
+  .tn-flow-dot,
+  .tn-marker-ring,
+  .tn-marker-selected,
+  .tn-skeleton,
+  .leaflet-container {
+    animation: none !important;
+  }
+  .tn-kpi:hover,
+  .tn-card-hover:hover,
+  .cam-feed-card:hover,
+  .tn-hop--active {
+    transform: none;
   }
 }

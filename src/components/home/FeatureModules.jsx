@@ -78,7 +78,7 @@ function ZoneSpeeds() {
       {areas.map((a) => {
         const speed = parseInt(a.speed, 10);
         return (
-          <div key={a.name} className="flex flex-1 flex-col items-center gap-1.5" title={`${a.title}: ${a.speed}`}>
+          <div key={a.name} className="flex flex-1 flex-col items-center gap-1.5" data-tip={`${a.title}: ${a.speed}`}>
             <span className="text-[10px] font-bold tabular-nums text-slate-400">{speed}</span>
             <div className="w-full rounded-t-md" style={{ height: `${(speed / max) * 44}px`, background: a.color, opacity: 0.75 }} />
             <span className="w-full truncate text-center text-[9.5px] font-semibold text-slate-500">{a.name.split(" /")[0]}</span>

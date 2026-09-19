@@ -20,7 +20,34 @@ import { MapContainer, TileLayer, CircleMarker, Popup, Circle, useMap } from "re
 import Navbar from "../components/Navbar";
 import { fetchAlerts } from "../api";
 import { WATCHLIST_CAMERAS, cameraDisplayId } from "../demoData";
-import { alertsFeed as localAlerts } from "../data";
+import { alertsFeed as localAlerts, cameraById } from "../data";
+import { AnimatedNumber, MapBoundary } from "../components/motion/Motion";
+import { formatClock, simNowSec } from "../sim/liveSim";
+
+// One controlled demo event per session: the blacklisted SUV from ALT-9041 is re-sighted
+// at the next camera on its path (CAM-401 → CAM-402 is 1.4 km). Not a random alert generator.
+let sessionResighting = null; // persists across page visits for this session
+const RESIGHT_DELAY_MS = 9000;
+const makeResighting = () => {
+  const cam = cameraById["CAM #402"];
+  const t = formatClock(simNowSec()).slice(0, 5);
+  return {
+    id: "ALT-9044",
+    plateNumber: "TS09EA4512",
+    category: "Blacklisted Vehicle",
+    type: "vehicle",
+    severity: "CRITICAL",
+    timestamp: `${t} (just now)`,
+    cameraId: cam.id,
+    cameraNode: `${cam.code} (${cam.name})`,
+    lat: cam.lat,
+    lng: cam.lng,
+    confidence: "97.4%",
+    description: "Watchlist re-sighting: same SUV as ALT-9041, now heading north-west past JNTU. Trajectory updated.",
+    status: "Active",
+    isNew: true,
+  };
+};
 
 // One severity palette across the app: critical = red, high = orange, medium = amber
 const SEVERITY = {
@@ -41,11 +68,13 @@ function FocusAlert({ alert }) {
 }
 
 export default function AlertsPage({ navigate, openModal }) {
-  const [alerts, setAlerts] = useState(localAlerts);
+  const [alerts, setAlerts] = useState(() => (sessionResighting ? [{ ...sessionResighting, isNew: false }, ...localAlerts] : localAlerts));
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAlert, setSelectedAlert] = useState(localAlerts[0]);
   const [toastMessage, setToastMessage] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
+  const [resolvingId, setResolvingId] = useState(null);
 
   const [newPlate, setNewPlate] = useState("");
   const [newReason, setNewReason] = useState("");
@@ -90,11 +119,27 @@ export default function AlertsPage({ navigate, openModal }) {
   };
 
   const handleResolve = (id) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "Resolved" } : a))
-    );
-    triggerToast(`Alert ${id} marked as Resolved.`);
+    setResolvingId(id);
+    const t = setTimeout(() => {
+      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status: "Resolved", isNew: false } : a)));
+      setResolvingId(null);
+      triggerToast(`Alert ${id} marked as Resolved.`);
+    }, 450);
+    timeoutIdsRef.current.push(t);
   };
+
+  // Controlled demo event (once per session)
+  useEffect(() => {
+    if (sessionResighting) return;
+    const t = setTimeout(() => {
+      const alert = makeResighting();
+      sessionResighting = alert;
+      setAlerts((prev) => (prev.some((a) => a.id === alert.id) ? prev : [alert, ...prev]));
+      setToastMessage(`New CRITICAL alert · ${alert.plateNumber} re-sighted at ${cameraById["CAM #402"].code}`);
+      setTimeout(() => setToastMessage(null), 3500);
+    }, RESIGHT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   // ── Propagation Sequence ──
   const startPropagation = (plate) => {
@@ -149,8 +194,9 @@ export default function AlertsPage({ navigate, openModal }) {
   };
 
   const handleOpenTrajectory = () => {
+    const plate = detectedPlate?.plate;
     resetPropagation();
-    navigate("tracking");
+    navigate("tracking", plate ? { plate } : null);
   };
 
   const open = alerts.filter((a) => a.status !== "Resolved");
@@ -194,7 +240,7 @@ export default function AlertsPage({ navigate, openModal }) {
       )}
 
       {/* Navbar */}
-      <div className="fade-up w-full">
+      <div className="w-full">
         <Navbar page="alerts" navigate={navigate} openModal={openModal} />
       </div>
 
@@ -216,33 +262,37 @@ export default function AlertsPage({ navigate, openModal }) {
 
       {/* Metrics Row — computed from the alert feed (resolving an alert updates them) */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <AlertMetricCard title="Blacklist Detections" value={`${metrics.blacklist} Active`} trend={metrics.blacklist ? "Action required" : "None open"} icon={ShieldAlert} color="text-red-600" />
-        <AlertMetricCard title="High-Density Spots" value={`${metrics.congestion} ${metrics.congestion === 1 ? "Corridor" : "Corridors"}`} trend="≥85% road capacity" icon={TrafficCone} color="text-amber-500" />
+        <AlertMetricCard title="Blacklist Detections" value={<><AnimatedNumber value={metrics.blacklist} /> Active</>} trend={metrics.blacklist ? "Action required" : "None open"} icon={ShieldAlert} color="text-red-600" />
+        <AlertMetricCard title="High-Density Spots" value={<><AnimatedNumber value={metrics.congestion} /> {metrics.congestion === 1 ? "Corridor" : "Corridors"}</>} trend="≥85% road capacity" icon={TrafficCone} color="text-amber-500" />
         <AlertMetricCard title="Sudden Traffic Surge" value={metrics.surge ? metrics.surge.confidence : "None"} trend={metrics.surge ? metrics.surge.plateNumber : "No surge open"} icon={Activity} color="text-orange-500" />
-        <AlertMetricCard title="Trajectory Anomalies" value={`${metrics.anomalies} Open`} trend="Route deviations · stops" icon={Route} color="text-purple-600" />
+        <AlertMetricCard title="Trajectory Anomalies" value={<><AnimatedNumber value={metrics.anomalies} /> Open</>} trend="Route deviations · stops" icon={Route} color="text-purple-600" />
       </div>
 
       {/* Main Content Grid (Map on Left, Alerts on Right) */}
       <div className="grid w-full gap-5 lg:grid-cols-[1fr_1.4fr] xl:grid-cols-[1fr_1.6fr]">
         
         {/* LEFT COLUMN: GIS Incident Spatial Map & Watchlist Tool */}
-        <div className="fade-up delay-300 flex flex-col gap-5 order-2 lg:order-1">
+        <div className="fade-up delay-300 flex min-w-0 flex-col gap-5 order-2 lg:order-1">
           
           {/* Leaflet Tactical Alert Map */}
           <div className="flex h-[420px] flex-col rounded-[28px] border border-white/80 bg-white/70 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-3 px-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2">
               <div className="flex items-center gap-2">
                 <ShieldAlert size={16} className="text-red-500" />
                 <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">
                   Incident & Congestion Map
                 </h3>
               </div>
-              <span className="text-[10px] font-bold text-gray-400">
-                Focus: {selectedAlert ? selectedAlert.plateNumber : "Mesh Grid"}
+              <span key={selectedAlert?.id} className="tn-new-item flex min-w-0 max-w-full items-center gap-1.5 truncate rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold text-gray-600" aria-live="polite">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: selectedAlert ? sev(selectedAlert).color : "#64748b" }} aria-hidden="true" />
+                Focus:
+                <span className="font-mono font-black text-gray-900">{selectedAlert ? selectedAlert.plateNumber : "Mesh Grid"}</span>
+                {selectedAlert && <span className="font-mono text-gray-400">{selectedAlert.cameraNode?.split(" ")[0]}</span>}
               </span>
             </div>
 
             <div className="relative flex-1 w-full rounded-[20px] overflow-hidden border border-gray-200/60 shadow-inner z-10">
+              <MapBoundary>
               <MapContainer
                 center={[selectedAlert ? selectedAlert.lat : 17.485, selectedAlert ? selectedAlert.lng : 78.41]}
                 zoom={13}
@@ -268,9 +318,9 @@ export default function AlertsPage({ navigate, openModal }) {
                       />
                       <CircleMarker
                         center={[al.lat, al.lng]}
-                        radius={selectedAlert?.id === al.id ? 9 : 7}
-                        pathOptions={{ color: "#fff", weight: 2, fillColor: resolved ? "#64748b" : color, fillOpacity: 1 }}
-                        eventHandlers={{ click: () => setSelectedAlert(al) }}
+                        radius={selectedAlert?.id === al.id ? 10 : hoveredId === al.id ? 10 : 7}
+                        pathOptions={{ color: hoveredId === al.id ? "#bfdbfe" : "#fff", weight: hoveredId === al.id ? 3 : 2, fillColor: resolved ? "#64748b" : color, fillOpacity: 1 }}
+                        eventHandlers={{ click: () => setSelectedAlert(al), mouseover: () => setHoveredId(al.id), mouseout: () => setHoveredId(null) }}
                       >
                         <Popup>
                           <div className="p-1">
@@ -285,7 +335,21 @@ export default function AlertsPage({ navigate, openModal }) {
                     </div>
                   );
                 })}
+                {/* focus ring on the selected alert; a one-off ping marks a newly arrived alert */}
+                {selectedAlert && (
+                  <CircleMarker
+                    key={`focus-${selectedAlert.id}`}
+                    center={[selectedAlert.lat, selectedAlert.lng]}
+                    radius={16}
+                    interactive={false}
+                    pathOptions={{ color: sev(selectedAlert).color, weight: 2.5, fill: false, className: "tn-marker-selected" }}
+                  />
+                )}
+                {alerts.filter((a) => a.isNew).map((a) => (
+                  <CircleMarker key={`new-${a.id}`} center={[a.lat, a.lng]} radius={12} interactive={false} pathOptions={{ color: "#ef4444", weight: 2, fill: false, className: "tn-marker-ring" }} />
+                ))}
               </MapContainer>
+              </MapBoundary>
             </div>
           </div>
 
@@ -451,7 +515,7 @@ export default function AlertsPage({ navigate, openModal }) {
         </div>
 
         {/* RIGHT COLUMN: Feed & Filter */}
-        <div className="fade-up delay-200 flex flex-col gap-4 order-1 lg:order-2">
+        <div className="fade-up delay-200 flex min-w-0 flex-col gap-4 order-1 lg:order-2">
           
           {/* Controls Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-[20px] border border-white/80 bg-white/80 p-3 shadow-sm backdrop-blur-xl">
@@ -470,17 +534,18 @@ export default function AlertsPage({ navigate, openModal }) {
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
-                { label: "All Alerts", key: "ALL" },
-                { label: "Congestion/Surge", key: "CONGESTION" },
-                { label: "Watchlist", key: "BLACKLIST" },
-                { label: "Anomalies", key: "ANOMALY" },
+                { label: "All Alerts", key: "ALL", active: "bg-blue-600" },
+                { label: "Congestion/Surge", key: "CONGESTION", active: "bg-orange-500" },
+                { label: "Watchlist", key: "BLACKLIST", active: "bg-red-500" },
+                { label: "Anomalies", key: "ANOMALY", active: "bg-purple-600" },
               ].map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setFilterCategory(f.key)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all shrink-0 ${
+                  aria-pressed={filterCategory === f.key}
+                  className={`tn-press rounded-xl px-3 py-1.5 text-xs font-bold shrink-0 ${
                     filterCategory === f.key
-                      ? "bg-red-500 text-white shadow-md shadow-red-500/20"
+                      ? `${f.active} text-white shadow-md`
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
@@ -491,10 +556,11 @@ export default function AlertsPage({ navigate, openModal }) {
           </div>
 
           {/* Alert Cards List (Rendered as a 2x2 Grid on Large Screens) */}
-          <div className="grid gap-3.5 sm:grid-cols-2">
+          <div key={filterCategory + "|" + searchQuery} className="tn-list-in grid gap-3.5 sm:grid-cols-2">
             {filteredAlerts.length === 0 ? (
-              <div className="col-span-full rounded-[24px] border border-dashed border-gray-300 bg-white/60 p-12 text-center text-xs font-bold text-gray-400">
-                No active alerts match the selected criteria.
+              <div className="tn-empty col-span-full">
+                <p className="tn-empty-title">No matching alerts</p>
+                <p className="tn-empty-sub">{searchQuery ? `Nothing matches “${searchQuery}” in this filter.` : "No alerts in this category right now."}</p>
               </div>
             ) : (
               filteredAlerts.map((item) => {
@@ -503,8 +569,14 @@ export default function AlertsPage({ navigate, openModal }) {
                 return (
                   <div
                     key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedAlert?.id === item.id}
                     onClick={() => setSelectedAlert(item)}
-                    className={`group relative flex flex-col gap-3 rounded-[24px] border p-5 transition-all duration-300 cursor-pointer backdrop-blur-xl ${
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), setSelectedAlert(item))}
+                    onMouseEnter={() => setHoveredId(item.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    className={`tn-card-hover group relative flex flex-col gap-3 rounded-[24px] border p-5 cursor-pointer backdrop-blur-xl ${item.isNew ? "tn-new-item" : ""} ${
                       selectedAlert?.id === item.id
                         ? `${sev(item).border} bg-white shadow-lg ring-2 ${sev(item).ring}`
                         : "border-white/80 bg-white/70 hover:bg-white hover:shadow-md"
@@ -524,14 +596,18 @@ export default function AlertsPage({ navigate, openModal }) {
                             <span className="font-mono text-[11px] font-black tracking-wider text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
                               {item.plateNumber}
                             </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${sev(item).badge} ${
-                                item.severity === "CRITICAL" && item.status === "Active" ? "live-flow-dot" : ""
-                              }`}
-                            >
+                            <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${sev(item).badge}`}>
+                              {/* urgency without flashing: critical/high pulse softly while open, medium is static */}
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full bg-white ${
+                                  item.status === "Resolved" ? "" : item.severity === "CRITICAL" ? "tn-pulse tn-pulse--red" : item.severity === "HIGH" ? "tn-pulse tn-pulse--orange" : ""
+                                }`}
+                                aria-hidden="true"
+                              />
                               {item.severity}
                             </span>
-                            <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-400">{item.status}</span>
+                            <span className={`text-[9px] font-extrabold uppercase tracking-wider ${item.status === "Resolved" ? "text-emerald-600" : "text-gray-400"}`}>{item.status}</span>
+                            {item.isNew && <span className="rounded-md bg-red-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-red-500">New</span>}
                           </div>
                           <span className="text-[11px] font-bold text-gray-600 mt-1 block">{item.category}</span>
                         </div>
@@ -544,7 +620,7 @@ export default function AlertsPage({ navigate, openModal }) {
                       <div className="flex items-center justify-between text-gray-500">
                         <span className="flex items-center gap-1 font-semibold truncate pr-2">
                           <MapPin size={12} className={isTraffic ? "text-amber-500" : "text-red-500"} />
-                          <span className="truncate" title={item.cameraNode}>{item.cameraNode}</span>
+                          <span className="truncate">{item.cameraNode}</span>
                         </span>
                         <span className="font-mono font-bold text-emerald-600 whitespace-nowrap">
                           {isTraffic ? `Metric: ${item.confidence}` : `Conf: ${item.confidence}`}
@@ -561,9 +637,10 @@ export default function AlertsPage({ navigate, openModal }) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate("traffic");
+                                navigate("traffic", item.corridorId ? { corridor: item.corridorId } : null);
                               }}
-                              className="flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-amber-600"
+                              className="tn-press flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-amber-600 group-hover:shadow-md"
+                              aria-label={`View traffic flow${item.corridorId ? ` for ${item.corridorId}` : ""}`}
                             >
                               <Gauge size={12} /> View Flow
                             </button>
@@ -571,9 +648,10 @@ export default function AlertsPage({ navigate, openModal }) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate("tracking");
+                                navigate("tracking", { plate: item.plateNumber });
                               }}
-                              className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-blue-600"
+                              className="tn-press flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-blue-600 group-hover:shadow-md"
+                              aria-label={`Trace ${item.plateNumber} on the Tracking page`}
                             >
                               <Navigation size={12} /> Trace
                             </button>
@@ -585,9 +663,10 @@ export default function AlertsPage({ navigate, openModal }) {
                                 e.stopPropagation();
                                 handleResolve(item.id);
                               }}
-                              className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+                              disabled={resolvingId === item.id}
+                              className="tn-press flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
                             >
-                              Resolve
+                              {resolvingId === item.id ? <><span className="tn-spinner" style={{ width: 10, height: 10 }} aria-hidden="true" /> Resolving…</> : "Resolve"}
                             </button>
                           )}
                         </div>
@@ -607,7 +686,7 @@ export default function AlertsPage({ navigate, openModal }) {
 
 function AlertMetricCard({ title, value, trend, icon: Icon, color }) {
   return (
-    <div className="rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+    <div className="tn-kpi fade-up delay-100 rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">{title}</span>
         <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 ${color}`}>
@@ -615,7 +694,7 @@ function AlertMetricCard({ title, value, trend, icon: Icon, color }) {
         </div>
       </div>
       <div className="mt-3 flex items-baseline justify-between">
-        <h2 className="text-xl font-black text-gray-900 tracking-tight">{value}</h2>
+        <h2 className="tn-kpi-value text-xl font-black text-gray-900 tracking-tight tabular-nums">{value}</h2>
         <span className="text-[10px] font-bold text-gray-500 truncate ml-2">{trend}</span>
       </div>
     </div>
