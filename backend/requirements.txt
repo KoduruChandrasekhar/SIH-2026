@@ -1,3 +1,8 @@
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
+
+# Phase 1: Vehicle detection & tracking
+ultralytics>=8.3.0
+opencv-python>=4.8.0
+imageio-ffmpeg>=0.5.1
