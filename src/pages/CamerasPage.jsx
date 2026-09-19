@@ -5,7 +5,9 @@ import Navbar from "../components/Navbar";
 import CameraFeedCard from "../components/CameraFeedCard";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
 import { fetchCameras } from "../api";
-import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraRegistry, hourlyTraffic } from "../data";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraById, cameraRegistry, hourlyTraffic } from "../data";
+import { AnimatedNumber } from "../components/motion/Motion";
+import { formatClock, useLiveSim } from "../sim/liveSim";
 
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
@@ -61,13 +63,15 @@ function hourlyReads(camera) {
   }));
 }
 
-export default function CamerasPage({ navigate, openModal }) {
+export default function CamerasPage({ navigate, openModal, params }) {
   const chart = useChartTheme();
   const [cameraList, setCameraList] = useState(cameraRegistry);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [zone, setZone] = useState("all");
-  const [selected, setSelected] = useState(null);
+  // Opening from the Dashboard ("Open CAM-xxx feed") shows that camera straight away
+  const [selected, setSelected] = useState(() => (params?.camera ? cameraById[params.camera] ?? null : null));
+  const sim = useLiveSim();
 
   // Backend cameras (if running) only update matching registry entries' live fields
   useEffect(() => {
@@ -91,11 +95,11 @@ export default function CamerasPage({ navigate, openModal }) {
       online: by("online"),
       degraded: by("degraded"),
       offline: by("offline"),
-      readsLastHour: cameraList.reduce((s, c) => s + (c.lastHour || 0), 0),
-      readsToday: cameraList.reduce((s, c) => s + (c.today || 0), 0),
+      readsLastHour: cameraList.reduce((s, c) => s + (sim.cameras[c.id]?.status === "offline" ? 0 : sim.cameras[c.id]?.lastHour ?? c.lastHour ?? 0), 0),
+      readsToday: cameraList.reduce((s, c) => s + (sim.cameras[c.id]?.today ?? c.today ?? 0), 0),
       belowTarget: cameraList.filter((c) => c.ocrRate != null && c.ocrRate < OCR_ACCURACY_TARGET).length,
     };
-  }, [cameraList]);
+  }, [cameraList, sim.cameras]);
 
   const filtered = cameraList.filter((c) => {
     const q = query.trim().toLowerCase();
@@ -103,11 +107,13 @@ export default function CamerasPage({ navigate, openModal }) {
     return matchesQuery && (statusFilter === "all" || c.status === statusFilter) && (zone === "all" || c.zone === zone);
   });
 
-  const activity = [...cameraList].sort((a, b) => b.lastHour - a.lastHour).map((c) => ({ code: c.code, reads: c.lastHour, status: c.status, name: c.name }));
+  const activity = [...cameraList]
+    .map((c) => ({ code: c.code, reads: c.status === "offline" ? 0 : sim.cameras[c.id]?.lastHour ?? c.lastHour, status: c.status, name: c.name }))
+    .sort((a, b) => b.reads - a.reads);
 
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10">
-      <div className="fade-up w-full">
+      <div className="w-full">
         <Navbar page="cameras" navigate={navigate} openModal={openModal} />
       </div>
 
@@ -129,8 +135,9 @@ export default function CamerasPage({ navigate, openModal }) {
             <span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-[11px] font-bold text-blue-200">
               OCR accuracy target &gt;{OCR_ACCURACY_TARGET}%
             </span>
-            <span className="rounded-full border border-slate-500/40 bg-slate-900/60 px-3 py-1.5 font-mono text-[11px] font-bold text-slate-300">
-              Snapshot {SNAPSHOT_TIME} IST · demo data
+            <span className="flex items-center gap-1.5 rounded-full border border-slate-500/40 bg-slate-900/60 px-3 py-1.5 font-mono text-[11px] font-bold text-slate-300">
+              <span className="tn-pulse tn-pulse--green h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+              {formatClock(sim.simSec)} IST · demo data
             </span>
           </div>
         </div>
@@ -142,7 +149,7 @@ export default function CamerasPage({ navigate, openModal }) {
         <Metric icon={Wifi} label="Online" value={counts.online} sub={`${counts.degraded} degraded`} tone="text-emerald-600" />
         <Metric icon={VideoOff} label="Offline" value={counts.offline} sub="field team assigned" tone="text-red-600" />
         <Metric icon={ScanLine} label="Active ANPR" value={counts.online + counts.degraded} sub={`${counts.belowTarget} below OCR target`} tone="text-blue-600" />
-        <Metric icon={Activity} label="Plate reads (last hour)" value={counts.readsLastHour.toLocaleString("en-IN")} sub={`${counts.readsToday.toLocaleString("en-IN")} today`} />
+        <Metric icon={Activity} label="Plate reads (last hour)" value={<AnimatedNumber value={counts.readsLastHour} />} sub={<><AnimatedNumber value={counts.readsToday} /> today</>} />
       </section>
 
       {/* Controls */}
@@ -196,11 +203,14 @@ export default function CamerasPage({ navigate, openModal }) {
           Showing {filtered.length} of {cameraList.length} cameras · hover a tile to preview, click for details
         </p>
         {filtered.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-gray-300 bg-white/60 p-12 text-center text-xs font-bold text-gray-400">No cameras match these filters.</div>
+          <div className="tn-empty">
+            <p className="tn-empty-title">No matching cameras</p>
+            <p className="tn-empty-sub">{query ? <>No camera matches “{query}”{statusFilter !== "all" || zone !== "all" ? " with the current filters" : ""}.</> : "No cameras match the current filters."}</p>
+          </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div key={statusFilter + zone} className="tn-list-in grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {filtered.map((cam, i) => (
-              <CameraFeedCard key={cam.id} camera={cam} index={i} onSelect={setSelected} selected={selected?.id === cam.id} />
+              <CameraFeedCard key={cam.id} camera={cam} live={sim.cameras[cam.id]} simSec={sim.simSec} index={i} onSelect={setSelected} selected={selected?.id === cam.id} />
             ))}
           </div>
         )}
@@ -236,25 +246,25 @@ export default function CamerasPage({ navigate, openModal }) {
         </div>
       </section>
 
-      {selected && <CameraDetail camera={selected} onClose={() => setSelected(null)} navigate={navigate} />}
+      {selected && <CameraDetail camera={selected} live={sim.cameras[selected.id]} simSec={sim.simSec} onClose={() => setSelected(null)} navigate={navigate} />}
     </div>
   );
 }
 
 function Metric({ icon: Icon, label, value, sub, tone = "text-gray-900" }) {
   return (
-    <div className="rounded-[20px] border border-white/80 bg-white/80 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+    <div className="tn-kpi fade-up delay-100 rounded-[20px] border border-white/80 bg-white/80 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">{label}</span>
         <Icon size={15} className="text-gray-400" />
       </div>
-      <p className={`mt-2 text-2xl font-black tabular-nums tracking-tight ${tone}`}>{value}</p>
+      <p className={`tn-kpi-value mt-2 text-2xl font-black tabular-nums tracking-tight ${tone}`}>{value}</p>
       <p className="mt-0.5 text-[10px] font-bold text-gray-500">{sub}</p>
     </div>
   );
 }
 
-function CameraDetail({ camera, onClose, navigate }) {
+function CameraDetail({ camera, live, simSec, onClose, navigate }) {
   const chart = useChartTheme();
   const closeRef = useRef(null);
   const reads = useMemo(() => recentReads(camera), [camera]);
@@ -301,7 +311,7 @@ function CameraDetail({ camera, onClose, navigate }) {
         )}
 
         <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-          <CameraFeedCard camera={camera} alwaysPlay compact />
+          <CameraFeedCard camera={camera} live={live} simSec={simSec} alwaysPlay compact />
 
           <dl className="grid grid-cols-2 content-start gap-3">
             <Detail label="Status" value={<span className={`tn-status tn-status--${camera.status}`}>{camera.status}</span>} />
@@ -309,7 +319,7 @@ function CameraDetail({ camera, onClose, navigate }) {
             <Detail label="Resolution / FPS" value={`${camera.resolution} · ${camera.fps || 0} fps`} />
             <Detail label="Stream latency" value={camera.latencyMs ? `${camera.latencyMs} ms` : "—"} mono />
             <Detail label="Uptime (30 d)" value={`${camera.uptime}%`} mono />
-            <Detail label="Reads today" value={camera.today.toLocaleString("en-IN")} mono />
+            <Detail label="Reads today" value={<AnimatedNumber value={live?.today ?? camera.today} />} mono />
             <Detail
               label={`OCR read rate (target >${OCR_ACCURACY_TARGET}%)`}
               value={
@@ -324,10 +334,10 @@ function CameraDetail({ camera, onClose, navigate }) {
             <div className="col-span-2">
               <button
                 type="button"
-                onClick={() => navigate("tracking")}
+                onClick={() => navigate("tracking", { plate: camera.lastPlate })}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white hover:bg-blue-700"
               >
-                <Signal size={14} /> Trace a plate seen here
+                <Signal size={14} /> Trace {camera.lastPlate} (last plate here)
               </button>
             </div>
           </dl>

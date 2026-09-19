@@ -1,17 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, VideoOff } from "lucide-react";
+import { VideoOff } from "lucide-react";
 import { OCR_ACCURACY_TARGET } from "../data";
+import { formatAge } from "../sim/liveSim";
+import { AnimatedNumber } from "./motion/Motion";
 
 /**
- * CameraFeedCard — a simulated AI-powered CCTV camera feed card.
+ * CameraFeedCard — a simulated AI-powered CCTV camera feed tile.
  *
- * Default: dark placeholder with camera info.
- * Hover:   looping MP4 with AI-style overlays (bounding boxes, track IDs, plate read).
- * Offline: "no signal" tile — no video, counters frozen at the last-seen time.
- * `alwaysPlay` keeps the feed running (used for the enlarged detail view).
+ * Live/degraded: real still frame from the feed + live counters (reads/h, last read, FPS);
+ *                hover (or `alwaysPlay`) plays the looping feed with AI-style overlays.
+ * Offline:       "no signal" tile — no pulse, no video, counters frozen, "last seen" age grows.
  *
- * All overlays are simulated UI — no real YOLO/OCR runs in the browser.
- * Accepts registry cameras (src/data.js cameraRegistry) or the legacy `cameras` shape.
+ * Overlays are simulated UI — no real YOLO/OCR runs in the browser.
+ * `live` is this camera's state from the shared simulation (src/sim/liveSim.js); `simSec` its clock.
  */
 
 const TRACK_DATA = [
@@ -22,10 +23,12 @@ const TRACK_DATA = [
 ];
 
 const STATUS_LABEL = { online: "Live", degraded: "Degraded", offline: "Offline" };
+const posterFor = (src) => src?.replace(/\.mp4$/, "-poster.jpg");
 
-export default function CameraFeedCard({ camera, index = 0, onSelect, selected = false, alwaysPlay = false, compact = false }) {
+export default function CameraFeedCard({ camera, live, simSec, index = 0, onSelect, selected = false, alwaysPlay = false, compact = false }) {
   const [isHovered, setIsHovered] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [buffering, setBuffering] = useState(alwaysPlay);
   const videoRef = useRef(null);
 
   const status = String(camera.status || "online").toLowerCase();
@@ -33,8 +36,11 @@ export default function CameraFeedCard({ camera, index = 0, onSelect, selected =
   const trackData = TRACK_DATA[index % TRACK_DATA.length];
   const camId = camera.code || camera.id.replace(" #", "-");
   const location = camera.name || camera.location;
-  const plate = camera.lastPlate || camera.lastPlateRead;
+  const plate = live?.lastPlate || camera.lastPlate || camera.lastPlateRead;
   const ocr = camera.ocrRate;
+  const fps = live?.fps ?? camera.fps;
+  const readsPerHour = live?.lastHour ?? camera.lastHour;
+  const lastReadAge = simSec != null && live?.lastReadSec != null ? simSec - live.lastReadSec : null;
 
   const showVideo = !offline && !videoFailed && (alwaysPlay || isHovered);
 
@@ -52,7 +58,6 @@ export default function CameraFeedCard({ camera, index = 0, onSelect, selected =
   }, [showVideo, alwaysPlay]);
 
   const handleVideoError = useCallback(() => setVideoFailed(true), []);
-
   const Tag = onSelect ? "button" : "div";
 
   return (
@@ -64,45 +69,58 @@ export default function CameraFeedCard({ camera, index = 0, onSelect, selected =
       onFocus={() => setIsHovered(true)}
       onBlur={() => setIsHovered(false)}
       aria-label={onSelect ? `${camId} ${location} — ${STATUS_LABEL[status] ?? status}. Open camera details` : undefined}
-      className={`cam-feed-card group relative block w-full overflow-hidden rounded-[20px] border border-gray-200/80 text-left shadow-[0_4px_24px_rgba(0,0,0,0.02)] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] ${selected ? "is-selected" : ""}`}
+      className={`cam-feed-card group relative block w-full overflow-hidden rounded-[20px] border border-gray-200/80 text-left shadow-[0_4px_24px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] ${selected ? "is-selected" : ""}`}
     >
-      {/* Viewport — fixed 3:2 aspect ratio */}
-      <div className="relative w-full" style={{ paddingBottom: "62%" }}>
+      {/* Viewport — fixed aspect ratio */}
+      <div className="relative w-full overflow-hidden bg-[#0b1220]" style={{ paddingBottom: "62%" }}>
         {offline ? (
           <div className="cam-feed-offline absolute inset-0 flex flex-col items-center justify-center gap-1.5">
             <VideoOff size={26} className="text-red-400/80" />
             <span className="font-mono text-[11px] font-black tracking-wider text-slate-300">NO SIGNAL</span>
-            <span className="text-[10px] font-bold text-slate-500">Last frame {camera.lastSeen ?? "—"}</span>
+            <span className="text-[10px] font-bold text-slate-500">
+              Last seen {simSec != null && live?.lastReadSec != null ? formatAge(simSec - live.lastReadSec) : camera.lastSeen}
+            </span>
           </div>
         ) : (
-          <div
-            className="cam-feed-placeholder absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-500"
-            style={{ opacity: showVideo ? 0 : 1 }}
-          >
-            <Camera size={26} className="cam-feed-icon mb-2" />
-            <span className="cam-feed-cam-id font-mono text-[11px] font-black tracking-wider">{camId}</span>
-            <span className="cam-feed-location mt-1 max-w-[80%] text-center text-[10px] font-bold leading-tight">{location}</span>
-            {!alwaysPlay && <span className="mt-2 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">Hover to preview</span>}
-          </div>
+          <>
+            {/* Real still frame from this camera's feed (the video only loads on hover / detail view) */}
+            <img src={posterFor(camera.videoFeed)} alt="" className="cam-feed-still" style={{ opacity: showVideo && !buffering ? 0 : 1 }} loading="lazy" />
+            {buffering && showVideo && <div className="tn-skeleton absolute inset-0" aria-hidden="true" />}
+            <div className="absolute left-2 top-2 flex items-center gap-1.5" style={{ opacity: showVideo ? 0 : 1, transition: "opacity 200ms" }}>
+              <span className="cam-live-badge">
+                <span className={`h-1.5 w-1.5 rounded-full ${status === "degraded" ? "bg-amber-400" : "tn-pulse tn-pulse--red bg-red-500"}`} aria-hidden="true" />
+                {status === "degraded" ? "DEGRADED" : "LIVE"}
+              </span>
+            </div>
+            {!alwaysPlay && (
+              <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] text-slate-300 opacity-80 transition-opacity group-hover:opacity-0">
+                Hover to play
+              </span>
+            )}
+          </>
         )}
 
         {!offline && !videoFailed && (
           <video
             ref={videoRef}
             src={camera.videoFeed}
+            poster={posterFor(camera.videoFeed)}
             muted
             loop
             playsInline
             preload={alwaysPlay ? "auto" : "none"}
             onError={handleVideoError}
-            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+            onLoadedData={() => setBuffering(false)}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => setBuffering(false)}
+            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
             style={{ opacity: showVideo ? 1 : 0, filter: status === "degraded" ? "brightness(1.15) contrast(0.8) blur(0.6px)" : undefined }}
           />
         )}
 
         {/* AI overlay (visible while the feed plays) */}
         {!offline && (
-          <div className="pointer-events-none absolute inset-0 transition-opacity duration-500" style={{ opacity: showVideo ? 1 : 0 }}>
+          <div className="pointer-events-none absolute inset-0 transition-opacity duration-300" style={{ opacity: showVideo ? 1 : 0 }}>
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
 
             <div className="absolute left-2 top-2 flex items-center gap-1.5">
@@ -110,9 +128,7 @@ export default function CameraFeedCard({ camera, index = 0, onSelect, selected =
                 <span className="cam-overlay-live-dot inline-block h-1.5 w-1.5 rounded-full" />
                 {camId}
               </span>
-              <span className="cam-overlay-live-label rounded px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-widest">
-                {status === "degraded" ? "DEGRADED" : "LIVE"}
-              </span>
+              <span className="cam-overlay-live-label rounded px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-widest">{status === "degraded" ? "DEGRADED" : "LIVE"}</span>
             </div>
 
             <div className="absolute right-2 top-2">
@@ -154,7 +170,7 @@ export default function CameraFeedCard({ camera, index = 0, onSelect, selected =
 
             <div className="absolute bottom-2 right-2">
               <span className="cam-overlay-meta rounded px-1.5 py-0.5 text-[7px] font-bold tracking-wide">
-                {camera.fps} FPS · {camera.resolution?.split(" ")[0] || "1080p"}
+                {fps} FPS · {camera.resolution?.split(" ")[0] || "1080p"}
               </span>
             </div>
 
@@ -176,23 +192,34 @@ export default function CameraFeedCard({ camera, index = 0, onSelect, selected =
           </span>
         </div>
 
-        {!compact && camera.lastHour !== undefined && (
-          <dl className="mt-2.5 grid grid-cols-3 gap-2 border-t border-gray-100 pt-2 text-[10px]">
-            <div>
-              <dt className="font-bold uppercase tracking-wider text-gray-400">Reads/h</dt>
-              <dd className="mt-0.5 font-mono font-black text-gray-800">{offline ? "—" : camera.lastHour.toLocaleString("en-IN")}</dd>
-            </div>
-            <div>
-              <dt className="font-bold uppercase tracking-wider text-gray-400">OCR</dt>
-              <dd className={`mt-0.5 font-mono font-black ${ocr == null ? "text-gray-400" : ocr >= OCR_ACCURACY_TARGET ? "text-emerald-600" : "text-amber-600"}`}>
-                {ocr == null ? "—" : `${ocr.toFixed(1)}%`}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-bold uppercase tracking-wider text-gray-400">FPS</dt>
-              <dd className="mt-0.5 font-mono font-black text-gray-800">{camera.fps || "—"}</dd>
-            </div>
-          </dl>
+        {!compact && readsPerHour !== undefined && (
+          <>
+            <dl className="mt-2.5 grid grid-cols-3 gap-2 border-t border-gray-100 pt-2 text-[10px]">
+              <div>
+                <dt className="font-bold uppercase tracking-wider text-gray-400">Reads/h</dt>
+                <dd className="mt-0.5 font-mono font-black text-gray-800">{offline ? "—" : <AnimatedNumber value={readsPerHour} />}</dd>
+              </div>
+              <div>
+                <dt className="font-bold uppercase tracking-wider text-gray-400">OCR</dt>
+                <dd className={`mt-0.5 font-mono font-black ${ocr == null ? "text-gray-400" : ocr >= OCR_ACCURACY_TARGET ? "text-emerald-600" : "text-amber-600"}`}>
+                  {ocr == null ? "—" : `${ocr.toFixed(1)}%`}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-bold uppercase tracking-wider text-gray-400">FPS</dt>
+                <dd className={`mt-0.5 font-mono font-black ${status === "degraded" ? "text-amber-600" : "text-gray-800"}`}>{offline ? "—" : fps}</dd>
+              </div>
+            </dl>
+            <p className="mt-2 truncate font-mono text-[10px] font-bold text-gray-500">
+              {offline ? (
+                <span className="text-red-500">Offline · last seen {lastReadAge != null ? formatAge(lastReadAge) : camera.lastSeen}</span>
+              ) : (
+                <>
+                  Last read {lastReadAge != null ? formatAge(lastReadAge) : "—"} · <span className="text-gray-700">{plate}</span>
+                </>
+              )}
+            </p>
+          </>
         )}
       </div>
     </Tag>

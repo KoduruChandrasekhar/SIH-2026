@@ -124,7 +124,8 @@ export default function CommandMap({ mode, onModeChange, telemetry, navigate, re
             onClick={() => setMaximized((m) => !m)}
             className="tn-icon-btn"
             aria-label={maximized ? "Restore map size" : "Maximize map"}
-            title={maximized ? "Restore (Esc)" : "Maximize map"}
+            data-tip={maximized ? "Restore (Esc)" : "Maximize map"}
+            data-tip-pos="bottom"
           >
             {maximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>

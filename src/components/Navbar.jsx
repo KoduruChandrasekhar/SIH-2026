@@ -54,8 +54,8 @@ export default function Navbar({ page, navigate, openModal }) {
           overflow-hidden
           ${
             isActive
-              ? "bg-blue-600/10 text-blue-700 shadow-[inset_0_0_0_1px_rgba(37,99,235,0.2)] scale-[1.02]"
-              : "text-[#636366] hover:bg-blue-50 hover:text-blue-600 hover:scale-105"
+              ? "bg-blue-600/10 text-blue-700 shadow-[inset_0_0_0_1px_rgba(37,99,235,0.2)]"
+              : "text-[#636366] hover:bg-blue-50 hover:text-blue-600"
           }
         `}
       >
@@ -64,8 +64,6 @@ export default function Navbar({ page, navigate, openModal }) {
           className={`
             transition-all
             duration-300
-            group-hover:rotate-12
-            group-hover:scale-125
             ${isActive ? "text-blue-600" : "group-hover:text-blue-600"}
           `}
         />
@@ -210,14 +208,14 @@ export default function Navbar({ page, navigate, openModal }) {
             overflow-hidden
             ${
               isAlertsActive
-                ? "bg-red-500/10 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)] scale-[1.02]"
-                : "text-[#636366] hover:bg-red-500/10 hover:text-red-600 hover:scale-105 hover:shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
+                ? "bg-red-500/10 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
+                : "text-[#636366] hover:bg-red-500/10 hover:text-red-600 hover:shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
             }
           `}
         >
           <Bell 
             size={16} 
-            className={`transition-transform duration-300 group-hover:rotate-12 group-hover:scale-125 ${isAlertsActive ? "text-red-500" : "text-red-500"}`} 
+            className="text-red-500" 
           />
           <span className="relative z-10">Alerts</span>
           <span 
@@ -231,7 +229,8 @@ export default function Navbar({ page, navigate, openModal }) {
         <button
           onClick={toggleTheme}
           className="theme-toggle-btn"
-          title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+          data-tip={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          data-tip-pos="bottom"
           aria-label="Toggle theme"
         >
           {theme === "light" ? (
@@ -262,9 +261,8 @@ export default function Navbar({ page, navigate, openModal }) {
             shadow-[0_4px_14px_rgba(0,0,0,0.15)]
             transition-all
             duration-300
-            hover:scale-105
             hover:shadow-[0_6px_20px_rgba(37,99,235,0.3)]
-            active:scale-95
+            active:scale-[0.97]
             sm:text-sm
           "
         >

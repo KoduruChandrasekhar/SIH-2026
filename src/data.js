@@ -76,6 +76,19 @@ export const hourlyTraffic = FLOW.map((flow, h) => ({
   delay: DELAY[h],
 }));
 
+// ─── Junction readings at the snapshot (density % of capacity, speed km/h) ──
+// The live simulation drifts these; corridors reuse their first camera's reading so the
+// Dashboard node and the Traffic corridor always agree.
+export const junctionReadings = {
+  "CAM #401": { speed: 14, density: 91, trend: "Severe gridlock", change: "+18%" },
+  "CAM #402": { speed: 16, density: 88, trend: "Heavy congestion", change: "+15%" },
+  "CAM #406": { speed: 19, density: 84, trend: "IT outflow surge", change: "+44%" },
+  "CAM #403": { speed: 27, density: 68, trend: "Moderate flow", change: "+6%" },
+  "CAM #411": { speed: 29, density: 62, trend: "Moderate flow", change: "+4%" },
+  "CAM #407": { speed: 33, density: 55, trend: "Steady flow", change: "+3%" },
+  "CAM #405": { speed: 39, density: 42, trend: "Free flow", change: "-2%" },
+};
+
 // ─── Corridors (Traffic page) — tied to registry cameras ──────────────────
 export const corridorsFeed = [
   { id: "COR-01", name: "Kukatpally Y-Junction ⇄ JNTU", cameras: ["CAM #401", "CAM #402"], status: "Severe", density: 91, speed: 14, volume: 2640, trend: "+18%", lat: 17.4947, lng: 78.3996, color: "#ef4444", bottleneck: "Signal queue spill-back at Y-Junction", length: "1.6 km", duration: "17 mins" },
@@ -121,6 +134,7 @@ export const alertsFeed = [
     severity: "CRITICAL",
     timestamp: "18:42 (3 mins ago)",
     cameraId: "CAM #402",
+    corridorId: "COR-01",
     cameraNode: cam("CAM #402"),
     lat: cameraById["CAM #402"].lat,
     lng: cameraById["CAM #402"].lng,
@@ -136,6 +150,7 @@ export const alertsFeed = [
     severity: "HIGH",
     timestamp: "18:38 (7 mins ago)",
     cameraId: "CAM #406",
+    corridorId: "COR-02",
     cameraNode: cam("CAM #406"),
     lat: cameraById["CAM #406"].lat,
     lng: cameraById["CAM #406"].lng,
