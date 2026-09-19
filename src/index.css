@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,700..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 @import "tailwindcss";
 
@@ -53,33 +53,35 @@
 }
 
 [data-theme="dark"] {
-  --bg-base: #0f1117;
-  --bg-card: rgba(30, 32, 44, 0.85);
-  --bg-card-solid: #1a1c2e;
-  --bg-card-hover: #22243a;
-  --bg-input: rgba(30, 32, 44, 0.6);
-  --bg-input-solid: #1e2030;
-  --bg-elevated: rgba(30, 32, 44, 0.75);
-  --bg-subtle: rgba(30, 32, 44, 0.4);
+  /* TraceNet dark: deep navy base, translucent navy surfaces, slate borders */
+  --bg-base: #050a14;
+  --bg-card: rgba(12, 20, 36, 0.86);
+  --bg-card-solid: #0c1424;
+  --bg-card-hover: #111c31;
+  --bg-input: rgba(9, 15, 28, 0.8);
+  --bg-input-solid: #0a1222;
+  --bg-elevated: rgba(13, 22, 40, 0.8);
+  --bg-subtle: rgba(15, 23, 42, 0.55);
   --bg-blob-1: rgba(59, 130, 246, 0.08);
   --bg-blob-2: rgba(139, 92, 246, 0.08);
   --bg-blob-3: rgba(6, 182, 212, 0.08);
 
-  --text-primary: #e8eaed;
-  --text-secondary: #9ba1b0;
-  --text-tertiary: #6b7280;
-  --text-muted: #4b5563;
+  --text-primary: #e6edf7;
+  --text-secondary: #a3b0c2;
+  --text-tertiary: #7a889c;
+  --text-muted: #5b6678;
 
-  --border-primary: rgba(55, 65, 81, 0.6);
-  --border-subtle: rgba(55, 65, 81, 0.4);
-  --border-input: rgba(55, 65, 81, 0.6);
+  --border-primary: rgba(71, 85, 105, 0.45);
+  --border-subtle: rgba(71, 85, 105, 0.32);
+  --border-input: rgba(71, 85, 105, 0.55);
 
-  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.2);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.25);
 
-  --scrollbar-thumb: #374151;
-  --scrollbar-thumb-hover: #4b5563;
+  --scrollbar-thumb: #243247;
+  --scrollbar-thumb-hover: #33455f;
 
+  color-scheme: dark;
   color: var(--text-primary);
   background: var(--bg-base);
 }
@@ -128,20 +130,20 @@ select {
 [data-theme="dark"] .bg-gray-50\/50,
 [data-theme="dark"] .bg-gray-50\/70,
 [data-theme="dark"] .bg-\[\\#f8f9fa\] {
-  background-color: #151725 !important;
+  background-color: #0a1222 !important;
 }
 
 [data-theme="dark"] .bg-gray-100 {
-  background-color: #1e2030 !important;
+  background-color: #0f1a2c !important;
 }
 
 [data-theme="dark"] .bg-gray-100\/80,
 [data-theme="dark"] .bg-gray-200 {
-  background-color: #25283a !important;
+  background-color: #15223a !important;
 }
 
 [data-theme="dark"] .bg-\[\#f0f4f8\]\/80 {
-  background-color: #171a28 !important;
+  background-color: #0a1222 !important;
 }
 
 /* Text overrides */
@@ -232,7 +234,7 @@ select {
 [data-theme="dark"] input[type="password"],
 [data-theme="dark"] input[type="email"],
 [data-theme="dark"] input[type="search"] {
-  background-color: #1e2030 !important;
+  background-color: #0f1a2c !important;
   border-color: rgba(55, 65, 81, 0.6) !important;
   color: #e8eaed !important;
 }
@@ -313,11 +315,11 @@ select {
 }
 
 [data-theme="dark"] .hover\:bg-gray-50:hover {
-  background-color: #1e2030 !important;
+  background-color: #0f1a2c !important;
 }
 
 [data-theme="dark"] .hover\:bg-white:hover {
-  background-color: #22243a !important;
+  background-color: #111c31 !important;
 }
 
 [data-theme="dark"] .hover\:bg-blue-50:hover {
@@ -326,7 +328,7 @@ select {
 
 /* App container override */
 [data-theme="dark"] .bg-gradient-to-br.from-slate-50 {
-  background: #0f1117 !important;
+  background: #050a14 !important;
 }
 
 /* Login page left-side branding - keep dark as-is */
@@ -336,7 +338,7 @@ select {
 
 /* Modal */
 [data-theme="dark"] .bg-white\/90 {
-  background-color: rgba(26, 28, 46, 0.95) !important;
+  background-color: rgba(12, 20, 36, 0.97) !important;
 }
 
 [data-theme="dark"] .bg-black\/40,
@@ -355,7 +357,7 @@ select {
 
 /* Fix the Recharts tooltip for dark mode */
 [data-theme="dark"] .recharts-default-tooltip {
-  background-color: #1a1c2e !important;
+  background-color: #0c1424 !important;
   border-color: rgba(55, 65, 81, 0.5) !important;
 }
 
@@ -456,27 +458,27 @@ select {
 
 /* Leaflet popup dark mode */
 [data-theme="dark"] .leaflet-popup-content-wrapper {
-  background: #1a1c2e !important;
+  background: #0c1424 !important;
   color: #e8eaed !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
 }
 
 [data-theme="dark"] .leaflet-popup-tip {
-  background: #1a1c2e !important;
+  background: #0c1424 !important;
 }
 
 [data-theme="dark"] .leaflet-control-zoom a {
-  background-color: #1a1c2e !important;
+  background-color: #0c1424 !important;
   color: #e8eaed !important;
   border-color: rgba(55, 65, 81, 0.5) !important;
 }
 
 [data-theme="dark"] .leaflet-control-zoom a:hover {
-  background-color: #22243a !important;
+  background-color: #111c31 !important;
 }
 
 [data-theme="dark"] .leaflet-control-attribution {
-  background: rgba(15, 17, 23, 0.8) !important;
+  background: rgba(5, 10, 20, 0.8) !important;
   color: #6b7280 !important;
 }
 
@@ -486,7 +488,11 @@ select {
 
 /* Leaflet map container in dark mode gets a dark tile filter */
 [data-theme="dark"] .leaflet-tile-pane {
-  filter: brightness(0.75) contrast(1.15) saturate(0.85);
+  filter: invert(1) hue-rotate(200deg) brightness(0.78) contrast(1.15) saturate(0.35);
+}
+
+[data-theme="dark"] .leaflet-container {
+  background: #0b1220;
 }
 
 /* Fix selected cam card in dark dashboard */
@@ -572,7 +578,7 @@ select {
 }
 
 [data-theme="dark"] .premium-panel {
-  background: linear-gradient(135deg, rgba(22, 24, 38, 0.92), rgba(31, 34, 48, 0.8));
+  background: linear-gradient(135deg, rgba(12, 20, 36, 0.94), rgba(10, 17, 31, 0.86));
   border-color: rgba(148, 163, 184, 0.18);
   box-shadow: 0 20px 42px rgba(2, 6, 23, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
@@ -587,7 +593,7 @@ select {
 }
 
 [data-theme="dark"] .metric-tile {
-  background: linear-gradient(180deg, rgba(26, 28, 46, 0.96), rgba(20, 23, 36, 0.8));
+  background: linear-gradient(180deg, rgba(15, 24, 42, 0.96), rgba(11, 18, 33, 0.85));
 }
 
 [data-theme="dark"] .metric-tile::after {
@@ -793,7 +799,7 @@ select {
 }
 
 [data-theme="dark"] .trace-slider-button:hover {
-  background: #22243a;
+  background: #111c31;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -1067,7 +1073,7 @@ select {
    ========================================================= */
 
 [data-theme="dark"] .bg-white\/95 {
-  background-color: rgba(26, 28, 46, 0.95) !important;
+  background-color: rgba(12, 20, 36, 0.97) !important;
 }
 
 /* =========================================================
@@ -1834,242 +1840,305 @@ select {
   padding-bottom: 0.6rem;
 }
 
-/* ---------- Hero backdrop ---------- */
+/* ---------- Hero: video through the TRACE NET letterforms ---------- */
 .tn-hero {
-  background:
-    radial-gradient(ellipse 55% 50% at 50% 42%, rgba(37, 99, 235, 0.22), transparent 70%),
-    radial-gradient(ellipse 90% 60% at 50% 110%, rgba(30, 58, 138, 0.35), transparent 65%),
-    linear-gradient(180deg, #02040a 0%, #040914 55%, var(--tn-bg-2) 100%);
-}
-
-.tn-hero-grid {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
-  background-size: 64px 64px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 20%, transparent 75%);
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 20%, transparent 75%);
-}
-
-.tn-hero-glow {
-  position: absolute;
-  left: 50%;
-  top: 44%;
-  z-index: 0;
-  width: min(900px, 120vw);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.16), transparent 60%);
-  pointer-events: none;
-}
-
-.tn-hero-fade {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 140px;
-  z-index: 1;
-  background: linear-gradient(180deg, transparent, var(--tn-bg-2));
-  pointer-events: none;
-}
-
-/* ---------- TRACE [portal] NET lockup ---------- */
-.tn-hero-lockup {
-  --tn-portal: min(72vw, 40svh, 360px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.1rem;
-}
-
-.tn-hero-word {
-  font-size: clamp(3.25rem, 19vw, 7rem);
-  font-weight: 800;
-  line-height: 0.85;
-  letter-spacing: -0.045em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 6px 40px rgba(2, 6, 23, 0.9), 0 0 60px rgba(37, 99, 235, 0.18);
-  user-select: none;
-  white-space: nowrap;
-}
-
-@media (min-width: 768px) {
-  .tn-hero-lockup {
-    --tn-portal: clamp(240px, min(31vw, 54svh), 540px);
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr var(--tn-portal) 1fr;
-    align-items: center;
-    column-gap: clamp(1.25rem, 3vw, 3.25rem);
-  }
-  .tn-hero-word {
-    font-size: clamp(3.5rem, 8.6vw, 9.25rem);
-  }
-  .tn-hero-word--left {
-    justify-self: end;
-  }
-  .tn-hero-word--right {
-    justify-self: start;
-  }
-}
-
-/* ---------- Portal (globe → city media) ---------- */
-.tn-portal {
   position: relative;
-  width: var(--tn-portal);
-  aspect-ratio: 1;
-  flex-shrink: 0;
-  margin: 1.2rem 0 2.9rem; /* room for the radar ring + caption when stacked */
+  display: grid;
+  isolation: isolate; /* blend only with the hero's own video layer */
+  overflow: hidden;
+  min-height: 88svh;
+  background: #02040a;
 }
 
-@media (min-width: 768px) {
-  .tn-portal {
-    margin: 0;
+@media (min-width: 1024px) {
+  .tn-hero {
+    min-height: 100svh;
   }
 }
 
-.tn-portal-lens {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: 9999px;
-  background: #02040a;
-  border: 1px solid rgba(96, 165, 250, 0.45);
-  box-shadow:
-    0 0 0 6px rgba(37, 99, 235, 0.06),
-    0 0 70px rgba(37, 99, 235, 0.35),
-    0 30px 80px rgba(0, 0, 0, 0.6);
-  isolation: isolate;
+.tn-hero-media,
+.tn-hero-knockout,
+.tn-hero-content {
+  grid-area: 1 / 1;
 }
 
-.tn-portal-media {
+.tn-hero-media {
+  position: absolute;
+  inset: 0;
+}
+
+.tn-hero-clip {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   opacity: 0;
+  filter: blur(10px) brightness(1.15) saturate(1.05);
+  transform: var(--tn-clip-from, scale(1.1));
   transition:
-    opacity 1.6s ease-in-out,
-    transform 2.6s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
+    opacity 1.4s ease-in-out,
+    filter 1.4s ease-in-out,
+    transform 2.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Globe clip: Earth fills the lens; zooms "through" when handing off to the city */
-.tn-portal-media--globe {
-  transform: scale(1.28);
-}
-.tn-portal-media--globe.is-active {
+.tn-hero-clip.is-active {
   opacity: 1;
-  transform: scale(1.08);
+  filter: blur(0) brightness(1.15) saturate(1.05);
+  transform: none;
 }
 
-/* City clip: settles in from a slight zoom — arriving at street level */
-.tn-portal-media--city {
-  transform: scale(1.22);
-}
-.tn-portal-media--city.is-active {
-  opacity: 1;
-  transform: scale(1.02);
-}
+/* each level of the story arrives from its own direction */
+.tn-hero-clip--globe { --tn-clip-from: scale(1.14); }
+.tn-hero-clip--cctv { --tn-clip-from: translateX(3%) scale(1.06); }
+.tn-hero-clip--street { --tn-clip-from: translateX(3%) scale(1.06); }
+.tn-hero-clip--aerial { --tn-clip-from: translateY(-3%) scale(1.12); }
 
-.tn-portal-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border-radius: inherit;
+/* Multiply layer: white letters keep the video at full strength, the navy tint dims it elsewhere */
+.tn-hero-knockout {
+  position: relative;
+  z-index: 1;
+  mix-blend-mode: multiply;
   background:
-    radial-gradient(circle at 50% 50%, transparent 58%, rgba(2, 6, 23, 0.55) 78%, rgba(2, 6, 23, 0.85) 100%),
-    linear-gradient(180deg, rgba(37, 99, 235, 0.08), transparent 40%);
+    /* soft dark spot over the globe source clip's watermark (bottom-right) */
+    radial-gradient(circle at 91% 83%, rgb(3, 5, 10) 0, rgb(3, 5, 10) 3.5vw, transparent 9vw),
+    radial-gradient(ellipse 70% 55% at 50% 34%, rgb(58, 78, 122) 0%, rgb(30, 42, 70) 45%, rgb(9, 14, 26) 100%);
   pointer-events: none;
 }
 
-.tn-portal-ring {
-  position: absolute;
-  border-radius: 9999px;
-  pointer-events: none;
+.tn-hero-knockout .tn-hero-title {
+  color: #fff;
 }
 
-/* Radar ring with a slow sweep */
-.tn-portal-ring--sweep {
-  inset: -7%;
-  border: 1px solid rgba(96, 165, 250, 0.16);
-  background: conic-gradient(from 0deg, transparent 0deg, rgba(59, 130, 246, 0.22) 28deg, transparent 60deg);
-  -webkit-mask: radial-gradient(circle, transparent calc(70% - 1px), #000 70%);
-  mask: radial-gradient(circle, transparent calc(70% - 1px), #000 70%);
-  animation: tn-spin 14s linear infinite;
+.tn-hero-content {
+  position: relative;
+  z-index: 2;
 }
 
-.tn-portal-ring--ticks {
-  inset: -13%;
-  border: 1px dashed rgba(148, 163, 184, 0.14);
-  animation: tn-spin 90s linear infinite reverse;
+.tn-hero-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 1640px;
+  margin: 0 auto;
+  padding: 5svh 1rem 7.5rem;
+  text-align: center;
 }
 
-@keyframes tn-spin {
-  to {
-    transform: rotate(360deg);
+@media (min-width: 1024px) {
+  .tn-hero-stage {
+    padding-top: calc(var(--tn-nav-h) + 3.5svh);
   }
 }
 
-.tn-portal-caption {
-  position: absolute;
-  left: 50%;
-  bottom: -2.6rem;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  white-space: nowrap;
-  padding: 0.35rem 0.8rem;
-  border-radius: 9999px;
-  border: 1px solid var(--tn-line);
-  background: rgba(2, 6, 23, 0.65);
-  backdrop-filter: blur(8px);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
+/* Display title — Archivo, expanded + black */
+.tn-hero-title {
+  margin: 0;
+  font-family: "Archivo", "Plus Jakarta Sans", sans-serif;
+  font-stretch: 125%;
+  font-weight: 900;
+  font-size: clamp(3rem, 19vw, 8rem);
+  line-height: 0.86;
+  letter-spacing: -0.012em;
   text-transform: uppercase;
-  color: #cbd5e1;
+  user-select: none;
 }
 
-.tn-portal-caption-dot {
+.tn-hero-title > span:not(.sr-only) {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .tn-hero-title {
+    font-size: clamp(4rem, 12vw, 14rem);
+    white-space: nowrap;
+  }
+  .tn-hero-title > span:not(.sr-only) {
+    display: inline;
+  }
+}
+
+/* Crisp outline on top so the letterforms read even over dark footage */
+.tn-hero-title--outline {
+  color: rgba(255, 255, 255, 0.03);
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.38);
+}
+
+/* Dynamic copy — swaps with each stage */
+.tn-hero-copy {
+  margin-top: clamp(1.5rem, 4svh, 2.75rem);
+  max-width: 46rem;
+  animation: tn-copy-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes tn-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+.tn-hero-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.55);
+  padding: 0.35rem 0.85rem;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+  backdrop-filter: blur(8px);
+}
+
+.tn-hero-label-dot {
   width: 6px;
   height: 6px;
   border-radius: 9999px;
   background: #60a5fa;
   box-shadow: 0 0 8px rgba(96, 165, 250, 0.9);
-  transition: background 0.6s ease, box-shadow 0.6s ease;
 }
-.tn-portal-caption-dot.is-city {
-  background: #34d399;
-  box-shadow: 0 0 8px rgba(52, 211, 153, 0.9);
+.tn-hero[data-stage="1"] .tn-hero-label-dot { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.9); }
+.tn-hero[data-stage="2"] .tn-hero-label-dot { background: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.9); }
+
+.tn-hero-heading {
+  margin-top: 0.9rem;
+  font-size: clamp(1.35rem, 3vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 4px 30px rgba(2, 6, 23, 0.8);
 }
 
-.tn-portal-control {
+.tn-hero-body {
+  margin: 0.6rem auto 0;
+  max-width: 38rem;
+  font-size: clamp(0.85rem, 1.2vw, 1rem);
+  line-height: 1.6;
+  color: #cbd5e1;
+  text-shadow: 0 2px 16px rgba(2, 6, 23, 0.9);
+}
+
+.tn-hero-ticker {
+  margin-top: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #93c5fd;
+}
+
+/* Stage navigation */
+.tn-hero-stages {
+  margin-top: 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.55);
+  padding: 0.35rem;
+  backdrop-filter: blur(10px);
+}
+
+.tn-hero-stage-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem 0.6rem;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.tn-hero-stage-btn:hover {
+  color: #e2e8f0;
+}
+.tn-hero-stage-btn.is-active {
+  color: #fff;
+  background: rgba(37, 99, 235, 0.22);
+}
+
+.tn-hero-stage-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: #60a5fa;
+}
+
+.tn-hero-stage-track {
   position: absolute;
-  right: 6%;
-  bottom: 6%;
-  z-index: 3;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.25rem;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.tn-hero-stage-bar {
+  display: block;
+  height: 100%;
+  background: #60a5fa;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.tn-hero-play {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9999px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(2, 6, 23, 0.6);
-  color: #e2e8f0;
-  backdrop-filter: blur(6px);
-  opacity: 0.7;
-  transition: opacity 0.2s ease, border-color 0.2s ease;
+  width: 30px;
+  height: 30px;
+  margin-left: 0.2rem;
+  border-radius: 9px;
+  color: #cbd5e1;
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
-.tn-portal-control:hover,
-.tn-portal-control:focus-visible {
-  opacity: 1;
-  border-color: rgba(96, 165, 250, 0.8);
+.tn-hero-play:hover {
+  color: #fff;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+/* Scroll-linked exit (no scroll-jacking): the hero eases away as it leaves the viewport */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .tn-hero-stage {
+      animation: tn-hero-exit linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 80%;
+    }
+    .tn-hero-media {
+      animation: tn-hero-media-exit linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 100%;
+    }
+  }
+}
+
+@keyframes tn-hero-exit {
+  to {
+    opacity: 0;
+    transform: translateY(-6vh) scale(0.97);
+  }
+}
+
+@keyframes tn-hero-media-exit {
+  to {
+    transform: scale(1.06);
+    filter: brightness(0.5);
+  }
 }
 
 /* ---------- Buttons ---------- */
@@ -2284,6 +2353,22 @@ select {
 }
 @keyframes tn-dash {
   to { stroke-dashoffset: -22; }
+}
+
+/* ---------- Scroll reveal (IntersectionObserver adds .is-revealed) ---------- */
+.tn-reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tn-reveal-ready .tn-module-slot:nth-child(even)[data-reveal] {
+  transform: translate(22px, 22px);
+}
+.tn-reveal-ready [data-reveal].is-revealed {
+  opacity: 1;
+  transform: none; /* 'none' (not translate(0)) so the maximized map can still use position: fixed */
 }
 
 /* ---------- Sticky GIS map ---------- */
@@ -2527,17 +2612,13 @@ select {
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .tn-portal-media {
-    transition: opacity 0.8s linear;
+  .tn-hero-clip,
+  .tn-hero-clip.is-active {
+    transform: none;
+    filter: brightness(1.15);
+    transition: opacity 0.6s linear;
   }
-  .tn-portal-media--globe,
-  .tn-portal-media--globe.is-active,
-  .tn-portal-media--city,
-  .tn-portal-media--city.is-active {
-    transform: scale(1.04);
-  }
-  .tn-portal-ring--sweep,
-  .tn-portal-ring--ticks,
+  .tn-hero-copy,
   .tn-scroll-cue-arrow,
   .tn-home .tn-live-dot,
   .tn-home .trace-live-dot {
@@ -2548,5 +2629,195 @@ select {
   .tn-btn-primary:hover,
   .tn-btn-secondary:hover {
     transform: none;
+  }
+}
+
+/* =========================================================
+   DARK MODE — CONSISTENCY FIXES (all pages)
+   ========================================================= */
+
+/* Form controls that the earlier overrides missed */
+[data-theme="dark"] input:not([type]),
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-input-solid) !important;
+  border-color: var(--border-input) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] select option {
+  background: var(--bg-input-solid);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: #3b82f6 !important;
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.45);
+}
+
+/* Light gradient cards (e.g. watchlist match) */
+[data-theme="dark"] .from-amber-50 {
+  --tw-gradient-from: rgba(120, 53, 15, 0.28) !important;
+}
+[data-theme="dark"] .to-red-50 {
+  --tw-gradient-to: rgba(127, 29, 29, 0.25) !important;
+}
+
+[data-theme="dark"] .bg-purple-100 {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+}
+
+[data-theme="dark"] .bg-gray-300 {
+  background-color: #334155 !important;
+}
+[data-theme="dark"] .border-dashed.border-gray-300 {
+  border-color: rgba(71, 85, 105, 0.6) !important;
+}
+
+/* Pastel background blobs only muddy the navy base — hide them in dark mode */
+[data-theme="dark"] .animate-blob {
+  display: none;
+}
+
+/* Recharts: tooltips/legends inherit dark surfaces */
+[data-theme="dark"] .recharts-default-tooltip {
+  background-color: var(--bg-card-solid) !important;
+  border-color: var(--border-primary) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="dark"] .recharts-legend-item-text {
+  color: var(--text-secondary) !important;
+}
+
+/* Leaflet tooltips (used by the shared map layers) */
+[data-theme="dark"] .leaflet-tooltip {
+  background: rgba(7, 12, 23, 0.94);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: #e2e8f0;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+[data-theme="dark"] .leaflet-tooltip-top::before {
+  border-top-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Tracking page is dark in both themes — keep its basemap dark too */
+.tracking-page .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(200deg) brightness(0.78) contrast(1.15) saturate(0.35);
+}
+.tracking-page .leaflet-container {
+  background: #0b1220;
+}
+
+/* Shared chart card helpers */
+.tn-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+.tn-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.tn-chart-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* Status chips (compact, monospace) */
+.tn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.tn-status--online { color: #16a34a; background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3); }
+.tn-status--degraded { color: #d97706; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); }
+.tn-status--offline { color: #dc2626; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
+[data-theme="dark"] .tn-status--online { color: #86efac; }
+[data-theme="dark"] .tn-status--degraded { color: #fcd34d; }
+[data-theme="dark"] .tn-status--offline { color: #fca5a5; }
+
+/* Cameras page banner (CCTV clip as an ambient backdrop) */
+.tn-cam-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: #050a14;
+  isolation: isolate;
+}
+.tn-cam-banner video {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+  filter: saturate(0.6) brightness(0.8);
+}
+.tn-cam-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(5, 10, 20, 0.97) 0%, rgba(5, 10, 20, 0.85) 45%, rgba(5, 10, 20, 0.35) 100%);
+}
+
+/* Offline camera tile */
+.cam-feed-offline {
+  background:
+    repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.05) 0 8px, transparent 8px 16px),
+    linear-gradient(135deg, #111827 0%, #0b1220 100%);
+}
+
+.cam-feed-card.is-selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   NAVBAR — collapsible below xl
+   ========================================================= */
+.tn-nav-menu {
+  display: none;
+}
+.tn-nav-menu.is-open {
+  display: flex;
+}
+@media (min-width: 1280px) {
+  .tn-nav-menu {
+    display: flex;
+  }
+  .tn-nav-toggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob,
+  .trace-live-dot,
+  .live-flow-dot,
+  .heartbeat-icon,
+  .cam-node-pulse,
+  .dashboard-flow-line {
+    animation: none !important;
   }
 }

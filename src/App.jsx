@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
+import CamerasPage from "./pages/CamerasPage";
 import TrackingPage from "./pages/TrackingPage";
 import TrafficPage from "./pages/TrafficPage";
 import AlertsPage from "./pages/AlertsPage";
@@ -29,6 +30,8 @@ export default function App() {
     switch (page) {
       case "dashboard":
         return <DashboardPage navigate={setPage} openModal={openModal} />;
+      case "cameras":
+        return <CamerasPage navigate={setPage} openModal={openModal} />;
       case "tracking":
         return <TrackingPage navigate={setPage} openModal={openModal} />;
       case "traffic":

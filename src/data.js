@@ -1,175 +1,102 @@
-export const slides = [
-  {
-    title: "Trace Net Intelligence Core",
-    desc: "Modern cities operate on isolated camera feeds. Trace Net integrates cross-sector infrastructure using centralized computer vision and deep learning to deliver real-time traffic visibility, trajectory reconstruction, and congestion analytics.",
-  },
-  {
-    title: "High-Accuracy ANPR & OCR Engine",
-    desc: "Optical Recognition Core: Advanced deep learning architecture achieving >96.8% precision across harsh environmental conditions, high-speed motion blur, angled multi-lane shots, and faded or damaged license plates.",
-  },
-  {
-    title: "Macro Traffic Flow & Origin Analytics",
-    desc: "City Dynamics: Aggregates over 250+ live feeds to continuously map corridor density, compute origin-destination matrices, forecast bottlenecks 30 minutes in advance, and optimize traffic signal timing dynamically.",
-  },
-  {
-    title: "Autonomous Threat & Incident Response",
-    desc: "Security Layer: Instantly flags blacklisted vehicles, anomalous loitering patterns, and erratic lane-changing behaviors with automated dispatch alerts routed directly to local command posts.",
-  },
+/**
+ * TraceNet — local demo dataset (used whenever the FastAPI backend is offline).
+ *
+ * Everything here describes ONE consistent snapshot of the west-Hyderabad ANPR cluster
+ * (Kukatpally · JNTU · Miyapur · Nizampet · Balanagar · Madhapur / Hitech City · Gachibowli)
+ * at the evening peak (SNAPSHOT_TIME). Cameras, corridors, zones, alerts and the hourly
+ * trend series all reference the same camera IDs, coordinates and traffic levels.
+ * Values are demo data, not measured production results.
+ */
+
+import { CAMERA_NETWORK_NODES } from "./demoData";
+
+export const SNAPSHOT_TIME = "18:45";
+
+// Problem-statement objective — a target, not a verified benchmark
+export const OCR_ACCURACY_TARGET = 90;
+
+// ─── Camera registry (single source of truth for camera IDs) ──────────────
+// CAM #401–#406 are the demo trajectory network (demoData); #407–#412 extend the cluster.
+const node = (id) => CAMERA_NETWORK_NODES.find((n) => n.id === id);
+
+const REGISTRY = [
+  { ...node("CAM #401"), status: "online", fps: 25, resolution: "4K", lastHour: 2310, today: 31840, ocrRate: 95.8, latencyMs: 42, uptime: 99.9, lastPlate: "TS08EJ4892", lastSeen: "18:44:58", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  { ...node("CAM #402"), status: "online", fps: 25, resolution: "1080p", lastHour: 2140, today: 29610, ocrRate: 94.9, latencyMs: 38, uptime: 99.8, lastPlate: "TS07FZ1029", lastSeen: "18:44:57", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { ...node("CAM #403"), status: "online", fps: 25, resolution: "4K", lastHour: 1580, today: 23470, ocrRate: 93.6, latencyMs: 47, uptime: 99.6, lastPlate: "TS10UA9921", lastSeen: "18:44:55", videoFeed: "/camera-feeds/CAM-403.mp4" },
+  { ...node("CAM #404"), status: "degraded", fps: 12, resolution: "1080p", lastHour: 690, today: 14120, ocrRate: 87.9, latencyMs: 214, uptime: 97.2, lastPlate: "TS15EX5540", lastSeen: "18:44:31", videoFeed: "/camera-feeds/CAM-401.mp4", note: "Low frame rate — lens glare after rain" },
+  { ...node("CAM #405"), status: "online", fps: 25, resolution: "1080p", lastHour: 1060, today: 17380, ocrRate: 96.4, latencyMs: 35, uptime: 99.9, lastPlate: "TS09FA3307", lastSeen: "18:44:59", videoFeed: "/camera-cards/84222-584891447_medium.mp4" },
+  { ...node("CAM #406"), status: "online", fps: 30, resolution: "4K", lastHour: 2190, today: 30250, ocrRate: 95.1, latencyMs: 40, uptime: 99.9, lastPlate: "TS09AB4521", lastSeen: "18:44:58", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { id: "CAM #407", name: "Miyapur X Roads", lat: 17.4966, lng: 78.3574, zone: "Miyapur", status: "online", fps: 25, resolution: "1080p", lastHour: 1240, today: 19860, ocrRate: 94.2, latencyMs: 44, uptime: 99.7, lastPlate: "TS09EE9911", lastSeen: "18:44:56", videoFeed: "/camera-feeds/CAM-403.mp4" },
+  { id: "CAM #408", name: "Nizampet Road Junction", lat: 17.5148, lng: 78.385, zone: "Nizampet", status: "online", fps: 25, resolution: "1080p", lastHour: 880, today: 13240, ocrRate: 93.1, latencyMs: 51, uptime: 99.4, lastPlate: "TS28C7745", lastSeen: "18:44:54", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  { id: "CAM #409", name: "Pragathi Nagar Main Road", lat: 17.5226, lng: 78.397, zone: "Nizampet", status: "offline", fps: 0, resolution: "1080p", lastHour: 0, today: 6120, ocrRate: null, latencyMs: null, uptime: 91.3, lastPlate: "TS15UB6021", lastSeen: "16:12:08", videoFeed: null, note: "No signal since 16:12 — fibre link down, field team assigned" },
+  { id: "CAM #410", name: "Gachibowli Flyover", lat: 17.4401, lng: 78.3489, zone: "Gachibowli", status: "online", fps: 30, resolution: "4K", lastHour: 1930, today: 26780, ocrRate: 96.0, latencyMs: 39, uptime: 99.9, lastPlate: "KA05MN8123", lastSeen: "18:44:59", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { id: "CAM #411", name: "KPHB Colony Phase 1", lat: 17.4849, lng: 78.391, zone: "Kukatpally", status: "online", fps: 25, resolution: "1080p", lastHour: 1370, today: 20550, ocrRate: 92.7, latencyMs: 46, uptime: 99.5, lastPlate: "TS08HK2210", lastSeen: "18:44:57", videoFeed: "/camera-feeds/CAM-403.mp4" },
+  { id: "CAM #412", name: "Bharat Nagar Flyover", lat: 17.4671, lng: 78.4296, zone: "Balanagar", status: "online", fps: 25, resolution: "1080p", lastHour: 1490, today: 22160, ocrRate: 94.4, latencyMs: 43, uptime: 99.6, lastPlate: "AP28BK8821", lastSeen: "18:44:55", videoFeed: "/camera-feeds/CAM-401.mp4" },
 ];
 
-export const areas = [
-  {
-    name: "Kukatpally",
-    title: "Kukatpally Zone",
-    sector: "Sector NW-1",
-    density: "High (Congestion Detected)",
-    speed: "36 km/h",
-    cameras: "54 ANPR Cameras",
-    accuracy: "95.1%",
-    status: "Critical Load",
-    peakHours: "17:30 - 20:00",
-    incidents: 4,
-    color: "#ff3b30",
-    position: [17.4932, 78.3984],
-  },
-  {
-    name: "Balanagar",
-    title: "Balanagar Corridor",
-    sector: "Sector N-2",
-    density: "Moderate",
-    speed: "48 km/h",
-    cameras: "38 ANPR Cameras",
-    accuracy: "93.7%",
-    status: "Stable Flow",
-    peakHours: "08:30 - 10:30",
-    incidents: 1,
-    color: "#ffcc00",
-    position: [17.5180, 78.4275],
-  },
-  {
-    name: "Cyberabad / Madhapur",
-    title: "Cyberabad Hub (Madhapur)",
-    sector: "Sector W-4",
-    density: "Very High Flow",
-    speed: "42 km/h",
-    cameras: "72 ANPR Cameras",
-    accuracy: "96.4%",
-    status: "Heavy Commuter Surge",
-    peakHours: "16:00 - 21:00",
-    incidents: 7,
-    color: "#007aff",
-    position: [17.4483, 78.3915],
-  },
-  {
-    name: "Begumpet",
-    title: "Begumpet Central",
-    sector: "Sector C-1",
-    density: "Moderate Density",
-    speed: "40 km/h",
-    cameras: "41 ANPR Cameras",
-    accuracy: "94.2%",
-    status: "Normal Operations",
-    peakHours: "09:00 - 11:00",
-    incidents: 2,
-    color: "#ffcc00",
-    position: [17.4440, 78.4670],
-  },
-  {
-    name: "Secunderabad",
-    title: "Secunderabad Hub",
-    sector: "Sector E-3",
-    density: "Normal Flow",
-    speed: "55 km/h",
-    cameras: "49 ANPR Cameras",
-    accuracy: "92.8%",
-    status: "Optimal Flow",
-    peakHours: "08:00 - 10:00",
-    incidents: 0,
-    color: "#34c759",
-    position: [17.4399, 78.4983],
-  },
-];
+export const cameraRegistry = REGISTRY.map((c) => ({ ...c, code: c.id.replace(" #", "-") }));
 
-export const cameras = [
-  {
-    id: "CAM #401",
-    location: "Kukatpally Flyover Junction",
-    latitude: 17.4932,
-    longitude: 78.3984,
-    speed: "34 km/h",
-    density: "High (84%)",
-    trend: "Traffic ↑ 18% since 4:00 PM",
-    status: "Online",
-    resolution: "4K AI Optical Stream",
-    fps: 60,
-    color: "#e64638",
-    flow: [0.4, 0.7, 1.0, 0.8, 0.5, 0.9],
-    vehicleClasses: { cars: "62%", bikes: "24%", trucks: "14%" },
-    lastPlateRead: "TS08EJ4892",
-    videoFeed: "/camera-feeds/CAM-401.mp4",
-  },
-  {
-    id: "CAM #402",
-    location: "Kukatpally Metro Station Gate 2",
-    latitude: 17.4891,
-    longitude: 78.4012,
-    speed: "28 km/h",
-    density: "Very High (92%)",
-    trend: "Traffic ↑ 24% since 3:30 PM",
-    status: "Online",
-    resolution: "1080p IR Night-Enhanced",
-    fps: 30,
-    color: "#e64638",
-    flow: [0.5, 0.9, 1.15, 0.85, 0.6, 1.1],
-    vehicleClasses: { cars: "55%", bikes: "35%", trucks: "10%" },
-    lastPlateRead: "TS07FZ1029",
-    videoFeed: "/camera-feeds/CAM-402.mp4",
-  },
-  {
-    id: "CAM #403",
-    location: "Balanagar Main Road Circle",
-    latitude: 17.4855,
-    longitude: 78.4120,
-    speed: "48 km/h",
-    density: "Medium (56%)",
-    trend: "Traffic ↑ 4% since 4:00 PM",
-    status: "Online",
-    resolution: "4K Wide Angle Matrix",
-    fps: 60,
-    color: "#f4be25",
-    flow: [0.3, 0.5, 0.7, 0.6, 0.4, 0.5],
-    vehicleClasses: { cars: "48%", bikes: "30%", trucks: "22%" },
-    lastPlateRead: "TS10UA9921",
-    videoFeed: "/camera-feeds/CAM-403.mp4",
-  },
-  {
-    id: "CAM #404",
-    location: "Moosapet Bypass Link",
-    latitude: 17.4810,
-    longitude: 78.4055,
-    speed: "56 km/h",
-    density: "Low (32%)",
-    trend: "Traffic ↓ 6% since 4:00 PM",
-    status: "Online",
-    resolution: "1080p Standard Telephoto",
-    fps: 30,
-    color: "#52b788",
-    flow: [0.2, 0.4, 0.5, 0.3, 0.3, 0.25],
-    vehicleClasses: { cars: "70%", bikes: "20%", trucks: "10%" },
-    lastPlateRead: "TS15EX5540",
-    videoFeed: "/camera-feeds/CAM-401.mp4",
-  },
-];
+export const cameraById = Object.fromEntries(cameraRegistry.map((c) => [c.id, c]));
+
+// Legacy shape used by CameraFeedCard / backend-compatible consumers
+export const cameras = cameraRegistry.map((c) => ({
+  id: c.id,
+  location: c.name,
+  latitude: c.lat,
+  longitude: c.lng,
+  status: c.status === "offline" ? "Offline" : "Online",
+  resolution: c.resolution,
+  fps: c.fps,
+  lastPlateRead: c.lastPlate,
+  videoFeed: c.videoFeed,
+}));
 
 export const systemMetrics = {
-  totalNodesActive: 254,
-  networkUptime: "99.98%",
-  averageInferenceLatency: "14ms",
+  totalNodesActive: 254, // city-wide ANPR nodes (the cluster above is 12 of them)
+  networkUptime: "99.6%",
+  averageInferenceLatency: "46ms",
   platesIndexedToday: "1,428,910",
   activeAlertsCount: 3,
 };
 
-// Local alert feed (fallback when the API is offline) incorporating distinct congestion vs surge, and route anomalies
+// ─── Hourly network profile for the cluster (00:00–23:00) ─────────────────
+// flow: vehicles/hour · density: % of road capacity · speed: km/h · delay: avg minutes lost per trip
+// Morning peak ~09:00, midday plateau, evening peak ~18:00, night decline. Density and delay rise
+// exactly where speed falls.
+const FLOW = [2100, 1500, 1100, 900, 1200, 2800, 5600, 9400, 13200, 14100, 12000, 10400, 9800, 9900, 10100, 10900, 12600, 14800, 16200, 15100, 11800, 8300, 5400, 3400];
+const DENSITY = [12, 9, 6, 5, 7, 16, 32, 54, 76, 81, 69, 60, 56, 57, 58, 62, 72, 85, 93, 87, 67, 47, 31, 19];
+const SPEED = [48, 50, 52, 52, 51, 47, 42, 35, 27, 25, 30, 33, 34, 34, 33, 32, 28, 22, 18, 21, 30, 37, 43, 46];
+const DELAY = [0.5, 0.3, 0.2, 0.2, 0.3, 0.9, 2.4, 5.8, 10.9, 12.4, 8.1, 6.0, 5.3, 5.4, 5.7, 6.6, 9.2, 14.8, 18.6, 15.3, 7.9, 4.1, 2.0, 1.0];
+
+export const hourlyTraffic = FLOW.map((flow, h) => ({
+  hour: `${String(h).padStart(2, "0")}:00`,
+  flow,
+  density: DENSITY[h],
+  speed: SPEED[h],
+  delay: DELAY[h],
+}));
+
+// ─── Corridors (Traffic page) — tied to registry cameras ──────────────────
+export const corridorsFeed = [
+  { id: "COR-01", name: "Kukatpally Y-Junction ⇄ JNTU", cameras: ["CAM #401", "CAM #402"], status: "Severe", density: 91, speed: 14, volume: 2640, trend: "+18%", lat: 17.4947, lng: 78.3996, color: "#ef4444", bottleneck: "Signal queue spill-back at Y-Junction", length: "1.6 km", duration: "17 mins" },
+  { id: "COR-02", name: "Hitech City – Madhapur IT Corridor", cameras: ["CAM #406", "CAM #410"], status: "High", density: 84, speed: 19, volume: 2380, trend: "+44%", lat: 17.4485, lng: 78.3742, color: "#f97316", bottleneck: "IT park outflow surge", length: "2.8 km", duration: "12 mins" },
+  { id: "COR-03", name: "Balanagar – Bharat Nagar", cameras: ["CAM #403", "CAM #412"], status: "Moderate", density: 68, speed: 27, volume: 1720, trend: "+6%", lat: 17.4682, lng: 78.4357, color: "#eab308", bottleneck: "Heavy-vehicle merge at flyover ramp", length: "0.9 km", duration: "6 mins" },
+  { id: "COR-04", name: "Miyapur X Roads – Nizampet", cameras: ["CAM #407", "CAM #408"], status: "Moderate", density: 55, speed: 33, volume: 1310, trend: "+3%", lat: 17.4966, lng: 78.3574, color: "#eab308", bottleneck: "Metro feeder buses at Miyapur", length: "0.6 km", duration: "4 mins" },
+  { id: "COR-05", name: "Jubilee Hills Checkpost", cameras: ["CAM #405"], status: "Low", density: 42, speed: 39, volume: 1150, trend: "-2%", lat: 17.4325, lng: 78.4072, color: "#22c55e", bottleneck: "None", length: "0 km", duration: "0 mins" },
+];
+
+// ─── City zones (homepage map / dashboard) — counts sum to the 254-node network ──
+export const areas = [
+  { name: "Kukatpally", title: "Kukatpally – JNTU Zone", density: "High (91%)", speed: "14 km/h", cameras: "54 ANPR Cameras", status: "Severe congestion", color: "#ef4444", position: [17.4947, 78.3996] },
+  { name: "Balanagar", title: "Balanagar Corridor", density: "Moderate (68%)", speed: "27 km/h", cameras: "38 ANPR Cameras", status: "Stable flow", color: "#eab308", position: [17.4682, 78.4357] },
+  { name: "Cyberabad / Madhapur", title: "Hitech City – Madhapur", density: "High (84%)", speed: "19 km/h", cameras: "72 ANPR Cameras", status: "IT outflow surge", color: "#f97316", position: [17.4485, 78.3742] },
+  { name: "Miyapur", title: "Miyapur – Nizampet", density: "Moderate (55%)", speed: "33 km/h", cameras: "41 ANPR Cameras", status: "Normal operations", color: "#eab308", position: [17.4966, 78.3574] },
+  { name: "Jubilee Hills", title: "Jubilee Hills", density: "Low (42%)", speed: "39 km/h", cameras: "49 ANPR Cameras", status: "Free flow", color: "#22c55e", position: [17.4325, 78.4072] },
+];
+
+// ─── Alerts (fallback when the API is offline) — cameras/locations from the registry ──
+const cam = (id) => `${cameraById[id].code} (${cameraById[id].name})`;
+
 export const alertsFeed = [
   {
     id: "ALT-9041",
@@ -177,12 +104,13 @@ export const alertsFeed = [
     category: "Blacklisted Vehicle",
     type: "vehicle",
     severity: "CRITICAL",
-    timestamp: "Just Now (10:45 PM)",
-    cameraNode: "CAM-04 (Kukatpally Y-Junction)",
-    lat: 17.4947,
-    lng: 78.3996,
-    confidence: "98.4%",
-    description: "National Crime Database match: Stolen SUV reported. Trajectory tracking active.",
+    timestamp: "18:44 (1 min ago)",
+    cameraId: "CAM #401",
+    cameraNode: cam("CAM #401"),
+    lat: cameraById["CAM #401"].lat,
+    lng: cameraById["CAM #401"].lng,
+    confidence: "97.9%",
+    description: "Watchlist match: SUV reported stolen (FIR 1127/2026). Cross-camera trajectory tracking started.",
     status: "Active",
   },
   {
@@ -191,26 +119,28 @@ export const alertsFeed = [
     category: "High-Density Congestion",
     type: "traffic",
     severity: "CRITICAL",
-    timestamp: "2 mins ago (10:43 PM)",
-    cameraNode: "CAM-02 (Main Expressway)",
-    lat: 17.4985,
-    lng: 78.3912,
-    confidence: "Sector 2",
-    description: "Severe urban bottleneck: Traffic density exceeded capacity. Average speed dropped to 5 km/h.",
+    timestamp: "18:42 (3 mins ago)",
+    cameraId: "CAM #402",
+    cameraNode: cam("CAM #402"),
+    lat: cameraById["CAM #402"].lat,
+    lng: cameraById["CAM #402"].lng,
+    confidence: "91% density",
+    description: "Density at 91% of capacity on COR-01; average speed down to 14 km/h and 17 min added delay.",
     status: "Active",
   },
   {
     id: "TRF-3015",
-    plateNumber: "Cyberabad IT Corridor",
+    plateNumber: "Hitech City Corridor",
     category: "Sudden Traffic Surge",
     type: "traffic",
     severity: "HIGH",
-    timestamp: "5 mins ago (10:40 PM)",
-    cameraNode: "CAM-07 (Hitec City Flyover)",
-    lat: 17.4485,
-    lng: 78.3742,
-    confidence: "+45% Vol",
-    description: "Unexpected inflow spike. Current count: 1,240 veh/hr (Normal: 850 veh/hr). Signal adjustment advised.",
+    timestamp: "18:38 (7 mins ago)",
+    cameraId: "CAM #406",
+    cameraNode: cam("CAM #406"),
+    lat: cameraById["CAM #406"].lat,
+    lng: cameraById["CAM #406"].lng,
+    confidence: "+44% volume",
+    description: "Inflow 2,380 veh/h vs 1,650 veh/h typical for this hour. Signal re-timing recommended.",
     status: "Investigating",
   },
   {
@@ -219,12 +149,13 @@ export const alertsFeed = [
     category: "Trajectory Anomaly",
     type: "vehicle",
     severity: "HIGH",
-    timestamp: "11 mins ago (10:34 PM)",
-    cameraNode: "CAM-12 (Balanagar Industrial)",
-    lat: 17.4682,
-    lng: 78.4357,
+    timestamp: "18:31 (14 mins ago)",
+    cameraId: "CAM #412",
+    cameraNode: cam("CAM #412"),
+    lat: cameraById["CAM #412"].lat,
+    lng: cameraById["CAM #412"].lng,
     confidence: "95.1%",
-    description: "Missing expected camera detection sequence. Vehicle deviated >3km from expected standard route.",
+    description: "Expected hand-off to CAM-403 not observed within 6 min; vehicle deviated ~3 km from its usual route.",
     status: "Active",
   },
   {
@@ -233,23 +164,24 @@ export const alertsFeed = [
     category: "Unusual Stop / Loitering",
     type: "vehicle",
     severity: "MEDIUM",
-    timestamp: "24 mins ago (10:21 PM)",
-    cameraNode: "CAM-19 (Begumpet Airport Rd)",
-    lat: 17.4439,
-    lng: 78.4684,
+    timestamp: "18:12 (33 mins ago)",
+    cameraId: "CAM #405",
+    cameraNode: cam("CAM #405"),
+    lat: cameraById["CAM #405"].lat,
+    lng: cameraById["CAM #405"].lng,
     confidence: "94.2%",
-    description: "Vehicle stopped for 18 minutes in restricted no-stopping zone. Repeated loitering detected.",
+    description: "Vehicle stationary for 18 min in a no-stopping zone near the checkpost; cleared by patrol.",
     status: "Resolved",
   },
 ];
 
-
 // Network traffic summary (mirrors backend traffic_metrics / od_routes; used when the API is offline)
 export const trafficSummary = {
-  networkAverageSpeed: "32 km/h",
+  networkAverageSpeed: "30 km/h", // 24h volume-weighted mean of hourlyTraffic
   odRoutes: [
     { origin: "Kukatpally", destination: "Balanagar", count: "1,842 vehicles" },
     { origin: "Balanagar", destination: "Madhapur", count: "1,426 vehicles" },
     { origin: "Kukatpally", destination: "Cyberabad", count: "2,103 vehicles" },
+    { origin: "Miyapur", destination: "Madhapur", count: "1,268 vehicles" },
   ],
 };

@@ -64,14 +64,14 @@ const localVehicles = {
     confidence: formatConfidence(DEMO_VEHICLE.ocrConfidence),
     status: DEMO_VEHICLE.status,
     badge: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-    expected: "Kukatpally → Balanagar → Madhapur",
-    actual: "Kukatpally → Begumpet → Madhapur",
-    deviation: "Yes (+3.2 km detour via Begumpet)",
-    stats: ["4", "12.8 km", "24 min", "42 km/h"],
+    expected: "Kukatpally → JNTU → Madhapur (direct, ~8 km)",
+    actual: "Kukatpally → JNTU → Balanagar → Madhapur",
+    deviation: "Yes (+11 km detour via Balanagar)",
+    stats: ["4", "19.2 km", "37 min", "31 km/h"],
     reid: "97.8%",
     transitions: "3",
-    fastest: "48 km/h",
-    slowest: "28 km/h",
+    fastest: "36 km/h",
+    slowest: "29 km/h",
     hops: DEMO_OBSERVATIONS.map(obs => [
       obs.camera,
       obs.name,
@@ -94,15 +94,15 @@ const localVehicles = {
     expected: "Balanagar → Kukatpally",
     actual: "Balanagar → Kukatpally",
     deviation: "None (Standard Corridor)",
-    stats: ["3", "8.4 km", "35 min", "36 km/h"],
+    stats: ["3", "7.3 km", "16 min", "27 km/h"],
     reid: "95.6%",
     transitions: "2",
-    fastest: "48 km/h",
-    slowest: "28 km/h",
+    fastest: "30 km/h",
+    slowest: "19 km/h",
     hops: [
-      ["CAM #403", "Balanagar Main Road Circle", "16:15:20", "48 km/h", "96.4%", "South", "0 km", 17.4682, 78.4357],
-      ["CAM #402", "Kukatpally Metro Station", "16:32:45", "28 km/h", "94.2%", "North", "3.8 km", 17.4947, 78.3996],
-      ["CAM #401", "Kukatpally Flyover Junction", "16:50:10", "34 km/h", "95.1%", "North-West", "4.6 km", 17.4985, 78.3912],
+      ["CAM #403", "Balanagar Main Road", "16:15:20", "30 km/h", "96.4%", "North-West", "0 km", 17.4682, 78.4357],
+      ["CAM #401", "Kukatpally Y-Junction", "16:27:05", "30 km/h", "95.1%", "West", "5.9 km", 17.4947, 78.3996],
+      ["CAM #402", "JNTU Metro Station", "16:31:30", "19 km/h", "94.2%", "North-West", "1.4 km", 17.4985, 78.3912],
     ],
   },
   TS09EE9911: {
@@ -112,38 +112,38 @@ const localVehicles = {
     confidence: "98.1%",
     status: "ALERT",
     badge: "bg-red-500/10 text-red-600 border-red-500/20",
-    expected: "Cyberabad → Miyapur",
-    actual: "Cyberabad → JNTU → Miyapur",
-    deviation: "Suspected Evasion Route",
-    stats: ["3", "15.2 km", "70 min", "62 km/h"],
+    expected: "Madhapur → Miyapur via Kondapur (~8.4 km)",
+    actual: "Madhapur → JNTU → Miyapur",
+    deviation: "Suspected evasion route (+2.9 km via JNTU)",
+    stats: ["3", "11.3 km", "23 min", "29 km/h"],
     reid: "96.9%",
     transitions: "2",
-    fastest: "70 km/h",
-    slowest: "52 km/h",
+    fastest: "38 km/h",
+    slowest: "26 km/h",
     hops: [
-      ["CAM #101", "Cyberabad IT Corridor", "14:10:05", "65 km/h", "98.1%", "West", "0 km", 17.4485, 78.3742],
-      ["CAM #105", "JNTU Junction", "14:45:20", "52 km/h", "97.5%", "North", "6.1 km", 17.4925, 78.393],
-      ["CAM #112", "Miyapur Metro Station", "15:20:00", "70 km/h", "96.8%", "North-West", "9.1 km", 17.4968, 78.3522],
+      ["CAM #406", "Madhapur IT Corridor", "14:10:05", "38 km/h", "98.1%", "North", "0 km", 17.4485, 78.3742],
+      ["CAM #402", "JNTU Metro Station", "14:24:50", "26 km/h", "97.5%", "West", "7.1 km", 17.4985, 78.3912],
+      ["CAM #407", "Miyapur X Roads", "14:33:20", "31 km/h", "96.8%", "West", "4.2 km", 17.4966, 78.3574],
     ],
   },
   AP28BY5521: {
     plate: "AP28BY5521",
-    type: "Sports Coupe",
+    type: "Hatchback",
     color: "Red",
-    confidence: "99.0%",
+    confidence: "97.6%",
     status: "COMPLETED",
     badge: "bg-gray-500/10 text-gray-600 border-gray-500/20",
-    expected: "Begumpet → Ameerpet",
-    actual: "Begumpet → Ameerpet",
+    expected: "Jubilee Hills → Madhapur",
+    actual: "Jubilee Hills → Madhapur",
     deviation: "None",
-    stats: ["2", "4.5 km", "17 min", "88 km/h"],
+    stats: ["2", "5.2 km", "10 min", "31 km/h"],
     reid: "98.4%",
     transitions: "1",
-    fastest: "92 km/h",
-    slowest: "84 km/h",
+    fastest: "34 km/h",
+    slowest: "29 km/h",
     hops: [
-      ["CAM #201", "Begumpet Flyover North", "11:05:12", "92 km/h", "99.0%", "South", "0 km", 17.4439, 78.4684],
-      ["CAM #204", "Ameerpet Crossroads", "11:22:40", "84 km/h", "97.2%", "West", "4.5 km", 17.4375, 78.4482],
+      ["CAM #405", "Jubilee Hills Checkpost", "11:05:12", "34 km/h", "97.6%", "West", "0 km", 17.4325, 78.4072],
+      ["CAM #406", "Madhapur IT Corridor", "11:15:18", "29 km/h", "96.9%", "North-West", "5.2 km", 17.4485, 78.3742],
     ],
   },
 };
@@ -548,6 +548,32 @@ export default function TrackingPage({ navigate, openModal }) {
         <Stat icon={Gauge} label="Average Speed" value={vehicle.stats[3]} />
         <Stat icon={ShieldAlert} label="OCR Match" value={vehicle.confidence} blue />
       </div>
+
+      {/* One plate → multiple cameras → complete trajectory */}
+      <section aria-label="Camera sequence" className="fade-up delay-150 overflow-x-auto rounded-[20px] border border-white/80 bg-white/80 px-4 py-3">
+        <ol className="flex min-w-max items-center gap-2">
+          <li className="flex items-center gap-2 pr-1">
+            <span className="rounded-lg bg-blue-600 px-2.5 py-1 font-mono text-[11px] font-black text-white">{vehicle.plate}</span>
+            <ArrowRight size={14} className="text-gray-400" aria-hidden="true" />
+          </li>
+          {vehicle.hops.map((h, i) => (
+            <li key={h[0] + i} className="flex items-center gap-2">
+              <span className="flex flex-col rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1">
+                <span className="font-mono text-[10px] font-black text-blue-600">{h[0].replace(" #", "-")}</span>
+                <span className="text-[10px] font-bold text-gray-500">{h[1]} · {h[2]}</span>
+              </span>
+              {i < vehicle.hops.length - 1 && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                  <ArrowRight size={14} aria-hidden="true" /> {vehicle.hops[i + 1][6]}
+                </span>
+              )}
+            </li>
+          ))}
+          <li className="pl-2 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600">
+            = {vehicle.stats[1]} trajectory in {vehicle.stats[2]}
+          </li>
+        </ol>
+      </section>
 
       {/* Main Map & Side Panel */}
       <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
