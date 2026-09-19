@@ -250,11 +250,14 @@ export default function AlertsPage({ navigate, openModal }) {
       pickable: false,
     });
 
+    // 2D Alert Disks (clean circular tactical disks, no extruded pillars)
     const alertPins = new ScatterplotLayer({
-      id: "alert-pins",
+      id: "alert-disks",
       data: alerts,
       getPosition: (d) => [d.lng, d.lat],
-      getRadius: 300,
+      getRadius: 160,
+      radiusMinPixels: 8,
+      radiusMaxPixels: 16,
       getFillColor: (d) =>
         d.id === selectedAlert?.id
           ? [255, 255, 255, 255]
@@ -271,8 +274,7 @@ export default function AlertsPage({ navigate, openModal }) {
           : [59, 130, 246, 255],
       lineWidthMinPixels: 2.5,
       stroked: true,
-      radiusMinPixels: 8,
-      radiusMaxPixels: 18,
+      filled: true,
       pickable: true,
       onClick: ({ object }) => {
         if (object) setSelectedAlert(object);
@@ -377,11 +379,11 @@ export default function AlertsPage({ navigate, openModal }) {
             <div className="relative flex-1 w-full rounded-2xl overflow-hidden border border-[var(--border-subtle)]">
               <DeckGLMap
                 layers={mapLayers}
-                viewState={{
+                initialViewState={{
                   longitude: selectedAlert ? selectedAlert.lng : 78.41,
                   latitude: selectedAlert ? selectedAlert.lat : 17.485,
                   zoom: 12.4,
-                  pitch: 20,
+                  pitch: 0,
                   bearing: 0,
                 }}
               >

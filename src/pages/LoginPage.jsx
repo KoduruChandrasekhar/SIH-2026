@@ -47,15 +47,15 @@ export default function LoginPage({ navigate }) {
             <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 shadow-2xl backdrop-blur-md">
               <img
                 src={traceforceLogo}
-                alt="Trace Force Logo"
+                alt="TraceNet Logo"
                 className="h-full w-full object-contain rounded-xl"
               />
             </div>
             <h1 className="mb-1 text-3xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              TraceNet
+              TRACENET
             </h1>
             <p className="mb-6 text-[10px] font-extrabold uppercase tracking-[2px] text-cyan-400">
-              by Trace Force
+              by Team Trace Force
             </p>
             <p className="text-xs font-medium leading-relaxed text-[var(--text-secondary)] max-w-[260px]">
               Secure authentication gateway for city-wide ANPR multi-camera tracking &amp; traffic analytics.

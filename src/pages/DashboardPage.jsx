@@ -8,6 +8,9 @@ import {
   TrendingUp,
   Radio,
   Zap,
+  ChevronDown,
+  ChevronUp,
+  X,
 } from "lucide-react";
 import {
   Area,
@@ -279,6 +282,16 @@ export default function DashboardPage({ navigate, openModal }) {
     hour12: false,
   });
 
+  const [showMapVideoHUD, setShowMapVideoHUD] = useState(true);
+  const [hudMinimized, setHudMinimized] = useState(false);
+
+  const camVideoSrc = useMemo(() => {
+    const idStr = String(liveSelectedCam?.id || "");
+    if (idStr.includes("02") || idStr.includes("402")) return "/camera-feeds/CAM-402.mp4";
+    if (idStr.includes("03") || idStr.includes("403")) return "/camera-feeds/CAM-403.mp4";
+    return "/camera-feeds/CAM-401.mp4";
+  }, [liveSelectedCam]);
+
   // Deck.gl layers for Dashboard Map
   const mapLayers = useMemo(() => {
     // Inter-camera network link flow lines
@@ -307,21 +320,26 @@ export default function DashboardPage({ navigate, openModal }) {
       pickable: false,
     });
 
-    // Interactive Camera Nodes
+    // Interactive 2D Camera Node Disks (clean tactical circular disks, no extruded pillars)
     const cameraNodes = new ScatterplotLayer({
-      id: "dashboard-camera-nodes",
+      id: "dashboard-camera-disks",
       data: liveCameras,
       getPosition: (d) => [d.lng, d.lat],
-      getRadius: (d) => 320,
+      getRadius: 160,
+      radiusMinPixels: 7,
+      radiusMaxPixels: 14,
       getFillColor: (d) => (d.id === liveSelectedCam.id ? [6, 182, 212, 255] : [...(d.rgb || [59, 130, 246]), 240]),
-      getLineColor: [255, 255, 255, 240],
-      lineWidthMinPixels: 2.5,
+      getLineColor: [255, 255, 255, 255],
+      lineWidthMinPixels: 2,
       stroked: true,
-      radiusMinPixels: 8,
-      radiusMaxPixels: 16,
+      filled: true,
       pickable: true,
       onClick: ({ object }) => {
-        if (object) setSelectedCam(object);
+        if (object) {
+          setSelectedCam(object);
+          setShowMapVideoHUD(true);
+          setHudMinimized(false);
+        }
       },
     });
 
@@ -398,19 +416,136 @@ export default function DashboardPage({ navigate, openModal }) {
           <div className="relative flex-1 w-full rounded-2xl overflow-hidden border border-[var(--border-subtle)]">
             <DeckGLMap
               layers={mapLayers}
-              viewState={{
+              initialViewState={{
                 longitude: 78.405,
                 latitude: 17.49,
                 zoom: 12.5,
-                pitch: 25,
+                pitch: 0,
                 bearing: 0,
               }}
             >
-              {/* Selected node quick badge on map */}
-              <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 text-[10px] font-mono text-gray-300">
-                Node: <strong className="text-cyan-400">{camId}</strong> | Speed:{" "}
-                <strong className="text-white">{liveSelectedCam.speed} km/h</strong>
-              </div>
+              {/* In-Situ Camera Video HUD (Floating on Map) */}
+              {showMapVideoHUD ? (
+                <div className="absolute bottom-3 left-3 z-10 w-72 sm:w-80 rounded-2xl border border-blue-500/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-xl pointer-events-auto transition-all duration-300">
+                  {/* HUD Header */}
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                      <span className="text-[11px] font-mono font-black text-cyan-400 truncate">
+                        {camId} · {camName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setHudMinimized((prev) => !prev)}
+                        className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        title={hudMinimized ? "Expand Stream" : "Minimize Stream"}
+                      >
+                        {hudMinimized ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowMapVideoHUD(false)}
+                        className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        title="Close HUD"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {!hudMinimized ? (
+                    <>
+                      {/* Live Video Feed with AI Overlay */}
+                      <div className="relative mt-2.5 h-36 w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+                        <video
+                          key={camVideoSrc}
+                          src={camVideoSrc}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+
+                        {/* AI Tactical Overlay */}
+                        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-2">
+                          <div className="flex items-center justify-between text-[9px] font-mono font-bold">
+                            <span className="rounded bg-black/60 px-1.5 py-0.5 text-cyan-300 backdrop-blur-sm">
+                              1080p · 30 FPS
+                            </span>
+                            <span className="rounded bg-red-600/80 px-1.5 py-0.5 text-white animate-pulse">
+                              ● LIVE
+                            </span>
+                          </div>
+
+                          {/* Simulated Target Detection Box */}
+                          <div className="mx-auto my-auto h-16 w-24 rounded border border-cyan-400/80 bg-cyan-500/10 p-1 flex flex-col justify-between backdrop-blur-[1px]">
+                            <span className="text-[7px] font-mono font-black uppercase tracking-wider text-cyan-300">
+                              TARGET ACQUIRED
+                            </span>
+                            <span className="text-[8px] font-mono font-black text-amber-300">
+                              OCR 96.4%
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[9px] font-mono text-gray-300 bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">
+                            <span>Plate: TS08EJ4892</span>
+                            <span className="text-cyan-400">YOLOv11+ByteTrack</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Telemetry Row */}
+                      <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
+                        <div className="rounded-lg bg-white/[0.04] p-1.5 border border-white/5">
+                          <span className="block text-[8px] font-bold text-gray-400 uppercase">Speed</span>
+                          <span className="text-[11px] font-black font-mono text-white">{liveSelectedCam.speed} km/h</span>
+                        </div>
+                        <div className="rounded-lg bg-white/[0.04] p-1.5 border border-white/5">
+                          <span className="block text-[8px] font-bold text-gray-400 uppercase">Density</span>
+                          <span className="text-[11px] font-black font-mono" style={{ color: liveSelectedCam.color }}>
+                            {liveSelectedCam.density}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-white/[0.04] p-1.5 border border-white/5">
+                          <span className="block text-[8px] font-bold text-gray-400 uppercase">Status</span>
+                          <span className="text-[10px] font-black truncate" style={{ color: liveSelectedCam.color }}>
+                            {liveSelectedCam.status}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-gray-300">
+                      <span>Speed: <strong className="text-white">{liveSelectedCam.speed} km/h</strong></span>
+                      <span>Density: <strong style={{ color: liveSelectedCam.color }}>{liveSelectedCam.density}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setHudMinimized(false)}
+                        className="text-cyan-400 font-bold hover:underline"
+                      >
+                        Expand Stream
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Minimized Launcher Pill */
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMapVideoHUD(true);
+                    setHudMinimized(false);
+                  }}
+                  className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-xl border border-blue-500/30 bg-black/80 px-3 py-1.5 text-[11px] font-mono text-gray-300 shadow-xl backdrop-blur-md hover:bg-black hover:text-white transition-all pointer-events-auto"
+                >
+                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span>Stream: <strong className="text-cyan-400">{camId}</strong></span>
+                  <span className="text-[10px] text-gray-400">({liveSelectedCam.speed} km/h)</span>
+                </button>
+              )}
             </DeckGLMap>
           </div>
         </div>
@@ -519,12 +654,19 @@ export default function DashboardPage({ navigate, openModal }) {
       {/* BOTTOM SECTION: 3 Analytics Graphs */}
       <div className="grid w-full gap-5 lg:grid-cols-3">
         {/* Graph 1: Traffic Flow Trends */}
-        <div className="fade-up delay-400 flex h-[320px] flex-col glass-card-static p-5">
-          <div className="mb-4">
-            <h3 className="flex items-center gap-1.5 text-sm font-black text-[var(--text-primary)]">
-              <Activity size={16} className="text-blue-400" /> Traffic Flow Trends
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-[var(--text-muted)]">Total volume over time</p>
+        <div className="fade-up delay-400 flex h-[330px] flex-col glass-card-static p-5">
+          <div className="mb-3 flex items-start justify-between">
+            <div>
+              <h3 className="flex items-center gap-1.5 text-sm font-black text-[var(--text-primary)]">
+                <Activity size={16} className="text-blue-400" /> ANPR Detections Volume
+              </h3>
+              <p className="mt-0.5 text-[10px] font-bold text-[var(--text-muted)]">
+                Hourly vehicles indexed across 254 camera nodes
+              </p>
+            </div>
+            <span className="rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-400">
+              Peak: 4.2k veh/h
+            </span>
           </div>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -549,7 +691,7 @@ export default function DashboardPage({ navigate, openModal }) {
                   tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }}
                   tickFormatter={(val) => `${val / 1000}k`}
                 />
-                <Tooltip content={<CustomTooltip suffix="Vehicles" />} />
+                <Tooltip content={<CustomTooltip suffix=" vehicles / hr" />} />
                 <Area
                   type="monotone"
                   dataKey="volume"
@@ -564,12 +706,27 @@ export default function DashboardPage({ navigate, openModal }) {
         </div>
 
         {/* Graph 2: Traffic Density Trends */}
-        <div className="fade-up delay-500 flex h-[320px] flex-col glass-card-static p-5">
-          <div className="mb-4">
-            <h3 className="flex items-center gap-1.5 text-sm font-black text-[var(--text-primary)]">
-              <MapIcon size={16} className="text-purple-400" /> Traffic Density Trends
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-[var(--text-muted)]">Road capacity utilization (%)</p>
+        <div className="fade-up delay-500 flex h-[330px] flex-col glass-card-static p-5">
+          <div className="mb-3 flex items-start justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="flex items-center gap-1.5 text-sm font-black text-[var(--text-primary)]">
+                <MapIcon size={16} className="text-purple-400" /> Road Capacity Utilization
+              </h3>
+              <p className="mt-0.5 text-[10px] font-bold text-[var(--text-muted)]">
+                Corridor saturation % (Normal vs Congested)
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[9px] font-bold">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> &lt;50%
+              </span>
+              <span className="flex items-center gap-1 text-amber-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> 50-85%
+              </span>
+              <span className="flex items-center gap-1 text-red-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400" /> &gt;85% Gridlock
+              </span>
+            </div>
           </div>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -587,8 +744,9 @@ export default function DashboardPage({ navigate, openModal }) {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }}
+                  tickFormatter={(val) => `${val}%`}
                 />
-                <Tooltip content={<CustomTooltip suffix="%" />} cursor={{ fill: cursorFill }} />
+                <Tooltip content={<CustomTooltip suffix="% capacity utilized" />} cursor={{ fill: cursorFill }} />
                 <Bar dataKey="density" radius={[6, 6, 0, 0]} barSize={24}>
                   {densityTrendsData.map((entry, index) => (
                     <Cell
@@ -603,12 +761,19 @@ export default function DashboardPage({ navigate, openModal }) {
         </div>
 
         {/* Graph 3: Congestion Trends */}
-        <div className="fade-up delay-[600ms] flex h-[320px] flex-col glass-card-static p-5">
-          <div className="mb-4">
-            <h3 className="flex items-center gap-1.5 text-sm font-black text-[var(--text-primary)]">
-              <AlertTriangle size={16} className="text-orange-400" /> Congestion Trends
-            </h3>
-            <p className="mt-0.5 text-[10px] font-bold text-[var(--text-muted)]">Average delay in minutes</p>
+        <div className="fade-up delay-[600ms] flex h-[330px] flex-col glass-card-static p-5">
+          <div className="mb-3 flex items-start justify-between">
+            <div>
+              <h3 className="flex items-center gap-1.5 text-sm font-black text-[var(--text-primary)]">
+                <AlertTriangle size={16} className="text-orange-400" /> Signal & Bottleneck Delays
+              </h3>
+              <p className="mt-0.5 text-[10px] font-bold text-[var(--text-muted)]">
+                Average excess transit time above free-flow (Mins)
+              </p>
+            </div>
+            <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-400">
+              Peak: 28 min delay
+            </span>
           </div>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -625,8 +790,9 @@ export default function DashboardPage({ navigate, openModal }) {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 10, fill: tickColor, fontWeight: 700 }}
+                  tickFormatter={(val) => `${val}m`}
                 />
-                <Tooltip content={<CustomTooltip suffix="mins delay" />} />
+                <Tooltip content={<CustomTooltip suffix=" min excess delay" />} />
                 <Line type="stepAfter" dataKey="delay" stroke="#f97316" strokeWidth={3} dot={false} />
               </LineChart>
             </ResponsiveContainer>

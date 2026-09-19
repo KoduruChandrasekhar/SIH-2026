@@ -13,10 +13,21 @@ import {
   ArrowRight,
   Filter,
 } from "lucide-react";
-import { ScatterplotLayer } from "@deck.gl/layers";
+import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import Navbar from "../components/Navbar";
 import DeckGLMap from "../components/DeckGLMap";
 import { fetchTrafficCorridors, fetchTrafficOD } from "../api";
+
+// Known Hyderabad Sector GPS Coordinates for O-D Flow Mapping
+const SECTOR_COORDS = {
+  "Kukatpally": [78.3996, 17.4947],
+  "Balanagar": [78.4357, 17.4682],
+  "Madhapur": [78.3742, 17.4485],
+  "Cyberabad": [78.3742, 17.4485],
+  "JNTU": [78.3912, 17.4985],
+  "Begumpet": [78.4735, 17.4435],
+  "Gachibowli": [78.3489, 17.4401],
+};
 
 // Mock Traffic Corridor Data
 const localCorridors = [
@@ -82,11 +93,52 @@ const localCorridors = [
   },
 ];
 
-// Origin-Destination Mock Routes
+// Origin-Destination Mock Routes with Coordinates & Parabolic Flow Telemetry
 const localOdRoutes = [
-  { origin: "Kukatpally", destination: "Balanagar", count: "1,842 vehicles" },
-  { origin: "Balanagar", destination: "Madhapur", count: "1,426 vehicles" },
-  { origin: "Kukatpally", destination: "Cyberabad", count: "2,103 vehicles" },
+  {
+    id: "OD-1",
+    origin: "Kukatpally",
+    destination: "Balanagar",
+    fromCoords: [78.3996, 17.4947],
+    toCoords: [78.4357, 17.4682],
+    count: "1,842 vehicles/h",
+    volume: 1842,
+    sourceColor: [34, 211, 238],
+    targetColor: [249, 115, 22],
+  },
+  {
+    id: "OD-2",
+    origin: "Balanagar",
+    destination: "Madhapur",
+    fromCoords: [78.4357, 17.4682],
+    toCoords: [78.3742, 17.4485],
+    count: "1,426 vehicles/h",
+    volume: 1426,
+    sourceColor: [59, 130, 246],
+    targetColor: [168, 85, 247],
+  },
+  {
+    id: "OD-3",
+    origin: "Kukatpally",
+    destination: "Cyberabad",
+    fromCoords: [78.3996, 17.4947],
+    toCoords: [78.3742, 17.4485],
+    count: "2,103 vehicles/h",
+    volume: 2103,
+    sourceColor: [168, 85, 247],
+    targetColor: [239, 68, 68],
+  },
+  {
+    id: "OD-4",
+    origin: "JNTU",
+    destination: "Cyberabad",
+    fromCoords: [78.3912, 17.4985],
+    toCoords: [78.3742, 17.4485],
+    count: "965 vehicles/h",
+    volume: 965,
+    sourceColor: [34, 197, 94],
+    targetColor: [249, 115, 22],
+  },
 ];
 
 export default function TrafficPage({ navigate, openModal }) {
@@ -95,6 +147,9 @@ export default function TrafficPage({ navigate, openModal }) {
   const [odRoutes, setOdRoutes] = useState(localOdRoutes);
   const [selectedCorridor, setSelectedCorridor] = useState(localCorridors[0]);
   const [hoveredCorridor, setHoveredCorridor] = useState(null);
+  const [showFlowLines, setShowFlowLines] = useState(true);
+  const [selectedOD, setSelectedOD] = useState(null);
+  const [hoveredOD, setHoveredOD] = useState(null);
 
   // Fetch from API with fallback
   useEffect(() => {
@@ -132,7 +187,7 @@ export default function TrafficPage({ navigate, openModal }) {
     corridor.status.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Deck.gl layers for corridor density hotspots
+  // Deck.gl layers for corridor density hotspots & 3D parabolic O-D arcs
   const layers = useMemo(() => {
     // Outer halo layer
     const haloLayer = new ScatterplotLayer({
@@ -155,21 +210,22 @@ export default function TrafficPage({ navigate, openModal }) {
       pickable: false,
     });
 
-    // Core marker layer
+    // Core 2D circular disk marker layer (clean tactical disks, no extruded pillars)
     const coreLayer = new ScatterplotLayer({
-      id: "corridor-core-layer",
+      id: "corridor-signal-disks",
       data: corridors,
       getPosition: (d) => [d.lng, d.lat],
-      getRadius: (d) => 350,
+      getRadius: 160,
+      radiusMinPixels: 8,
+      radiusMaxPixels: 16,
       getFillColor: (d) => {
         const rgb = d.rgb || [249, 115, 22];
-        return [...rgb, 220];
+        return [...rgb, 240];
       },
-      getLineColor: [255, 255, 255, 220],
-      lineWidthMinPixels: 2,
+      getLineColor: [255, 255, 255, 255],
+      lineWidthMinPixels: 2.5,
       stroked: true,
-      radiusMinPixels: 8,
-      radiusMaxPixels: 20,
+      filled: true,
       pickable: true,
       onClick: ({ object }) => {
         if (object) setSelectedCorridor(object);
@@ -179,8 +235,34 @@ export default function TrafficPage({ navigate, openModal }) {
       },
     });
 
-    return [haloLayer, coreLayer];
-  }, [corridors]);
+    // 2D Origin-Destination Corridor Flow Lines (flat 2D, no 3D arcs)
+    const odFlowLayer = new LineLayer({
+      id: "od-flow-lines",
+      data: odRoutes.map((r) => ({
+        ...r,
+        fromCoords: r.fromCoords || SECTOR_COORDS[r.origin] || [78.3996, 17.4947],
+        toCoords: r.toCoords || SECTOR_COORDS[r.destination] || [78.4357, 17.4682],
+        sourceColor: r.sourceColor || [168, 85, 247],
+        targetColor: r.targetColor || [59, 130, 246],
+      })),
+      getSourcePosition: (d) => d.fromCoords,
+      getTargetPosition: (d) => d.toCoords,
+      getColor: (d) => [...(d.sourceColor || [168, 85, 247]), 210],
+      getWidth: (d) => Math.max(3, ((d.volume || 1400) / 500) * 2),
+      widthMinPixels: 2.5,
+      pickable: true,
+      autoHighlight: true,
+      highlightColor: [255, 255, 255, 220],
+      onClick: ({ object }) => {
+        if (object) setSelectedOD(object);
+      },
+      onHover: ({ object }) => {
+        setHoveredOD(object || null);
+      },
+    });
+
+    return showFlowLines ? [haloLayer, odFlowLayer, coreLayer] : [haloLayer, coreLayer];
+  }, [corridors, odRoutes, showFlowLines]);
 
   return (
     <div className="relative flex w-full flex-col gap-6 pb-12 text-[var(--text-primary)]">
@@ -270,22 +352,37 @@ export default function TrafficPage({ navigate, openModal }) {
               <div className="flex items-center gap-2">
                 <MapIcon size={16} className="text-orange-400" />
                 <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
-                  Live Corridor GIS Map (deck.gl)
+                  Live Corridor & O-D GIS Map (deck.gl)
                 </h3>
               </div>
-              <span className="flex items-center gap-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-[10px] font-bold text-orange-400">
-                <Zap size={10} /> WebGL Accelerating
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFlowLines((prev) => !prev)}
+                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold transition-all ${
+                    showFlowLines
+                      ? "border-purple-500/50 bg-purple-500/20 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]"
+                      : "border-white/10 bg-white/5 text-gray-400 hover:text-white"
+                  }`}
+                  title="Toggle 2D Origin-Destination Flow Lines"
+                >
+                  <TrendingUp size={10} />
+                  <span>{showFlowLines ? "O-D Flows: ON" : "O-D Flows: OFF"}</span>
+                </button>
+                <span className="flex items-center gap-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-[10px] font-bold text-orange-400">
+                  <Zap size={10} /> WebGL Accelerating
+                </span>
+              </div>
             </div>
 
             <div className="relative flex-1 w-full rounded-2xl overflow-hidden border border-[var(--border-subtle)]">
               <DeckGLMap
                 layers={layers}
-                viewState={{
+                initialViewState={{
                   longitude: 78.41,
                   latitude: 17.478,
                   zoom: 11.8,
-                  pitch: 30,
+                  pitch: 0,
                   bearing: 0,
                 }}
               >
@@ -306,6 +403,42 @@ export default function TrafficPage({ navigate, openModal }) {
                     <span className="text-orange-400 font-bold">{selectedCorridor.status}</span>
                   </div>
                 </div>
+
+                {/* 2D O-D Flow Hover / Selection Readout */}
+                {(hoveredOD || selectedOD) && (
+                  <div className="absolute bottom-4 right-4 p-3 rounded-xl bg-black/85 backdrop-blur-md border border-purple-500/30 max-w-xs shadow-2xl pointer-events-auto">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-wider text-purple-300">
+                          2D Corridor Flow
+                        </span>
+                      </div>
+                      {selectedOD && !hoveredOD && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOD(null);
+                          }}
+                          className="text-[9px] text-gray-400 hover:text-white"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-white mt-1.5">
+                      <span>{(hoveredOD || selectedOD).origin}</span>
+                      <ArrowRight size={13} className="text-purple-400" />
+                      <span>{(hoveredOD || selectedOD).destination}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[10px] text-gray-300 font-mono">
+                      <span>Flow Volume:</span>
+                      <span className="font-bold text-purple-300">
+                        {(hoveredOD || selectedOD).count || `${(hoveredOD || selectedOD).volume} vehicles/h`}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {hoveredCorridor && hoveredCorridor.id !== selectedCorridor.id && (
                   <div className="absolute bottom-4 left-4 p-2.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/15 pointer-events-none">

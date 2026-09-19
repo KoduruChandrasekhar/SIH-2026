@@ -1,372 +1,303 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
-  Activity,
-  ArrowRight,
-  Bell,
-  ChevronDown,
-  LayoutDashboard,
-  Navigation,
-  Radar,
-  Route,
-  ShieldAlert,
-  TrafficCone,
-  Zap,
-  Camera,
-  Globe,
+  Activity, ArrowRight, Bell, ChevronDown, LayoutDashboard, Navigation,
+  Route, ShieldAlert, TrafficCone, Zap, Globe2, Radar,
 } from "lucide-react";
 import Navbar from "../components/Navbar";
-import { slides } from "../data";
 
-// Lazy load Earth globe for smooth rendering
 const EarthGlobe = lazy(() => import("../components/EarthGlobe"));
+gsap.registerPlugin(ScrollTrigger);
 
-/* ──────────────────────────────────────────
-   Animated Counter Component
-   ────────────────────────────────────────── */
-function AnimatedCounter({ target, suffix = "", prefix = "", duration = 2000 }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const hasAnimated = useRef(false);
+function AnimatedCounter({ target, suffix = "", prefix = "" }) {
+  const node = useRef(null);
+  const [value, setValue] = useState(0);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated.current) {
-          hasAnimated.current = true;
-          const startTime = Date.now();
-          const tick = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setCount(Math.round(target * eased));
-            if (progress < 1) requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-        }
-      },
-      { threshold: 0.3 }
-    );
-    if (ref.current) observer.observe(ref.current);
+    const element = node.current;
+    if (!element) return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || element.dataset.counted) return;
+      element.dataset.counted = "true";
+      const state = { value: 0 };
+      gsap.to(state, {
+        value: target,
+        duration: 1.6,
+        ease: "power3.out",
+        onUpdate: () => setValue(Math.round(state.value)),
+      });
+      observer.disconnect();
+    }, { threshold: 0.45 });
+    observer.observe(element);
     return () => observer.disconnect();
-  }, [target, duration]);
+  }, [target]);
 
-  return (
-    <span ref={ref}>
-      {prefix}{count.toLocaleString()}{suffix}
-    </span>
-  );
+  return <span ref={node}>{prefix}{value.toLocaleString()}{suffix}</span>;
 }
 
-/* ──────────────────────────────────────────
-   Loading fallback for Earth globe
-   ────────────────────────────────────────── */
-function GlobeLoader() {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div className="relative">
-        <div className="w-32 h-32 rounded-full border border-blue-500/20 animate-pulse" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Globe size={32} className="text-blue-500/40 animate-spin" style={{ animationDuration: "3s" }} />
-        </div>
-      </div>
-    </div>
-  );
-}
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+  buttonText = "Open command module",
+  onClick,
+  eyebrow,
+  theme = "blue",
+  bgImage,
+  liveBadge,
+  liveStatusColor = "bg-blue-400",
+  isPulse = false,
+}) {
+  const [coord, setCoord] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
-/* ──────────────────────────────────────────
-   Feature Card
-   ────────────────────────────────────────── */
-function FeatureCard({ icon: Icon, title, description, onClick, accentColor, delay, liveBadge }) {
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCoord({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
+  const themeStyles = {
+    purple: {
+      accent: "#a855f7",
+      hoverOverlay: "from-purple-950/90 via-purple-900/80 to-slate-950/90",
+      iconBox: "bg-purple-500/15 text-purple-400 group-hover:bg-purple-500/30 group-hover:text-white",
+    },
+    blue: {
+      accent: "#3b82f6",
+      hoverOverlay: "from-blue-950/90 via-blue-900/80 to-slate-950/90",
+      iconBox: "bg-blue-500/15 text-blue-400 group-hover:bg-blue-500/30 group-hover:text-white",
+    },
+    orange: {
+      accent: "#f97316",
+      hoverOverlay: "from-amber-950/90 via-orange-900/80 to-slate-950/90",
+      iconBox: "bg-orange-500/15 text-orange-400 group-hover:bg-orange-500/30 group-hover:text-white",
+    },
+    red: {
+      accent: "#ef4444",
+      hoverOverlay: "from-rose-950/90 via-red-900/80 to-slate-950/90",
+      iconBox: "bg-red-500/15 text-red-400 group-hover:bg-red-500/30 group-hover:text-white",
+    },
+  };
+
+  const currentTheme = themeStyles[theme] || themeStyles.blue;
+
   return (
     <div
       onClick={onClick}
-      className="feature-card fade-up group"
-      style={{ animationDelay: `${delay}ms` }}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="group relative flex min-h-[260px] cursor-pointer flex-col overflow-hidden rounded-[24px] border border-white/15 bg-slate-900/80 p-6 shadow-[0_12px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1.5 hover:border-white/30 hover:shadow-[0_20px_50px_rgba(0,0,0,0.8)]"
+      style={{ isolation: "isolate" }}
     >
-      {/* Gradient border glow on hover */}
-      <div
-        className="absolute inset-0 rounded-[20px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"
-        style={{
-          background: `radial-gradient(600px circle at 50% 50%, ${accentColor}15, transparent 70%)`,
-        }}
+      {/* Background Cover Image with Hover Zoom */}
+      <img
+        src={bgImage}
+        alt={title}
+        className="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover opacity-0 transition-all duration-700 group-hover:scale-105 group-hover:opacity-100"
       />
 
-      <div className="flex items-start justify-between mb-4">
+      {/* Thematic Gradient Overlay */}
+      <div
+        className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${currentTheme.hoverOverlay}`}
+      />
+
+      {/* Floating Spotlight Follows Cursor */}
+      {isHovered && (
         <div
-          className="flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+          className="pointer-events-none absolute -inset-px z-10 transition-opacity duration-300 rounded-[24px]"
           style={{
-            background: `${accentColor}15`,
-            color: accentColor,
+            background: `radial-gradient(350px circle at ${coord.x}px ${coord.y}px, rgba(255,255,255,0.22), transparent 75%)`,
           }}
-        >
-          <Icon size={20} strokeWidth={2} />
-        </div>
+        />
+      )}
 
-        {liveBadge && (
-          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold"
-            style={{
-              background: `${accentColor}12`,
-              color: accentColor,
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{
-                background: accentColor,
-                boxShadow: `0 0 6px ${accentColor}`,
-                animation: "pulse-glow 2s ease-in-out infinite",
-              }}
-            />
-            {liveBadge}
-          </div>
-        )}
-      </div>
-
-      <h3 className="text-base font-bold text-[var(--text-primary)] mb-2">{title}</h3>
-      <p className="text-[13px] leading-relaxed text-[var(--text-secondary)] mb-5 min-h-[40px]">
-        {description}
-      </p>
-
-      <button
-        className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-300"
-        style={{
-          background: `${accentColor}10`,
-          color: accentColor,
-          border: `1px solid ${accentColor}20`,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = `${accentColor}20`;
-          e.currentTarget.style.borderColor = `${accentColor}40`;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = `${accentColor}10`;
-          e.currentTarget.style.borderColor = `${accentColor}20`;
-        }}
-      >
-        Launch <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
-      </button>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────
-   Stat Item
-   ────────────────────────────────────────── */
-function StatItem({ value, label, suffix = "", prefix = "" }) {
-  return (
-    <div className="text-center px-6">
-      <div className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
-        <AnimatedCounter target={value} suffix={suffix} prefix={prefix} />
-      </div>
-      <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-widest mt-1">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────
-   Status Item
-   ────────────────────────────────────────── */
-function StatusItem({ icon: Icon, text }) {
-  return (
-    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-      <Icon size={14} className="text-[var(--text-dim)]" />
-      {text}
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────
-   Main HomePage Component
-   ────────────────────────────────────────── */
-export default function HomePage({ navigate, openModal }) {
-  const [scrollY, setScrollY] = useState(0);
-  const heroRef = useRef(null);
-
-  // Track scroll for parallax effects
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Calculate hero opacity and transform based on scroll
-  const heroOpacity = Math.max(0, 1 - scrollY / 600);
-  const heroScale = Math.max(0.6, 1 - scrollY / 2000);
-  const heroTranslateY = scrollY * 0.4;
-
-  // Live telemetry tickers
-  const [liveSpeed, setLiveSpeed] = useState(42);
-  const [activeFeeds, setActiveFeeds] = useState(254);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveSpeed(prev => Math.max(30, Math.min(55, prev + (Math.random() > 0.5 ? 1 : -1))));
-      setActiveFeeds(250 + Math.floor(Math.random() * 8));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="relative w-full">
-      {/* ═══════════════════════════════════════
-          SECTION 1: HERO — Full-Screen Earth Globe
-          ═══════════════════════════════════════ */}
-      <section ref={heroRef} className="relative h-screen w-full overflow-hidden">
-        {/* Radial gradient backdrop */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.12),transparent_70%)]" />
-
-        {/* 3D Earth Globe */}
-        <div
-          className="absolute inset-0 z-0"
-          style={{
-            opacity: heroOpacity,
-            transform: `scale(${heroScale}) translateY(${heroTranslateY}px)`,
-            transition: "transform 0.1s linear",
-          }}
-        >
-          <Suspense fallback={<GlobeLoader />}>
-            {EarthGlobe && <EarthGlobe />}
-          </Suspense>
-        </div>
-
-        {/* Hero overlay content */}
-        <div className="relative z-10 flex h-full flex-col">
-          {/* Navbar */}
-          <div className="fade-up px-4 pt-4 sm:px-6 lg:px-8">
-            <Navbar page="home" navigate={navigate} openModal={openModal} />
-          </div>
-
-          {/* Hero text */}
-          <div className="flex flex-1 flex-col items-center justify-center px-4 text-center"
-            style={{ opacity: heroOpacity }}
-          >
-            <div className="fade-up delay-200">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-glass)] px-4 py-1.5 backdrop-blur-xl">
-                <span className="live-dot" style={{ width: 6, height: 6 }} />
-                <span className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                  AI Traffic Intelligence Platform
+      {/* Card Content */}
+      <div className="relative z-20 flex h-full flex-col justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 ${currentTheme.iconBox}`}
+              >
+                <Icon size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] group-hover:text-white/80 transition-colors">
+                  {eyebrow}
                 </span>
+                <h3 className="text-xl font-bold tracking-tight text-[var(--text-primary)] group-hover:text-white transition-colors">
+                  {title}
+                </h3>
               </div>
             </div>
 
-            <h1 className="fade-up delay-300 text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter text-[var(--text-primary)] mb-4">
-              <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(59,130,246,0.4)]">
-                TraceNet
-              </span>
-            </h1>
+            {liveBadge && (
+              <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-[11px] font-bold text-gray-200 backdrop-blur-md transition-all duration-300 group-hover:border-white/30 group-hover:bg-white/20 group-hover:text-white">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${liveStatusColor} ${
+                    isPulse ? "animate-pulse" : ""
+                  }`}
+                />
+                <span>{liveBadge}</span>
+              </div>
+            )}
+          </div>
 
-            <p className="fade-up delay-400 max-w-2xl text-base sm:text-lg text-[var(--text-secondary)] leading-relaxed mb-8">
-              City-Wide AI Engine for Multi-Camera ANPR Trajectory Tracking & Urban Traffic Analytics
-            </p>
+          <p className="mt-4 text-xs leading-relaxed text-[var(--text-secondary)] group-hover:text-white/90 transition-colors max-w-sm">
+            {description}
+          </p>
+        </div>
 
-            <div className="fade-up delay-500 flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={() => navigate("dashboard")}
-                className="btn-primary text-sm px-6 py-3"
-              >
-                <Zap size={16} /> Launch Dashboard
-              </button>
-              <button
-                onClick={() => navigate("tracking")}
-                className="btn-glass text-sm px-6 py-3"
-              >
-                <Navigation size={16} /> Track Vehicle
-              </button>
+        <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">
+          <span className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary)] group-hover:text-white transition-colors">
+            {buttonText}
+            <ArrowRight
+              size={15}
+              className="transition-transform duration-300 group-hover:translate-x-1.5 text-[var(--text-muted)] group-hover:text-white"
+            />
+          </span>
+          <span
+            className="h-1.5 w-1.5 rounded-full transition-transform duration-300 group-hover:scale-150"
+            style={{ backgroundColor: currentTheme.accent }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ value, suffix, label }) {
+  return <div className="stat-unit"><strong><AnimatedCounter target={value} suffix={suffix} /></strong><span>{label}</span></div>;
+}
+
+export default function HomePage({ navigate, openModal, launchTracking }) {
+  const root = useRef(null);
+  const hero = useRef(null);
+  const globe = useRef(null);
+  const copy = useRef(null);
+
+  useLayoutEffect(() => {
+    const context = gsap.context(() => {
+      // Hero scroll animation
+      gsap.timeline({
+        scrollTrigger: { trigger: hero.current, start: "top top", end: "bottom 35%", scrub: 0.6 },
+      })
+        .to(globe.current, { scale: 0.59, x: "27vw", y: "-16vh", opacity: 0.42, ease: "none" }, 0)
+        .to(copy.current, { opacity: 0, y: -34, filter: "blur(8px)", ease: "none" }, 0);
+
+      // Immediately fade out the scroll cue on initial scroll
+      gsap.to(".hero-scroll-cue", {
+        scrollTrigger: { trigger: hero.current, start: "top top", end: "top -50px", scrub: true },
+        opacity: 0,
+        y: 25,
+      });
+    }, root);
+    return () => context.revert();
+  }, []);
+
+  const track = () => (launchTracking ? launchTracking() : navigate("tracking"));
+
+  return (
+    <main ref={root} className="relative overflow-hidden">
+      <section ref={hero} className="hero-orbit-stage">
+        <div className="hero-aurora" />
+        <div ref={globe} className="hero-globe-stage"><Suspense fallback={<div className="globe-fallback" />}><EarthGlobe /></Suspense></div>
+        <div className="hero-interface pointer-events-none">
+          <div className="pointer-events-auto px-4 pt-4 sm:px-6 lg:px-8"><Navbar page="home" navigate={navigate} openModal={openModal} launchTracking={track} /></div>
+          <div ref={copy} className="hero-copy">
+            <div className="hero-kicker"><span className="live-dot" /> TRACENET · BY TEAM TRACE FORCE</div>
+            <h1>TRACE <span>NET</span></h1>
+            <p>City-wide AI engine for multi-camera ANPR tracking, live traffic intelligence and decisive field response.</p>
+            <div className="pointer-events-auto mt-8 flex flex-wrap justify-center gap-3">
+              <button onClick={() => navigate("dashboard")} className="btn-primary px-6 py-3 text-sm"><Zap size={16} /> Open command center</button>
+              <button onClick={track} className="btn-glass px-6 py-3 text-sm"><Navigation size={16} /> Track a vehicle</button>
             </div>
           </div>
-
-          {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-            style={{ opacity: Math.max(0, 1 - scrollY / 200) }}
-          >
-            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Scroll to explore</span>
-            <ChevronDown size={20} className="text-[var(--text-muted)] animate-scroll-hint" />
-          </div>
+          <div className="hero-scroll-cue"><span>Scroll to enter</span><ChevronDown size={18} /></div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════
-          SECTION 2: Feature Cards
-          ═══════════════════════════════════════ */}
-      <section className="relative z-10 mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 -mt-20">
-        {/* Gradient fade from hero */}
-        <div className="absolute -top-40 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-[var(--bg-void)] pointer-events-none" />
-
-        <div className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="platform-overview relative z-10 mx-auto max-w-6xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="section-heading">
+          <span><Radar size={14} /> FOUR CONNECTED COMMAND SURFACES</span>
+          <h2>See the city as one intelligence system.</h2>
+          <p>From a single plate observation to city-wide response, every action stays connected to the same real-time operational picture.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
           <FeatureCard
             icon={LayoutDashboard}
             title="Dashboard"
-            description="Real-time city overview. Centralized performance metrics and network speeds."
+            eyebrow="01 / OBSERVE"
+            theme="purple"
+            bgImage="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=800&auto=format&fit=crop"
+            liveBadge="42 km/h avg"
+            liveStatusColor="bg-purple-400"
+            description="Real-Time City Overview. Centralized performance metrics, camera availability, and average network speeds across urban sectors."
+            buttonText="View Dashboard"
             onClick={() => navigate("dashboard")}
-            accentColor="#8b5cf6"
-            delay={0}
-            liveBadge={`${liveSpeed} km/h avg`}
           />
           <FeatureCard
             icon={Navigation}
             title="Tracking"
-            description="Spatial-temporal vehicle tracking. Reconstruct complete paths from ANPR feeds."
-            onClick={() => navigate("tracking")}
-            accentColor="#3b82f6"
-            delay={100}
-            liveBadge={`${activeFeeds} Feeds`}
+            eyebrow="02 / TRACE"
+            theme="blue"
+            bgImage="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=800&auto=format&fit=crop"
+            liveBadge="254 Feeds Active"
+            liveStatusColor="bg-blue-400"
+            description="Spatial-Temporal Vehicle Tracking. Reconstruct complete paths and cross-camera trajectories from ANPR feeds with millisecond precision."
+            buttonText="Launch Tracking"
+            onClick={track}
           />
           <FeatureCard
             icon={TrafficCone}
-            title="Traffic Analytics"
-            description="City-wide flow analysis. Visualize origin-destination patterns and congestion."
+            title="Traffic"
+            eyebrow="03 / UNDERSTAND"
+            theme="orange"
+            bgImage="https://images.unsplash.com/photo-1506146332389-18140dc7b2fb?q=80&w=800&auto=format&fit=crop"
+            liveBadge="3 Congestion Zones"
+            liveStatusColor="bg-amber-400"
+            description="City-Wide Traffic Analytics. Macro WebGL corridor heatmaps, origin-destination arcs, and bottleneck prediction."
+            buttonText="Analyze Traffic"
             onClick={() => navigate("traffic")}
-            accentColor="#f59e0b"
-            delay={200}
-            liveBadge="3 Zones Active"
           />
           <FeatureCard
             icon={Bell}
-            title="Alert Center"
-            description="Blacklist detection and anomaly alerts. Real-time threat monitoring system."
+            title="Alerts"
+            eyebrow="04 / RESPOND"
+            theme="red"
+            bgImage="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=800&auto=format&fit=crop"
+            liveBadge="3 Priority Flags"
+            liveStatusColor="bg-rose-400"
+            isPulse={true}
+            description="Anomalous Route & Blacklist Alerts. Real-time notifications for stolen vehicles, suspicious routes, and perimeter violations."
+            buttonText="View Alerts"
             onClick={() => navigate("alerts")}
-            accentColor="#ef4444"
-            delay={300}
-            liveBadge="3 Priority"
           />
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════
-          SECTION 3: Live Stats Strip
-          ═══════════════════════════════════════ */}
-      <section className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 mt-12 mb-6">
-        <div className="glass-card-static flex flex-wrap items-center justify-around py-8 px-6 gap-6">
-          <StatItem value={254} label="Camera Nodes" />
-          <div className="hidden sm:block w-px h-10 bg-[var(--border-subtle)]" />
-          <StatItem value={99} suffix=".98%" label="Uptime" />
-          <div className="hidden sm:block w-px h-10 bg-[var(--border-subtle)]" />
-          <StatItem value={14} suffix="ms" label="Inference Latency" />
-          <div className="hidden sm:block w-px h-10 bg-[var(--border-subtle)]" />
-          <StatItem value={1428910} label="Plates Indexed Today" />
+      <section className="telemetry-strip mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="status-reveal telemetry-panel">
+          <Stat value={254} label="Camera nodes" />
+          <Stat value={99} suffix=".98%" label="Network uptime" />
+          <Stat value={14} suffix=" ms" label="Inference latency" />
+          <Stat value={1400000} suffix="+" label="Plates indexed today" />
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════
-          SECTION 4: System Status
-          ═══════════════════════════════════════ */}
-      <section className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 mb-16">
-        <div className="glass-card-static flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="live-dot" />
-            <span className="text-xs font-bold text-[var(--text-primary)]">
-              All core AI systems operational
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-6">
-            <StatusItem icon={Route} text="Trajectory Engine" />
-            <StatusItem icon={Activity} text="Traffic Engine" />
-            <StatusItem icon={ShieldAlert} text="Alert Service" />
+      <footer className="mx-auto max-w-6xl px-4 pb-14 pt-5 sm:px-6 lg:px-8">
+        <div className="status-reveal system-status-bar">
+          <div className="flex items-center gap-3"><span className="live-dot" /><span className="text-sm font-semibold text-[var(--text-primary)]">All AI systems operational</span></div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            <span><Route size={13} /> Trajectory engine</span><span><Activity size={13} /> Traffic engine</span><span><ShieldAlert size={13} /> Alert service</span>
           </div>
         </div>
-      </section>
-    </div>
+      </footer>
+    </main>
   );
 }

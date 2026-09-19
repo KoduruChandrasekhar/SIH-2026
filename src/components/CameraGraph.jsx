@@ -22,7 +22,7 @@ export default function CameraGraph({ activeRoute, currentCamera, isAnimating })
   };
 
   return (
-    <div className="rounded-[24px] border border-white/80 bg-gray-900 p-5 shadow-[0_8px_32px_rgba(0,0,0,.15)] relative overflow-hidden mt-5">
+    <div className="glass-card-static relative mt-5 overflow-hidden p-5">
       <div className="absolute top-4 left-4 z-10 text-[9px] font-extrabold uppercase tracking-widest text-gray-400">
         Camera Network Graph
       </div>

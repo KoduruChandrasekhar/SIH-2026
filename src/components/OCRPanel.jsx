@@ -1,64 +1,10 @@
 import { useEffect, useState } from "react";
-import { Scan, CheckCircle2, Workflow } from "lucide-react";
+import { CheckCircle2, Scan } from "lucide-react";
 import { formatConfidence } from "../demoData";
 
 export default function OCRPanel({ ocrData, isActive }) {
-  const [showSelected, setShowSelected] = useState(false);
-  const [showConsensus, setShowConsensus] = useState(false);
-
-  useEffect(() => {
-    if (!isActive) {
-      setShowSelected(false);
-      setShowConsensus(false);
-      return;
-    }
-    
-    const t1 = setTimeout(() => setShowSelected(true), 1000);
-    const t2 = setTimeout(() => setShowConsensus(true), 2500);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [isActive]);
-
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => { if (!isActive) { setRevealed(false); return undefined; } const timer = window.setTimeout(() => setRevealed(true), 1200); return () => window.clearTimeout(timer); }, [isActive]);
   if (!isActive || !ocrData) return null;
-
-  return (
-    <div className="rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl mt-4">
-      <div className="mb-4 flex items-center gap-2">
-        <Scan size={14} className="text-blue-600" />
-        <span className="text-[9px] font-extrabold uppercase tracking-widest text-gray-400">OCR Evidence & Multi-Frame Consensus</span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {ocrData.candidateFrames.slice(0,3).map((frame, i) => (
-          <div key={i} className={`relative overflow-hidden rounded-lg border bg-gray-900 p-2 text-white transition-all duration-500 ${showSelected && frame.selected ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'border-gray-800 opacity-60'}`}>
-            <div className="mb-2 h-8 w-full bg-gray-800 rounded flex items-center justify-center font-mono text-xs tracking-widest border border-gray-700">
-              {frame.ocrOutput}
-            </div>
-            <div className="text-[8px] text-gray-400 flex justify-between">
-              <span>{frame.camera}</span>
-              <span className={showSelected && frame.selected ? 'text-blue-400 font-bold' : ''}>{formatConfidence(frame.ocrConfidence)}</span>
-            </div>
-            {showSelected && frame.selected && (
-              <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-500 flex items-center justify-center text-[8px] font-bold">✓</div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className={`mt-4 overflow-hidden rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 transition-all duration-500 ${showConsensus ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0 py-0 mt-0'}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-600" />
-            <div>
-              <div className="text-[9px] font-extrabold uppercase text-emerald-600">Final Validation</div>
-              <div className="font-mono text-sm font-black">{ocrData.consensusPlate}</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-lg font-black text-emerald-600">{formatConfidence(ocrData.consensusConfidence)}</div>
-            <div className="text-[8px] font-bold text-gray-500">MULTI-FRAME CONSENSUS</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <section className="glass-card-static mt-4 p-5"><div className="mb-4 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-widest text-[var(--text-muted)]"><Scan size={14} className="text-blue-400" /> OCR evidence / multi-frame consensus</div><div className="grid grid-cols-3 gap-2">{ocrData.candidateFrames.slice(0, 3).map((frame, index) => <div key={index} className={`rounded-xl border bg-[#080d19] p-2 transition-all duration-500 ${revealed && frame.selected ? "border-blue-400/60 shadow-[0_0_14px_rgba(59,130,246,.18)]" : "border-white/[0.08] opacity-60"}`}><div className="mb-2 rounded-md border border-white/[0.07] bg-white/[0.04] py-2 text-center font-mono text-[10px] tracking-widest text-[var(--text-primary)]">{frame.ocrOutput}</div><div className="flex justify-between text-[8px] text-[var(--text-muted)]"><span>{frame.camera}</span><span className={revealed && frame.selected ? "font-bold text-blue-400" : ""}>{formatConfidence(frame.ocrConfidence)}</span></div></div>)}</div><div className={`mt-4 flex items-center justify-between overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3 transition-all duration-500 ${revealed ? "max-h-24 opacity-100" : "max-h-0 border-0 p-0 opacity-0"}`}><div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-400" /><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-400">Final validation</p><p className="font-mono text-sm font-black text-[var(--text-primary)]">{ocrData.consensusPlate}</p></div></div><strong className="text-lg text-emerald-400">{formatConfidence(ocrData.consensusConfidence)}</strong></div></section>;
 }

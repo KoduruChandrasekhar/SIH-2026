@@ -19,6 +19,8 @@ import {
   Zap,
   Network,
   Play,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { ScatterplotLayer, PathLayer } from "@deck.gl/layers";
 import Navbar from "../components/Navbar";
@@ -120,7 +122,7 @@ const localVehicles = {
   },
 };
 
-export default function TrackingPage({ navigate, openModal }) {
+export default function TrackingPage({ navigate, openModal, cinematicEntry = false, onCinematicComplete }) {
   const [query, setQuery] = useState(DEMO_PLATE);
   const [plate, setPlate] = useState(DEMO_PLATE);
   const [selected, setSelected] = useState(null);
@@ -144,10 +146,22 @@ export default function TrackingPage({ navigate, openModal }) {
   const [macroProgress, setMacroProgress] = useState(0);
   const [showGraph, setShowGraph] = useState(false);
   const [isDemoVehicle, setIsDemoVehicle] = useState(true);
+  const [mapFlyTo, setMapFlyTo] = useState(null);
+  const [showPipMonitor, setShowPipMonitor] = useState(true);
+  const [pipMinimized, setPipMinimized] = useState(false);
 
   // Animation timers
   const playbackTimer = useRef(null);
   const animationTimer = useRef(null);
+
+  useEffect(() => {
+    if (!cinematicEntry) return undefined;
+    const flyTimer = window.setTimeout(() => {
+      setMapFlyTo({ longitude: 78.405, latitude: 17.485, zoom: 12.8, pitch: 0, bearing: 0, transitionDuration: 2100 });
+    }, 180);
+    const completeTimer = window.setTimeout(() => onCinematicComplete?.(), 2500);
+    return () => { window.clearTimeout(flyTimer); window.clearTimeout(completeTimer); };
+  }, [cinematicEntry, onCinematicComplete]);
 
   useEffect(() => {
     if (apiLoaded.current) return;
@@ -160,6 +174,27 @@ export default function TrackingPage({ navigate, openModal }) {
   }, []);
 
   const vehicle = vehicles[plate] || localVehicles[DEMO_PLATE];
+
+  const activeHop = useMemo(() => {
+    if (vehicle?.hops && vehicle.hops.length > 0) {
+      const idx = currentHopIndex >= 0 ? currentHopIndex : 0;
+      return vehicle.hops[Math.min(idx, vehicle.hops.length - 1)];
+    }
+    return null;
+  }, [vehicle, currentHopIndex]);
+
+  const activeCamId = activeHop ? activeHop[0] : "CAM-01";
+  const activeCamName = activeHop ? activeHop[1] : "Kukatpally Y-Junction";
+  const activeTime = activeHop ? activeHop[2] : "10:42 PM";
+  const activeSpeed = activeHop ? activeHop[3] : "42 km/h";
+  const activeConf = activeHop ? activeHop[4] : "98.7%";
+
+  const pipVideoSrc = useMemo(() => {
+    const hopIdx = Math.max(0, currentHopIndex);
+    if (hopIdx === 1) return "/camera-feeds/CAM-402.mp4";
+    if (hopIdx === 2) return "/camera-feeds/CAM-403.mp4";
+    return "/camera-feeds/CAM-401.mp4";
+  }, [currentHopIndex]);
 
   // deck.gl uses [lng, lat] coordinate format
   const deckPoints = useMemo(
@@ -444,38 +479,41 @@ export default function TrackingPage({ navigate, openModal }) {
       pickable: false,
     });
 
+    // 3. Camera Node Disks (clean tactical circular disks, no extruded pillars)
     const cameraNodes = new ScatterplotLayer({
-      id: "tracking-cam-nodes",
+      id: "tracking-camera-disks",
       data: relevantCameraNodes,
       getPosition: (d) => [d.lng, d.lat],
-      getRadius: 280,
+      getRadius: 140,
+      radiusMinPixels: 6,
+      radiusMaxPixels: 13,
       getFillColor: (d) => {
         const s = getCameraStatus(d.id);
         if (s === "active") return [6, 182, 212, 255];
         if (s === "visited") return [59, 130, 246, 240];
-        return [75, 85, 99, 180];
+        return [100, 116, 139, 200];
       },
-      getLineColor: [255, 255, 255, 240],
+      getLineColor: [255, 255, 255, 255],
       lineWidthMinPixels: 2,
       stroked: true,
-      radiusMinPixels: 7,
-      radiusMaxPixels: 15,
+      filled: true,
       pickable: true,
     });
 
-    // 4. Vehicle Marker
+    // 4. Vehicle 2D Marker Disc (clean tracking puck)
     const vehicleMarker = vehiclePosition
       ? new ScatterplotLayer({
-          id: "tracking-vehicle-marker",
+          id: "tracking-vehicle-disk",
           data: [{ position: vehiclePosition }],
           getPosition: (d) => d.position,
-          getRadius: 400,
+          getRadius: 180,
+          radiusMinPixels: 9,
+          radiusMaxPixels: 18,
           getFillColor: [245, 158, 11, 255],
           getLineColor: [255, 255, 255, 255],
           lineWidthMinPixels: 2.5,
           stroked: true,
-          radiusMinPixels: 10,
-          radiusMaxPixels: 20,
+          filled: true,
           pickable: true,
         })
       : null;
@@ -580,7 +618,7 @@ export default function TrackingPage({ navigate, openModal }) {
 
       {/* Main Map & Side Panel */}
       <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-        <section className="fade-up delay-200 flex h-[640px] flex-col glass-card-static p-4">
+        <section className={`${cinematicEntry ? "tracking-cinematic-map" : ""} fade-up delay-200 flex h-[640px] flex-col glass-card-static p-4`}>
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
               <MapPin size={15} className="text-blue-400" />
@@ -601,13 +639,10 @@ export default function TrackingPage({ navigate, openModal }) {
           <div className="relative flex-1 overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
             <DeckGLMap
               layers={mapLayers}
-              viewState={{
-                longitude: 78.405,
-                latitude: 17.485,
-                zoom: 12.8,
-                pitch: 30,
-                bearing: 0,
-              }}
+              initialViewState={cinematicEntry
+                ? { longitude: 78.9637, latitude: 20.5937, zoom: 4.15, pitch: 0, bearing: 0 }
+                : { longitude: 78.405, latitude: 17.485, zoom: 12.8, pitch: 0, bearing: 0 }}
+              flyTo={mapFlyTo}
             >
               {/* Overlay Status Badge */}
               <div className="absolute top-3 right-3 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 px-3 py-1.5 text-[10px] font-mono text-gray-300 pointer-events-none">
@@ -616,6 +651,127 @@ export default function TrackingPage({ navigate, openModal }) {
                   <span className="ml-2 text-emerald-400 font-bold">● Active Trace</span>
                 )}
               </div>
+
+              {/* In-Map Picture-in-Picture (PIP) Camera Feed Monitor */}
+              {showPipMonitor ? (
+                <div className="absolute bottom-3 left-3 z-10 w-72 sm:w-80 rounded-2xl border border-cyan-500/30 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-xl pointer-events-auto transition-all duration-300">
+                  {/* Monitor Header */}
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                      <span className="text-[10px] font-mono font-black uppercase tracking-wider text-cyan-300 truncate">
+                        PIP FEED · {activeCamId}
+                      </span>
+                      <span className="rounded bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 text-[9px] font-bold text-cyan-400 flex-shrink-0">
+                        Hop {currentHopIndex >= 0 ? currentHopIndex + 1 : 1}/{vehicle.hops.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPipMinimized((prev) => !prev)}
+                        className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        title={pipMinimized ? "Expand Stream" : "Minimize Stream"}
+                      >
+                        {pipMinimized ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPipMonitor(false)}
+                        className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        title="Close PIP Monitor"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {!pipMinimized ? (
+                    <>
+                      {/* Dynamic Video Stream switching on camera hop */}
+                      <div className="relative mt-2.5 h-36 w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+                        <video
+                          key={pipVideoSrc}
+                          src={pipVideoSrc}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+
+                        {/* Tactical Target Acquisition Overlay */}
+                        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-2">
+                          <div className="flex items-center justify-between text-[9px] font-mono font-bold">
+                            <span className="rounded bg-black/60 px-1.5 py-0.5 text-cyan-300 backdrop-blur-sm truncate max-w-[170px]">
+                              {activeCamName}
+                            </span>
+                            <span className="rounded bg-emerald-600/80 px-1.5 py-0.5 text-white flex-shrink-0">
+                              {playbackState === "playing" ? "● TRACKING" : "● FEED SYNC"}
+                            </span>
+                          </div>
+
+                          {/* Target Reticle */}
+                          <div className="mx-auto my-auto h-16 w-28 rounded border border-emerald-400/80 bg-emerald-500/10 p-1 flex flex-col justify-between backdrop-blur-[1px]">
+                            <span className="text-[7px] font-mono font-black uppercase tracking-wider text-emerald-300">
+                              TARGET ACQUIRED
+                            </span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] font-mono font-black text-white">
+                                {vehicle.plate}
+                              </span>
+                              <span className="text-[8px] font-mono font-bold text-amber-300">
+                                {activeConf}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[9px] font-mono text-gray-300 bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">
+                            <span>{activeTime}</span>
+                            <span className="text-emerald-400 font-bold">{activeSpeed}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live Re-ID / Optical Status */}
+                      <div className="mt-2.5 flex items-center justify-between rounded-lg bg-white/[0.04] p-2 border border-white/5 text-[10px] font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                          <span className="text-gray-300">Optical Hand-off:</span>
+                        </div>
+                        <span className="font-bold text-cyan-400">
+                          {handoffStage === "idle" ? "Locked (98.7%)" : handoffStage.toUpperCase()}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-gray-300">
+                      <span>{activeCamId} · {activeSpeed}</span>
+                      <button
+                        type="button"
+                        onClick={() => setPipMinimized(false)}
+                        className="text-cyan-400 font-bold hover:underline"
+                      >
+                        Expand Stream
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Minimized Launcher Button */
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPipMonitor(true);
+                    setPipMinimized(false);
+                  }}
+                  className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-black/80 px-3 py-1.5 text-[11px] font-mono text-gray-300 shadow-xl backdrop-blur-md hover:bg-black hover:text-white transition-all pointer-events-auto"
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>PIP Feed: <strong className="text-cyan-400">{activeCamId}</strong></span>
+                  <span className="text-[10px] text-gray-400">({activeSpeed})</span>
+                </button>
+              )}
             </DeckGLMap>
           </div>
         </section>
