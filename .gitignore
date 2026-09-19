@@ -1,10 +1,23 @@
-# Dependencies
+# =========================================================
+# Node / Frontend
+# =========================================================
+
 node_modules/
 
 # Local environment variables
 .env
+.env.*
+!.env.example
 
-# IDE and Editor files
+# Build output
+dist/
+build/
+.vite/
+
+# =========================================================
+# IDE / Editor
+# =========================================================
+
 .idea/
 .vscode/
 *.suo
@@ -13,7 +26,10 @@ node_modules/
 *.sln
 *.swp
 
+# =========================================================
 # OS generated files
+# =========================================================
+
 .DS_Store
 .DS_Store?
 ._*
@@ -22,34 +38,64 @@ node_modules/
 ehthumbs.db
 Thumbs.db
 
+# =========================================================
 # Logs
-logs
+# =========================================================
+
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+# =========================================================
 # Python
+# =========================================================
+
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# YOLO model weights (auto-downloaded)
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# =========================================================
+# YOLO / AI model weights
+# =========================================================
+
 *.pt
+*.onnx
 
-# Backend AI output artifacts
+# =========================================================
+# TraceNet backend generated output
+# =========================================================
+
 backend/output/*.mp4
 backend/output/*.json
-# Generated AI annotated videos
+
+# Keep the output directory itself
+!backend/output/.gitkeep
+
+# =========================================================
+# Generated annotated camera videos
+# These are generated locally and MUST NOT be pushed.
+# =========================================================
+
 public/camera-feeds/*_annotated.mp4
+
+# =========================================================
+# Temporary / generated archives
+# =========================================================
+
 tracenet-camera-viewer.zip
-!public/camera-feeds/CAM-401_annotated.mp4
+backend-source.zip
 
-# TraceNet generated Phase 1 files
-backend/output/*
-!backend/output/.gitkeep
-public/camera-feeds/*_annotated.mp4
+# =========================================================
+# Python / AI temporary files
+# =========================================================
 
-# TraceNet generated Phase 1 files
-backend/output/*
-!backend/output/.gitkeep
-public/camera-feeds/*_annotated.mp4
+*.tmp
+*.temp
