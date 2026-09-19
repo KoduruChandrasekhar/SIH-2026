@@ -715,15 +715,15 @@ export default function TrackingPage({ navigate, openModal, params }) {
                 aria-pressed={showGraph}
                 data-tip="Show the camera network graph"
                 data-tip-pos="bottom"
-                className="tn-press flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[9px] font-bold text-gray-600 hover:bg-gray-50"
+                className="tn-surface-btn rounded-lg px-2.5 py-1.5 text-[9px] font-bold"
               >
-                <Network size={11} className={showGraph ? "text-blue-600" : ""} /> Graph
+                <Network size={11} /> Graph
               </button>
               <button
                 onClick={() => setFit((v) => v + 1)}
                 data-tip="Fit the whole route in view"
                 data-tip-pos="bottom"
-                className="tn-press flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[9px] font-bold text-gray-600 hover:bg-gray-50"
+                className="tn-surface-btn rounded-lg px-2.5 py-1.5 text-[9px] font-bold"
               >
                 <Target size={11} /> Fit
               </button>
@@ -813,7 +813,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
               </div>
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-black font-mono">{vehicle.plate}</h2>
-                <button onClick={copyPlate} aria-label="Copy plate" data-tip="Copy plate" className="tn-press rounded-lg border border-gray-200 p-2 text-gray-400 hover:bg-gray-50">
+                <button onClick={copyPlate} aria-label="Copy plate" data-tip="Copy plate" className="tn-surface-btn h-8 w-8">
                   {copied ? <CheckCircle2 size={15} className="text-emerald-500" /> : <Copy size={15} />}
                 </button>
               </div>

@@ -3390,3 +3390,261 @@ header nav button[aria-current="page"] {
     transform: none;
   }
 }
+
+/* =========================================================
+   DARK SURFACE SYSTEM — every light Tailwind surface used in the app, mapped to a role.
+   Tailwind v4 emits these as oklch/color-mix, and the earlier overrides only covered some
+   opacity variants (e.g. bg-gray-50/50 but not /60 or /80). This block covers all of them.
+   ========================================================= */
+[data-theme="dark"] {
+  --tn-surface: rgba(12, 20, 36, 0.88);        /* cards */
+  --tn-surface-inset: rgba(8, 14, 27, 0.72);   /* inset panels, legend, list rows */
+  --tn-surface-chip: rgba(30, 41, 59, 0.55);   /* pills, chips, secondary buttons */
+  --tn-surface-chip-2: rgba(51, 65, 85, 0.55);
+  --tn-surface-hover: rgba(30, 48, 80, 0.75);  /* hover: slightly lighter navy/blue */
+  --tn-line: rgba(71, 85, 105, 0.42);
+  --tn-line-soft: rgba(71, 85, 105, 0.3);
+}
+
+/* Cards / panels */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/90,
+[data-theme="dark"] .bg-white\/80,
+[data-theme="dark"] .bg-white\/70,
+[data-theme="dark"] .bg-white\/60,
+[data-theme="dark"] .bg-white\/50,
+[data-theme="dark"] .focus\:bg-white:focus {
+  background-color: var(--tn-surface) !important;
+}
+
+/* Inset / secondary surfaces (legend pill, list rows, detail tiles) */
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-50\/50,
+[data-theme="dark"] .bg-gray-50\/60,
+[data-theme="dark"] .bg-gray-50\/70,
+[data-theme="dark"] .bg-gray-50\/80 {
+  background-color: var(--tn-surface-inset) !important;
+}
+
+/* Chips, pills, secondary buttons */
+[data-theme="dark"] .bg-gray-100,
+[data-theme="dark"] .bg-gray-100\/80 {
+  background-color: var(--tn-surface-chip) !important;
+}
+[data-theme="dark"] .bg-gray-200 {
+  background-color: var(--tn-surface-chip-2) !important;
+}
+
+/* Hover: slightly lighter navy (never white) */
+[data-theme="dark"] .hover\:bg-white:hover,
+[data-theme="dark"] .hover\:bg-gray-50:hover,
+[data-theme="dark"] .hover\:bg-gray-100:hover,
+[data-theme="dark"] .hover\:bg-gray-200:hover {
+  background-color: var(--tn-surface-hover) !important;
+}
+
+/* Semantic tints — same hue, dark and translucent */
+[data-theme="dark"] .bg-blue-50,
+[data-theme="dark"] .bg-blue-50\/50,
+[data-theme="dark"] .bg-blue-50\/70 { background-color: rgba(59, 130, 246, 0.12) !important; }
+[data-theme="dark"] .bg-blue-100,
+[data-theme="dark"] .hover\:bg-blue-50:hover { background-color: rgba(59, 130, 246, 0.18) !important; }
+[data-theme="dark"] .hover\:bg-blue-100:hover { background-color: rgba(59, 130, 246, 0.24) !important; }
+
+[data-theme="dark"] .bg-emerald-50,
+[data-theme="dark"] .bg-emerald-50\/60,
+[data-theme="dark"] .bg-emerald-50\/70 { background-color: rgba(16, 185, 129, 0.1) !important; }
+[data-theme="dark"] .hover\:bg-emerald-50:hover { background-color: rgba(16, 185, 129, 0.16) !important; }
+
+[data-theme="dark"] .bg-amber-50,
+[data-theme="dark"] .bg-amber-50\/70 { background-color: rgba(245, 158, 11, 0.1) !important; }
+[data-theme="dark"] .bg-amber-100 { background-color: rgba(245, 158, 11, 0.16) !important; }
+
+[data-theme="dark"] .bg-orange-50 { background-color: rgba(249, 115, 22, 0.1) !important; }
+[data-theme="dark"] .bg-orange-100 { background-color: rgba(249, 115, 22, 0.16) !important; }
+
+[data-theme="dark"] .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
+[data-theme="dark"] .bg-red-100 { background-color: rgba(239, 68, 68, 0.16) !important; }
+
+[data-theme="dark"] .bg-purple-50 { background-color: rgba(168, 85, 247, 0.12) !important; }
+[data-theme="dark"] .bg-purple-100 { background-color: rgba(168, 85, 247, 0.16) !important; }
+
+/* Borders — low-contrast blue-grey, tinted where the colour carries meaning */
+[data-theme="dark"] .border-white\/80,
+[data-theme="dark"] .border-white\/60,
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-gray-200\/50,
+[data-theme="dark"] .border-gray-200\/60,
+[data-theme="dark"] .border-gray-200\/70,
+[data-theme="dark"] .border-gray-200\/80 { border-color: var(--tn-line) !important; }
+[data-theme="dark"] .border-gray-100 { border-color: var(--tn-line-soft) !important; }
+[data-theme="dark"] .border-gray-300 { border-color: rgba(100, 116, 139, 0.5) !important; }
+[data-theme="dark"] .border-blue-100,
+[data-theme="dark"] .border-blue-200 { border-color: rgba(59, 130, 246, 0.32) !important; }
+[data-theme="dark"] .border-blue-300 { border-color: rgba(59, 130, 246, 0.45) !important; }
+[data-theme="dark"] .border-emerald-100,
+[data-theme="dark"] .border-emerald-200 { border-color: rgba(16, 185, 129, 0.32) !important; }
+[data-theme="dark"] .hover\:border-emerald-300:hover { border-color: rgba(16, 185, 129, 0.55) !important; }
+[data-theme="dark"] .border-amber-200 { border-color: rgba(245, 158, 11, 0.35) !important; }
+
+/* ---------- Explicit dark components ---------- */
+
+/* Map legend pill (e.g. DENSITY: High / Med / Low) — dark glass */
+.tn-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: rgba(8, 14, 27, 0.72);
+  padding: 0.375rem 0.75rem;
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06);
+}
+.tn-legend-title {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7a889c;
+}
+.tn-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 10px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+html:not([data-theme="dark"]) .tn-legend {
+  border-color: #e5e7eb;
+  background: rgba(249, 250, 251, 0.8);
+}
+html:not([data-theme="dark"]) .tn-legend-item { color: #374151; }
+
+/* Icon / utility button on dark panels (camera, Graph, Fit, copy…) */
+.tn-surface-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  background: rgba(12, 20, 36, 0.9);
+  color: #bfdbfe;
+  transition:
+    background-color var(--tn-fast, 180ms) ease,
+    border-color var(--tn-fast, 180ms) ease,
+    color var(--tn-fast, 180ms) ease,
+    box-shadow var(--tn-fast, 180ms) ease,
+    transform var(--tn-fast, 180ms) ease;
+}
+.tn-surface-btn svg {
+  color: inherit !important;
+}
+.tn-surface-btn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(30, 58, 110, 0.55);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+.tn-surface-btn[aria-pressed="true"] {
+  border-color: rgba(59, 130, 246, 0.7);
+  background: rgba(37, 99, 235, 0.22);
+  color: #fff;
+}
+.tn-surface-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.tn-surface-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+html:not([data-theme="dark"]) .tn-surface-btn:not(.tracking-page *) {
+  border-color: #e5e7eb;
+  background: #fff;
+  color: #475569;
+}
+
+/* ---------- Leaflet: popups, tooltips (all directions), controls ---------- */
+[data-theme="dark"] .leaflet-popup-content-wrapper,
+[data-theme="dark"] .leaflet-popup-tip {
+  background: #0c1424 !important;
+  color: #e6edf7 !important;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+}
+[data-theme="dark"] .leaflet-popup-content-wrapper * {
+  color: inherit;
+}
+[data-theme="dark"] .leaflet-popup-content-wrapper .text-gray-900 { color: #e6edf7 !important; }
+[data-theme="dark"] .leaflet-popup-close-button {
+  color: #94a3b8 !important;
+}
+[data-theme="dark"] .leaflet-popup-close-button:hover {
+  color: #fff !important;
+}
+[data-theme="dark"] .leaflet-tooltip {
+  background: rgba(7, 12, 23, 0.94) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .leaflet-tooltip-top::before { border-top-color: rgba(96, 165, 250, 0.3) !important; }
+[data-theme="dark"] .leaflet-tooltip-bottom::before { border-bottom-color: rgba(96, 165, 250, 0.3) !important; }
+[data-theme="dark"] .leaflet-tooltip-left::before { border-left-color: rgba(96, 165, 250, 0.3) !important; }
+[data-theme="dark"] .leaflet-tooltip-right::before { border-right-color: rgba(96, 165, 250, 0.3) !important; }
+[data-theme="dark"] .leaflet-bar,
+[data-theme="dark"] .leaflet-control-zoom {
+  border: 1px solid rgba(71, 85, 105, 0.55) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  background: transparent !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+}
+[data-theme="dark"] .leaflet-bar a,
+[data-theme="dark"] .leaflet-control-zoom a {
+  background-color: rgba(12, 20, 36, 0.92) !important;
+  color: #cbd5e1 !important;
+  border-bottom-color: rgba(71, 85, 105, 0.5) !important;
+  backdrop-filter: blur(6px);
+}
+[data-theme="dark"] .leaflet-bar a:hover,
+[data-theme="dark"] .leaflet-control-zoom a:hover {
+  background-color: rgba(37, 99, 235, 0.85) !important;
+  color: #fff !important;
+}
+[data-theme="dark"] .leaflet-bar a.leaflet-disabled {
+  background-color: rgba(12, 20, 36, 0.7) !important;
+  color: #475569 !important;
+}
+
+/* ---------- Native controls ---------- */
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #64748b !important;
+}
+[data-theme="dark"] input[type="search"]::-webkit-search-cancel-button {
+  filter: invert(0.7);
+}
+[data-theme="dark"] input:-webkit-autofill {
+  -webkit-text-fill-color: #e6edf7;
+  -webkit-box-shadow: 0 0 0 1000px #0a1222 inset;
+}
+[data-theme="dark"] button:not([class]) {
+  background: var(--tn-surface-chip);
+  color: #e6edf7;
+  border: 1px solid var(--tn-line);
+}
+[data-theme="dark"] ::selection {
+  background: rgba(37, 99, 235, 0.55);
+  color: #fff;
+}
+
+/* Focus ring for every text control (specific enough to beat the per-type input overrides) */
+[data-theme="dark"] input[type]:focus,
+[data-theme="dark"] input:not([type]):focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22) !important;
+  outline: none;
+}

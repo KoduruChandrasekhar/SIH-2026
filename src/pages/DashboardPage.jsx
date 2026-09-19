@@ -261,17 +261,17 @@ export default function DashboardPage({ navigate, openModal }) {
             </div>
 
             {/* Map Legend */}
-            <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-              <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-gray-500">Density:</span>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+            <div className="tn-legend" role="note" aria-label="Density legend">
+              <span className="tn-legend-title">Density:</span>
+              <span className="tn-legend-item">
                 <span className="h-2 w-2 rounded-full bg-red-500" /> High
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+              </span>
+              <span className="tn-legend-item">
                 <span className="h-2 w-2 rounded-full bg-orange-500" /> Med
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700">
+              </span>
+              <span className="tn-legend-item">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> Low
-              </div>
+              </span>
             </div>
           </div>
 
@@ -364,12 +364,12 @@ export default function DashboardPage({ navigate, openModal }) {
               type="button"
               onClick={() => navigate("cameras", { camera: selected.camId })}
               disabled={!selected.camId}
-              className="tn-press rounded-xl border border-gray-100 bg-gray-50/80 p-2.5 shadow-sm"
+              className="tn-surface-btn h-10 w-10 rounded-xl"
               aria-label={`Open ${camId} feed on the Cameras page`}
               data-tip="Open this camera's feed"
               data-tip-pos="bottom"
             >
-              <Camera size={20} className="text-gray-400" />
+              <Camera size={19} />
             </button>
           </div>
 

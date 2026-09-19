@@ -599,7 +599,8 @@ export default function AlertsPage({ navigate, openModal }) {
                             <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${sev(item).badge}`}>
                               {/* urgency without flashing: critical/high pulse softly while open, medium is static */}
                               <span
-                                className={`h-1.5 w-1.5 rounded-full bg-white ${
+                                style={{ background: "#fff" }}
+                                className={`h-1.5 w-1.5 rounded-full ${
                                   item.status === "Resolved" ? "" : item.severity === "CRITICAL" ? "tn-pulse tn-pulse--red" : item.severity === "HIGH" ? "tn-pulse tn-pulse--orange" : ""
                                 }`}
                                 aria-hidden="true"
