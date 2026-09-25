@@ -18,8 +18,10 @@ Outputs:
     backend/output/<CAMERA>_detections.json
     public/camera-feeds/<CAMERA>_annotated.mp4
 
+Phase 2 ANPR (backend/anpr) consumes the tracks through `frame_callback`;
+plate detection and OCR are not implemented in this module.
+
 This module does NOT implement:
-    - License plate detection / OCR
     - Cross-camera Re-ID
     - Database functionality
     - Network functionality
@@ -30,6 +32,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
+from typing import Any, Callable, Optional
 
 import cv2
 from ultralytics import YOLO
@@ -86,17 +89,35 @@ class VehicleTracker:
 
         print("[TraceNet] Model loaded successfully")
 
+    def track_frame(self, frame) -> list[dict]:
+        """Run YOLO + ByteTrack on one frame (tracker state persists across calls)."""
+        results = self.model.track(
+            frame,
+            persist=True,
+            tracker="bytetrack.yaml",
+            conf=self.confidence,
+            classes=list(VEHICLE_CLASS_IDS),
+            verbose=False,
+        )
+        return self._extract_detections(results)
+
     def process_video(
         self,
         video_path: str,
         camera_id: str = "UNKNOWN",
+        frame_callback: Optional[Callable[[int, float, Any, list[dict]], None]] = None,
+        max_frames: Optional[int] = None,
+        write_video: bool = True,
     ) -> dict:
         """
         Process one camera video.
 
         Creates:
             backend/output/<camera>_detections.json
-            public/camera-feeds/<camera>_annotated.mp4
+            public/camera-feeds/<camera>_annotated.mp4   (unless write_video=False)
+
+        frame_callback(frame_index, timestamp, frame, detections) is called for
+        every frame after tracking — Phase 2 ANPR consumes the tracks here.
         """
 
         video_path = Path(video_path).resolve()
@@ -157,14 +178,18 @@ class VehicleTracker:
         # FFmpeg converts it to H.264 afterwards.
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 
-        writer = cv2.VideoWriter(
-            str(temp_video_path),
-            fourcc,
-            fps,
-            (width, height),
+        writer = (
+            cv2.VideoWriter(
+                str(temp_video_path),
+                fourcc,
+                fps,
+                (width, height),
+            )
+            if write_video
+            else None
         )
 
-        if not writer.isOpened():
+        if writer is not None and not writer.isOpened():
             cap.release()
             raise RuntimeError(
                 f"Cannot create temporary video: "
@@ -188,31 +213,32 @@ class VehicleTracker:
                 if not ret:
                     break
 
-                results = self.model.track(
-                    frame,
-                    persist=True,
-                    tracker="bytetrack.yaml",
-                    conf=self.confidence,
-                    classes=list(VEHICLE_CLASS_IDS),
-                    verbose=False,
-                )
+                if max_frames is not None and frame_index >= max_frames:
+                    break
 
-                frame_detections = self._extract_detections(
-                    results
-                )
+                frame_detections = self.track_frame(frame)
 
-                annotated_frame = self._annotate_frame(
-                    frame,
-                    frame_detections,
-                )
+                if writer is not None:
+                    annotated_frame = self._annotate_frame(
+                        frame,
+                        frame_detections,
+                    )
 
-                writer.write(annotated_frame)
+                    writer.write(annotated_frame)
 
                 timestamp = (
                     frame_index / fps
                     if fps > 0
                     else 0.0
                 )
+
+                if frame_callback is not None:
+                    frame_callback(
+                        frame_index,
+                        timestamp,
+                        frame,
+                        frame_detections,
+                    )
 
                 all_frames.append(
                     {
@@ -249,7 +275,9 @@ class VehicleTracker:
 
         finally:
             cap.release()
-            writer.release()
+
+            if writer is not None:
+                writer.release()
 
         elapsed = time.time() - start_time
 
@@ -286,14 +314,15 @@ class VehicleTracker:
 
         print("[TraceNet] Detection JSON written.")
 
-        # Convert temporary video to browser-compatible H.264.
-        self._convert_to_browser_mp4(
-            temp_video_path,
-            final_video_path,
-        )
+        if write_video:
+            # Convert temporary video to browser-compatible H.264.
+            self._convert_to_browser_mp4(
+                temp_video_path,
+                final_video_path,
+            )
 
-        # Delete temporary intermediate file.
-        self._safe_delete(temp_video_path)
+            # Delete temporary intermediate file.
+            self._safe_delete(temp_video_path)
 
         summary = {
             "camera_id": camera_id,
@@ -308,7 +337,11 @@ class VehicleTracker:
                 if elapsed > 0
                 else 0
             ),
-            "output_video": str(final_video_path),
+            "output_video": (
+                str(final_video_path)
+                if write_video
+                else None
+            ),
             "output_json": str(json_path),
         }
 

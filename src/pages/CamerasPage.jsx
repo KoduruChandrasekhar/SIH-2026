@@ -4,7 +4,8 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import Navbar from "../components/Navbar";
 import CameraFeedCard from "../components/CameraFeedCard";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
-import { fetchCameras } from "../api";
+import { anprToOcrEvidence, fetchCameraAnpr, fetchCameras, fetchIngestionCameras } from "../api";
+import OCRPanel from "../components/OCRPanel";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraById, cameraRegistry, hourlyTraffic } from "../data";
 import { AnimatedNumber } from "../components/motion/Motion";
 import { formatClock, useLiveSim } from "../sim/liveSim";
@@ -72,6 +73,8 @@ export default function CamerasPage({ navigate, openModal, params }) {
   // Opening from the Dashboard ("Open CAM-xxx feed") shows that camera straight away
   const [selected, setSelected] = useState(() => (params?.camera ? cameraById[params.camera] ?? null : null));
   const sim = useLiveSim();
+  // camera_id (CAM-401) → live ingestion row from the Phase 1 backend, or null when offline
+  const [ingestion, setIngestion] = useState(null);
 
   // Backend cameras (if running) only update matching registry entries' live fields
   useEffect(() => {
@@ -84,6 +87,23 @@ export default function CamerasPage({ navigate, openModal, params }) {
         })
       );
     });
+  }, []);
+
+  // Phase 1: when the ingestion backend is running, show its REAL camera state
+  // (state, source type, decoded frames) instead of the local demo status.
+  useEffect(() => {
+    let alive = true;
+    const poll = () =>
+      fetchIngestionCameras().then((rows) => {
+        if (!alive) return;
+        setIngestion(rows ? Object.fromEntries(rows.map((r) => [r.camera_id, r])) : null);
+      });
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
   }, []);
 
   const zones = useMemo(() => [...new Set(cameraList.map((c) => c.zone))].sort(), [cameraList]);
@@ -101,7 +121,21 @@ export default function CamerasPage({ navigate, openModal, params }) {
     };
   }, [cameraList, sim.cameras]);
 
-  const filtered = cameraList.filter((c) => {
+  // Ingestion state wins over the demo dataset whenever the Phase 1 backend is up
+  const INGEST_STATE_TO_STATUS = { ONLINE: "online", STARTING: "online", DEGRADED: "degraded", COMPLETED: "online", ERROR: "offline", OFFLINE: "offline", IDLE: null };
+  const withIngestion = (c) => {
+    const row = ingestion?.[c.code];
+    if (!row) return c;
+    const mapped = INGEST_STATE_TO_STATUS[row.state];
+    return {
+      ...c,
+      status: mapped ?? c.status,
+      fps: row.measured_fps ? Math.round(row.measured_fps) : c.fps,
+      ingestion: row,
+    };
+  };
+
+  const filtered = cameraList.map(withIngestion).filter((c) => {
     const q = query.trim().toLowerCase();
     const matchesQuery = !q || [c.code, c.id, c.name, c.zone, c.lastPlate].some((v) => v?.toLowerCase().includes(q));
     return matchesQuery && (statusFilter === "all" || c.status === statusFilter) && (zone === "all" || c.zone === zone);
@@ -135,6 +169,12 @@ export default function CamerasPage({ navigate, openModal, params }) {
             <span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-[11px] font-bold text-blue-200">
               OCR accuracy target &gt;{OCR_ACCURACY_TARGET}%
             </span>
+            {ingestion && (
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-bold text-emerald-200" data-tip="Live camera ingestion (Phase 1 backend)" data-tip-pos="bottom">
+                <span className="tn-pulse tn-pulse--green h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                Ingestion {Object.values(ingestion).filter((r) => r.state === "ONLINE").length}/{Object.keys(ingestion).length} live
+              </span>
+            )}
             <span className="flex items-center gap-1.5 rounded-full border border-slate-500/40 bg-slate-900/60 px-3 py-1.5 font-mono text-[11px] font-bold text-slate-300">
               <span className="tn-pulse tn-pulse--green h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
               {formatClock(sim.simSec)} IST · demo data
@@ -267,9 +307,45 @@ function Metric({ icon: Icon, label, value, sub, tone = "text-gray-900" }) {
 function CameraDetail({ camera, live, simSec, onClose, navigate }) {
   const chart = useChartTheme();
   const closeRef = useRef(null);
-  const reads = useMemo(() => recentReads(camera), [camera]);
   const hourly = useMemo(() => hourlyReads(camera), [camera]);
   const offline = camera.status === "offline";
+
+  // Phase 2: real ANPR observations for this camera when the backend has a run; null → demo reads
+  const [anpr, setAnpr] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetchCameraAnpr(camera.code).then((data) => alive && setAnpr(data));
+    return () => {
+      alive = false;
+    };
+  }, [camera.code]);
+  const anprReads = useMemo(() => {
+    // Same 6-row size as the demo table: validated plates first, then newest
+    const rank = { DETECTED: 0, INVALID_FORMAT: 1, OCR_FAILED: 2 };
+    const read = (anpr?.observations ?? []).filter((o) => o.frames_used > 0);
+    return read.length
+      ? read
+          .slice()
+          .sort((a, b) => rank[a.plate_status] - rank[b.plate_status] || b.timestamp.localeCompare(a.timestamp))
+          .slice(0, 6)
+          .map((o) => ({
+            time: o.timestamp.slice(11, 19),
+            plate: o.plate ?? `${o.consensus_text || "—"} · ${o.plate_status.replace("_", " ").toLowerCase()}`,
+            cls: o.vehicle_class,
+            conf: o.ocr_confidence != null ? o.ocr_confidence * 100 : null,
+            obs: o,
+          }))
+      : null;
+  }, [anpr]);
+  const reads = useMemo(() => anprReads ?? recentReads(camera), [anprReads, camera]);
+  const bestEvidence = useMemo(() => {
+    const withReads = (anpr?.observations ?? []).filter((o) => o.frames_used > 0);
+    const best =
+      withReads.filter((o) => o.plate_status === "DETECTED").sort((a, b) => b.ocr_confidence - a.ocr_confidence)[0] ??
+      withReads.sort((a, b) => (b.ocr_confidence ?? 0) - (a.ocr_confidence ?? 0))[0];
+    return anprToOcrEvidence(best);
+  }, [anpr]);
+  const anprStats = anpr?.stats;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -318,6 +394,22 @@ function CameraDetail({ camera, live, simSec, onClose, navigate }) {
             <Detail label="Last seen" value={camera.lastSeen} mono />
             <Detail label="Resolution / FPS" value={`${camera.resolution} · ${camera.fps || 0} fps`} />
             <Detail label="Stream latency" value={camera.latencyMs ? `${camera.latencyMs} ms` : "—"} mono />
+            {camera.ingestion && (
+              <Detail
+                label="Phase 1 ingestion"
+                value={`${camera.ingestion.state} · ${camera.ingestion.source_type} · ${camera.ingestion.frames_processed} frames`}
+                mono
+                wide
+              />
+            )}
+            {anprStats && (
+              <Detail
+                label="Phase 2 ANPR (last run)"
+                value={`${anprStats.status_counts?.DETECTED ?? 0} plates read · ${anprStats.observations} transits · ${anprStats.crops_sent_to_ocr} crops OCR'd`}
+                mono
+                wide
+              />
+            )}
             <Detail label="Uptime (30 d)" value={`${camera.uptime}%`} mono />
             <Detail label="Reads today" value={<AnimatedNumber value={live?.today ?? camera.today} />} mono />
             <Detail
@@ -345,7 +437,9 @@ function CameraDetail({ camera, live, simSec, onClose, navigate }) {
 
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <section>
-            <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-gray-500">Recent ANPR detections</h3>
+            <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-gray-500">
+              Recent ANPR detections{anprReads ? " · Phase 2 pipeline" : ""}
+            </h3>
             <div className="overflow-x-auto rounded-xl border border-gray-100">
               <table className="w-full text-left text-[11px]">
                 <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
@@ -358,17 +452,18 @@ function CameraDetail({ camera, live, simSec, onClose, navigate }) {
                 </thead>
                 <tbody>
                   {reads.map((r) => (
-                    <tr key={r.time + r.plate} className="border-t border-gray-100">
+                    <tr key={r.obs?.observation_id ?? r.time + r.plate} className="border-t border-gray-100">
                       <td className="px-3 py-1.5 font-mono text-gray-500">{r.time}</td>
                       <td className="px-3 py-1.5 font-mono font-black text-gray-900">{r.plate}</td>
                       <td className="px-3 py-1.5 font-semibold text-gray-600">{r.cls}</td>
-                      <td className={`px-3 py-1.5 text-right font-mono font-bold ${r.conf >= OCR_ACCURACY_TARGET ? "text-emerald-600" : "text-amber-600"}`}>{r.conf.toFixed(1)}%</td>
+                      <td className={`px-3 py-1.5 text-right font-mono font-bold ${r.conf == null ? "text-gray-400" : r.conf >= OCR_ACCURACY_TARGET ? "text-emerald-600" : "text-amber-600"}`}>{r.conf == null ? "—" : `${r.conf.toFixed(1)}%`}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             {offline && <p className="mt-2 text-[10px] font-bold text-gray-500">Reads shown are the last ones received before the link dropped.</p>}
+            {bestEvidence && <OCRPanel ocrData={bestEvidence} isActive />}
           </section>
 
           <section>

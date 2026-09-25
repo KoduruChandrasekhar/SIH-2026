@@ -1,0 +1,27 @@
+{
+  "$comment": [
+    "TraceNet Phase 3 — road-network topology for cross-camera kinematics.",
+    "distances_km[a][b] is the DIRECTED driving distance from camera a to camera b (one-way roads make it asymmetric).",
+    "Values: OSRM table service (router.project-osrm.org, OpenStreetMap data), retrieved 2026-09-24, snapped to the camera coordinates below.",
+    "Pairs not in the table fall back to haversine distance x tortuosity_factor.",
+    "Coordinates: CAM-401/402/403/406 from backend/config/cameras.json; CAM-410/411 from the frontend camera registry (src/data.js)."
+  ],
+  "source": "OSRM table API (OpenStreetMap), 2026-09-24",
+  "tortuosity_factor": 1.35,
+  "cameras": {
+    "CAM-401": { "name": "Kukatpally Y-Junction",   "latitude": 17.4947, "longitude": 78.3996 },
+    "CAM-402": { "name": "JNTU Metro Station",      "latitude": 17.4985, "longitude": 78.3912 },
+    "CAM-403": { "name": "Balanagar Main Road",     "latitude": 17.4682, "longitude": 78.4357 },
+    "CAM-406": { "name": "Madhapur IT Corridor",    "latitude": 17.4485, "longitude": 78.3742 },
+    "CAM-410": { "name": "Gachibowli Flyover",      "latitude": 17.4401, "longitude": 78.3489 },
+    "CAM-411": { "name": "KPHB Colony Phase 1",     "latitude": 17.4849, "longitude": 78.3910 }
+  },
+  "distances_km": {
+    "CAM-401": { "CAM-402": 1.699,  "CAM-403": 5.622,  "CAM-406": 8.081,  "CAM-410": 11.964, "CAM-411": 1.887 },
+    "CAM-402": { "CAM-401": 2.443,  "CAM-403": 6.223,  "CAM-406": 8.682,  "CAM-410": 12.565, "CAM-411": 2.488 },
+    "CAM-403": { "CAM-401": 5.104,  "CAM-402": 6.803,  "CAM-406": 10.345, "CAM-410": 14.227, "CAM-411": 6.991 },
+    "CAM-406": { "CAM-401": 7.409,  "CAM-402": 7.554,  "CAM-403": 9.246,  "CAM-410": 5.429,  "CAM-411": 5.403 },
+    "CAM-410": { "CAM-401": 11.735, "CAM-402": 11.880, "CAM-403": 13.573, "CAM-406": 5.193,  "CAM-411": 9.730 },
+    "CAM-411": { "CAM-401": 2.517,  "CAM-402": 2.816,  "CAM-403": 7.986,  "CAM-406": 6.305,  "CAM-410": 10.188 }
+  }
+}

@@ -8,15 +8,31 @@ import {
   ArrowLeft 
 } from "lucide-react";
 import tracenetLogo from "../assets/tracenet-logo.jpg";
+import { login } from "../auth";
 
 export default function LoginPage({ navigate }) {
   // Toggle between 'police' and 'admin'
   const [role, setRole] = useState("police");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const handleLogin = (e) => {
+  // Phase 6: real JWT login (demo accounts: officer / police123, admin / admin123)
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Dummy login action: immediately route to the dashboard
-    navigate("dashboard");
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await login(username, password);
+      const expected = role === "police" ? "law_enforcement" : "camera_admin";
+      if (session.role !== expected) setError(`Signed in as ${session.role.replace("_", " ")}.`);
+      navigate("dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -101,6 +117,11 @@ export default function LoginPage({ navigate }) {
 
           {/* Form */}
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
+                {error}
+              </p>
+            )}
             {/* Username / Badge ID */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 pl-1">
@@ -111,6 +132,9 @@ export default function LoginPage({ navigate }) {
                 <input
                   type="text"
                   required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
                   placeholder={role === "police" ? "e.g. POL-4921" : "e.g. SYS-ADMIN"}
                   className="w-full rounded-xl border border-gray-200 bg-white/50 py-3 pl-10 pr-4 text-sm font-bold text-gray-900 transition-all placeholder:font-semibold placeholder:text-gray-300 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
                 />
@@ -127,6 +151,9 @@ export default function LoginPage({ navigate }) {
                 <input
                   type="password"
                   required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   className="w-full rounded-xl border border-gray-200 bg-white/50 py-3 pl-10 pr-4 text-sm font-bold text-gray-900 transition-all placeholder:text-gray-300 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
                 />

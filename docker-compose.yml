@@ -1,0 +1,49 @@
+# TraceNet local infrastructure.
+#
+#   docker compose up -d postgis                       # Phase 4: PostgreSQL 16 + PostGIS 3.4
+#   docker compose --profile streaming up -d           # + Redis & RabbitMQ for the Phase 3 fusion worker
+#
+# Credentials come from backend/.env (see backend/.env.example); the defaults below are
+# local-development values only.
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: tracenet-postgis
+    environment:
+      POSTGRES_DB: ${TRACENET_DB_NAME:-tracenet}
+      POSTGRES_USER: ${TRACENET_DB_USER:-tracenet}
+      POSTGRES_PASSWORD: ${TRACENET_DB_PASSWORD:-tracenet}
+    ports:
+      - "${TRACENET_DB_PORT:-5432}:5432"
+    volumes:
+      - tracenet-pgdata:/var/lib/postgresql/data
+      # First start only; `python -m backend.db.migrate` applies the same file idempotently.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      # TCP check: the temporary init-time server only listens on the unix socket
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: tracenet-redis
+    profiles: ["streaming"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: tracenet-rabbitmq
+    profiles: ["streaming"]
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
+
+volumes:
+  tracenet-pgdata:

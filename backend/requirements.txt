@@ -6,3 +6,35 @@ pydantic>=2.0.0
 ultralytics>=8.3.0
 opencv-python>=4.8.0
 imageio-ffmpeg>=0.5.1
+
+# Phase 2: ANPR / OCR (PaddleOCR 3.x on CPU; models download to ~/.paddlex on first run)
+# Note: paddlex pins opencv-contrib-python==4.10.0.84, which shadows opencv-python's cv2 (works with ultralytics).
+paddlepaddle==3.3.1
+paddleocr>=3.3,<4
+
+# Phase 3: cross-camera fusion (Redis / RabbitMQ are optional at runtime - in-memory + direct fallbacks)
+redis>=5,<7
+pika>=1.3,<2
+# Optional Re-ID upgrade: `pip install torchreid` + OSNet/VeRi-776 weights in backend/models/
+
+# Phase 4: PostgreSQL 16 + PostGIS 3.4 (docker compose up -d postgis)
+asyncpg>=0.29              # spatial API
+psycopg[binary]>=3.1       # persistence writer, migrations, seeding
+python-ulid>=2,<4          # ULID primary keys
+
+# Phase 5: macro analytics (Polars). Arrow-native readers: connectorx first, ADBC fallback;
+# psycopg is the last-resort reader, so neither is strictly required.
+polars>=1.0
+pyarrow>=14
+connectorx>=0.4
+adbc-driver-postgresql>=1.0
+
+# Phase 6: JWT auth + WebSocket alerts (uvicorn[standard] already brings the `websockets` server;
+# run_demo.py uses its sync client)
+pyjwt>=2.8
+websockets>=12
+
+# Phase 1 tests (dev only)
+pytest>=8.0.0
+httpx>=0.27.0  # fastapi TestClient
+fakeredis>=2.20  # Phase 3 Redis-state tests

@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Circle, useMap } from "react-leaflet";
 import Navbar from "../components/Navbar";
-import { fetchAlerts } from "../api";
+import { addToWatchlist, fetchAlerts } from "../api";
+import { useAlerts } from "../alerts/AlertsContext";
 import { WATCHLIST_CAMERAS, cameraDisplayId } from "../demoData";
 import { alertsFeed as localAlerts, cameraById } from "../data";
 import { AnimatedNumber, MapBoundary } from "../components/motion/Motion";
@@ -56,7 +57,8 @@ const SEVERITY = {
   MEDIUM: { color: "#eab308", badge: "bg-amber-500 text-white", icon: "bg-amber-100 text-amber-600", border: "border-amber-500/80", ring: "ring-amber-500/20" },
 };
 const sev = (a) => SEVERITY[a.severity] ?? SEVERITY.MEDIUM;
-const isAnomaly = (a) => a.category === "Trajectory Anomaly" || a.category === "Unusual Stop / Loitering";
+const ANOMALY_CATEGORIES = ["Trajectory Anomaly", "Unusual Stop / Loitering", "Cloned Plate", "Invalid / Tampered Plate"];
+const isAnomaly = (a) => ANOMALY_CATEGORIES.includes(a.category);
 
 // Pans the existing map to the selected alert without re-creating it
 function FocusAlert({ alert }) {
@@ -85,6 +87,29 @@ export default function AlertsPage({ navigate, openModal }) {
   const [detectedPlate, setDetectedPlate] = useState(null);
   const timeoutIdsRef = useRef([]);
 
+  // Phase 6: when the backend stream is live, this table shows real alerts (snapshot + WebSocket)
+  const { live, alerts: liveAlerts, markRead, subscribe } = useAlerts();
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const pendingWatchPlate = useRef(null);
+  useEffect(() => {
+    if (!live) return;
+    setAlerts((prev) => liveAlerts.map((a) => ({ ...a, status: prev.find((p) => p.alertId && p.alertId === a.alertId)?.status ?? a.status })));
+    setSelectedAlert((cur) => (cur && liveAlerts.some((a) => a.alertId === cur.alertId) ? cur : liveAlerts[0] ?? null));
+    markRead();
+  }, [live, liveAlerts, markRead]);
+  // A real BLACKLIST_HIT for a plate just added here completes the propagation panel
+  useEffect(
+    () =>
+      subscribe((row) => {
+        if (row.alertType === "BLACKLIST_HIT" && row.plateNumber === pendingWatchPlate.current) {
+          setPropagationState("detected");
+          setDetectedPlate({ plate: row.plateNumber, camera: row.cameraId, timestamp: row.timestamp, confidence: row.confidence });
+        }
+      }),
+    [subscribe]
+  );
+
   // Cleanup all timeouts on unmount or reset
   const clearAllTimeouts = useCallback(() => {
     timeoutIdsRef.current.forEach((id) => clearTimeout(id));
@@ -105,7 +130,7 @@ export default function AlertsPage({ navigate, openModal }) {
   // Fetch from API with fallback
   useEffect(() => {
     fetchAlerts().then((data) => {
-      if (data) {
+      if (data && !liveRef.current) {
         setAlerts(data);
         setSelectedAlert(data[0]);
       }
@@ -132,6 +157,7 @@ export default function AlertsPage({ navigate, openModal }) {
   useEffect(() => {
     if (sessionResighting) return;
     const t = setTimeout(() => {
+      if (liveRef.current) return; // real alerts only when the backend stream is live
       const alert = makeResighting();
       sessionResighting = alert;
       setAlerts((prev) => (prev.some((a) => a.id === alert.id) ? prev : [alert, ...prev]));
@@ -142,7 +168,7 @@ export default function AlertsPage({ navigate, openModal }) {
   }, []);
 
   // ── Propagation Sequence ──
-  const startPropagation = (plate) => {
+  const startPropagation = (plate, real = false) => {
     clearAllTimeouts();
     setPropagationState('propagating');
     setPropagatedCameras([]);
@@ -161,6 +187,17 @@ export default function AlertsPage({ navigate, openModal }) {
       setPropagationState('synced');
     }, WATCHLIST_CAMERAS.length * 300 + 400);
     timeoutIdsRef.current.push(syncId);
+
+    // Real watchlist: detection happens only when a camera actually reads the plate (WebSocket)
+    if (real) {
+      pendingWatchPlate.current = plate;
+      const resetId = setTimeout(() => {
+        pendingWatchPlate.current = null;
+        resetPropagation();
+      }, 120000);
+      timeoutIdsRef.current.push(resetId);
+      return;
+    }
 
     // After sync → detection
     const detectId = setTimeout(() => {
@@ -183,12 +220,22 @@ export default function AlertsPage({ navigate, openModal }) {
     timeoutIdsRef.current.push(resetId);
   };
 
-  const handleAddWatchlist = (e) => {
+  const handleAddWatchlist = async (e) => {
     e.preventDefault();
     if (!newPlate) return;
-    const plate = newPlate.toUpperCase();
-    triggerToast(`Plate [${plate}] registered to Central Watchlist.`);
-    startPropagation(plate);
+    const plate = newPlate.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (live) {
+      const res = await addToWatchlist(plate, newReason || "Added from the Alerts page");
+      if (!res.ok) {
+        triggerToast(`Watchlist update failed (${res.status || "offline"}).`);
+        return;
+      }
+      triggerToast(`Plate [${plate}] added to the central watchlist — enforced on the next sighting.`);
+      startPropagation(plate, true);
+    } else {
+      triggerToast(`Plate [${plate}] registered to Central Watchlist.`);
+      startPropagation(plate);
+    }
     setNewPlate("");
     setNewReason("");
   };
@@ -212,7 +259,7 @@ export default function AlertsPage({ navigate, openModal }) {
       filterCategory === "ALL" ||
       (filterCategory === "CONGESTION" && item.type === "traffic") ||
       (filterCategory === "BLACKLIST" && item.category === "Blacklisted Vehicle") ||
-      (filterCategory === "ANOMALY" && (item.category === "Trajectory Anomaly" || item.category === "Unusual Stop / Loitering"));
+      (filterCategory === "ANOMALY" && isAnomaly(item));
 
     const matchesSearch =
       item.plateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||

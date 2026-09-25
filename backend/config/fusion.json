@@ -1,0 +1,31 @@
+{
+  "$comment": [
+    "TraceNet Phase 3 — cross-camera fusion tuning. Missing keys use backend/fusion/config.py defaults.",
+    "score = w_text*text_sim + w_visual*visual_sim + w_kinematic*physics_ok; ghost cars use w_text=0, w_visual=0.75."
+  ],
+
+  "w_text": 0.35,
+  "w_visual": 0.40,
+  "w_kinematic": 0.25,
+  "ghost_w_visual": 0.75,
+  "ghost_ocr_confidence": 0.70,
+  "match_threshold": 0.70,
+
+  "speed_ok_kmh": 120.0,
+  "speed_max_kmh": 150.0,
+  "clone_text_similarity": 0.90,
+  "plate_link_min_text_similarity": 0.80,
+  "ghost_min_visual_similarity": 0.90,
+  "ghost_same_camera_max_gap_seconds": 15.0,
+
+  "active_window_seconds": 1800,
+  "candidate_radius_km": 50.0,
+
+  "redis_url": "redis://localhost:6379/0",
+  "redis_prefix": "tracenet",
+  "amqp_url": "amqp://guest:guest@localhost:5672/%2F",
+  "amqp_exchange": "tracenet.events",
+  "amqp_queue": "q.fusion",
+
+  "reid_weights_path": null
+}

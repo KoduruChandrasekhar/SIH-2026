@@ -798,3 +798,122 @@ Actual ANPR accuracy, tracking performance, latency and scalability depend on th
 **Centralized AI. Connected Cameras. Complete Traffic Intelligence.**
 
 Built for **Smart India Hackathon 2026 — Problem Statement 26127**.
+
+---
+
+# 🎥 Phase 1 — Multi-Camera Video Ingestion & Simulation
+
+Recorded MP4 files act as the simulation layer for the city camera network. The ingestion
+layer decodes them, attaches camera metadata and deterministic timestamps, and emits
+standardized `FramePacket`s for Phase 2 (ANPR/OCR).
+
+```bash
+python -m backend.ingestion.cli --list                 # configured cameras
+python -m backend.ingestion.cli --demo                 # replay the whole network
+python -m backend.ingestion.cli --camera CAM-401       # one camera
+python -m pytest backend/tests/test_phase1_ingestion.py -v
+```
+
+Camera network: `backend/config/cameras.json` (CAM-401, CAM-402, CAM-403, CAM-406).
+Live ingestion state is served at `/api/ingestion/cameras` and shown on the Cameras page.
+
+**Full documentation: [docs/PHASE1_INGESTION.md](docs/PHASE1_INGESTION.md)**
+
+---
+
+# 🔎 Phase 2 — High-Accuracy ANPR / OCR
+
+Vehicle tracks from YOLO11 + ByteTrack feed a plate pipeline: plate candidate
+(geometric fallback until a plate model is added) → pixel-only Q-score → best 2–3 crops
+per vehicle → CLAHE → PaddleOCR (bilateral retry below 0.85) → Indian STANDARD/BH
+validation with positional correction → multi-frame consensus → structured observation.
+
+```bash
+python backend/scripts/run_vehicle_tracking.py --camera CAM-401 --anpr
+python -m pytest backend/tests/test_phase2_anpr.py -v
+```
+
+Results: `backend/output/anpr/<CAM>_anpr.json` + evidence crops, served at `/api/anpr`,
+`/api/anpr/{track_id}` and `/api/cameras/{id}/anpr`.
+
+**Full documentation: [docs/PHASE2_ANPR.md](docs/PHASE2_ANPR.md)**
+
+---
+
+# 🧭 Phase 3 — Cross-Camera Identity & Trajectory Fusion
+
+Phase 2 sightings are fused into city-wide trajectories: normalised-Levenshtein plate
+similarity + 512-D appearance cosine + road-network kinematics (OSRM distances), ghost-car
+weight redistribution, cloned-plate alerts (>150 km/h), deterministic UUIDv5 vehicle IDs.
+Redis / RabbitMQ are used when running; otherwise in-memory state and direct mode.
+
+```bash
+python -m backend.fusion.cli --scenarios      # 4 golden scenarios
+python -m backend.fusion.cli --demo           # fuse the real Phase 2 sightings
+python -m pytest backend/tests/test_phase3_fusion.py -v
+```
+
+API: `/api/v1/trajectories`, `/api/v1/trajectories/{plate_or_id}`, `/api/v1/alerts/anomalies`.
+
+**Full documentation: [docs/PHASE3_FUSION.md](docs/PHASE3_FUSION.md)**
+
+---
+
+# 🗺️ Phase 4 — PostGIS Storage & GIS Vehicle Trace
+
+Fused journeys are stored in PostgreSQL 16 + PostGIS 3.4 (`LineString` + epoch `LineStringM`),
+served by an asyncpg API with pg_trgm/levenshtein fuzzy search and a hash-chained audit log,
+and drawn on the Tracking page map from the returned GeoJSON.
+
+```bash
+docker compose up -d postgis
+python backend/scripts/seed_db.py --migrate
+python -m backend.fusion.cli --demo --store postgres
+python -m pytest backend/tests/test_phase4_postgis.py -v
+```
+
+API: `/api/v1/vehicles/{plate}/trajectory`, `/api/v1/search?q=`, `/api/v1/geo/observations`, `/api/v1/audit/verify`.
+
+**Full documentation: [docs/PHASE4_POSTGIS.md](docs/PHASE4_POSTGIS.md)**
+
+---
+
+# 📈 Phase 5 — Macro Traffic Analytics (Polars)
+
+A background job (asyncio task, every 45 s) reads observations and trajectories from PostGIS
+with connectorx into Polars and computes per-junction density, speed, OCR yield, the Bottleneck
+Congestion Index (BCI = 1 − v/60) and a 24 h O-D matrix into `corridor_stats` / `od_matrix`.
+The Traffic and Dashboard pages render these instead of mock stats.
+
+```bash
+python -m uvicorn backend.main:app --port 8000     # scheduler starts with the API
+python -m backend.analytics.polars_jobs            # one run, printed
+python -m pytest backend/tests/test_phase5_analytics.py -v
+```
+
+API: `/api/v1/geo/heatmap`, `/api/v1/analytics/od-matrix`, `/api/v1/analytics/summary`, `/api/v1/analytics/hourly`.
+
+**Full documentation: [docs/PHASE5_ANALYTICS.md](docs/PHASE5_ANALYTICS.md)**
+
+---
+
+# 🚨 Phase 6 — Real-Time Alerts, RBAC & End-to-End Demo
+
+JWT auth with role-based access control, where the audit log records the JWT user.
+Posted sightings are fused live and raise `CLONED_PLATE`, `BLACKLIST_HIT` (from the watchlist) and `INVALID_FORMAT` alerts.
+The alerts reach the React app over `ws://localhost:8000/ws/alerts?token=<JWT>` as toasts plus Alerts-table rows, with no refresh.
+
+| User | Password | Role |
+|---|---|---|
+| `officer` | `police123` | `law_enforcement` (trajectories, search, alerts, watchlist) — the React app signs in as this user automatically |
+| `admin` | `admin123` | `camera_admin` (camera control, sighting ingest, analytics refresh) |
+
+```bash
+docker compose up -d postgis
+python -m uvicorn backend.main:app --port 8000
+npm run dev
+python backend/scripts/run_demo.py        # golden scenarios over HTTP → live WebSocket alerts, with checks
+python -m pytest backend/tests/test_phase6_realtime.py -v
+```
+
+**Full documentation: [docs/PHASE6_REALTIME.md](docs/PHASE6_REALTIME.md)**

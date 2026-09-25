@@ -16,8 +16,10 @@ import {
 
 import tracenetLogo from "../assets/tracenet-logo.jpg"; 
 import { useTheme } from "../ThemeContext";
+import { useAlerts } from "../alerts/AlertsContext";
 
 export default function Navbar({ page, navigate, openModal }) {
+  const { unread, connected } = useAlerts();
   const { theme, toggleTheme } = useTheme();
   // Below xl the links collapse behind a menu button
   const [menuOpen, setMenuOpen] = useState(false);
@@ -213,11 +215,15 @@ export default function Navbar({ page, navigate, openModal }) {
             }
           `}
         >
-          <Bell 
-            size={16} 
-            className="text-red-500" 
-          />
-          <span className="relative z-10">Alerts</span>
+          <span className="relative">
+            <Bell size={16} className="text-red-500" />
+            {unread > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black leading-none text-white" aria-label={`${unread} new alerts`}>
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
+          </span>
+          <span className="relative z-10" data-tip={connected ? "Live alert stream connected" : undefined}>Alerts</span>
           <span 
             className={`absolute bottom-0 left-0 h-[2px] w-full bg-red-500 origin-left transition-transform duration-300 ${isAlertsActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} 
           />

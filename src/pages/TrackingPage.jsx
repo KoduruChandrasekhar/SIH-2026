@@ -18,10 +18,10 @@ import {
   Network,
   Check as CheckIcon,
 } from "lucide-react";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { GeoJSON, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import Navbar from "../components/Navbar";
-import { fetchVehicles } from "../api";
+import { fetchDbHealth, fetchStoredTrajectories, fetchTrajectory, fetchVehicles, searchPlates, trajectoryToVehicle } from "../api";
 import { MapBoundary } from "../components/motion/Motion";
 import { cameraById, cameraRegistry } from "../data";
 
@@ -230,6 +230,36 @@ function FitRoute({ points, trigger }) {
   return null;
 }
 
+// Real (PostGIS) routes: fit the map to the GeoJSON layer itself
+function FitGeoJSON({ data, trigger }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!data) return;
+    const bounds = L.geoJSON(data).getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true });
+  }, [map, data, trigger]);
+  return null;
+}
+
+// Numbered waypoint markers for real journeys (positions come from the database)
+const WAYPOINT_ICONS = new Map();
+function waypointIcon(n, last) {
+  const key = `${n}-${last}`;
+  if (!WAYPOINT_ICONS.has(key)) {
+    const bg = n === 1 ? "#16a34a" : last ? "#dc2626" : "#2563eb";
+    WAYPOINT_ICONS.set(
+      key,
+      L.divIcon({
+        className: "",
+        html: `<div style="width:22px;height:22px;border-radius:50%;background:${bg};border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.35);color:white;font:800 10px/18px ui-monospace,monospace;text-align:center">${n}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      })
+    );
+  }
+  return WAYPOINT_ICONS.get(key);
+}
+
 const MARKER_STYLE = {
   active: { bg: "#06b6d4", size: 24 },
   visited: { bg: "#3b82f6", size: 16 },
@@ -276,6 +306,11 @@ export default function TrackingPage({ navigate, openModal, params }) {
   const [fit, setFit] = useState(0);
   const [vehicles, setVehiclesData] = useState(localVehicles);
   const apiLoaded = useRef(false);
+  // Phase 4: with the PostGIS backend online, Trace Vehicle queries real stored journeys
+  const [backend, setBackend] = useState("checking"); // checking | online | offline
+  const [realPlates, setRealPlates] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [noticeDetail, setNoticeDetail] = useState(null);
 
   // Playback state — hop index is the single source of truth for map, timeline, hop strip and profile
   const [playbackState, setPlaybackState] = useState("idle"); // idle | resolving | playing | paused | complete
@@ -462,18 +497,112 @@ export default function TrackingPage({ navigate, openModal, params }) {
     [plate, resetPlayback, run]
   );
 
+  // ── Phase 4: real journeys from PostgreSQL + PostGIS ─────────────
+  // Every lookup is written to the hash-chained audit log by the backend.
+  const loadReal = useCallback(async (p, reason) => {
+    const data = await fetchTrajectory(p, reason);
+    const v = data ? trajectoryToVehicle(data) : null;
+    if (v) setVehiclesData((prev) => ({ ...prev, [v.plate]: v }));
+    return { data, v };
+  }, []);
+
+  const traceReal = useCallback(
+    async (q) => {
+      resetPlayback();
+      setNotice(null);
+      setNoticeDetail(null);
+      setSuggestions([]);
+      setPlaybackState("resolving");
+      const { data, v } = await loadReal(q, "Trace Vehicle (Tracking page)");
+      if (!mounted.current) return;
+      if (v) {
+        setQuery(v.plate);
+        trace(v.plate);
+        return;
+      }
+      setPlaybackState("idle");
+      setNotice(q);
+      if (data?.waypoints?.length) {
+        const sources = [...new Set(data.waypoints.map((w) => w.source))].join(", ");
+        setNoticeDetail(`${data.waypoints.length} sighting(s) on record (${sources}) but no fused journey.`);
+      }
+      // Fuzzy search (pg_trgm + levenshtein) for "did you mean"
+      const res = await searchPlates(q);
+      if (!mounted.current) return;
+      const seen = new Set([q]);
+      setSuggestions(
+        (res?.results ?? [])
+          .filter((r) => r.has_trajectory && r.canonical_plate && !seen.has(r.canonical_plate) && seen.add(r.canonical_plate))
+          .slice(0, 5)
+          .map((r) => r.canonical_plate)
+      );
+    },
+    [loadReal, resetPlayback, trace]
+  );
+
+  const selectReal = useCallback(
+    async (p, reason = "Select plate (Tracking page)") => {
+      const { v } = await loadReal(p, reason);
+      if (!v || !mounted.current) return;
+      resetPlayback();
+      setPlate(v.plate);
+      setQuery(v.plate);
+      setSelected(null);
+      setNotice(null);
+      setSuggestions([]);
+      setFit((x) => x + 1);
+    },
+    [loadReal, resetPlayback]
+  );
+
+  // Is the PostGIS backend up? If so, list real traceable plates and open the most complete journey.
+  useEffect(() => {
+    let alive = true;
+    fetchDbHealth().then(async (health) => {
+      if (!alive) return;
+      if (health?.database !== "ok") return setBackend("offline");
+      setBackend("online");
+      const list = await fetchStoredTrajectories(60);
+      if (!alive) return;
+      const plates = [];
+      // most complete journeys first (more waypoints), then most recent
+      // pipeline / scenario journeys only — synthetic backdrop journeys stay searchable but are not suggested
+      const journeys = [...(list?.trajectories ?? [])]
+        .filter((t) => t.source !== "seed_backdrop")
+        .sort((x, y) => y.observation_count - x.observation_count);
+      for (const t of journeys) {
+        if (t.canonical_plate && !plates.includes(t.canonical_plate)) plates.push(t.canonical_plate);
+      }
+      setRealPlates(plates.slice(0, 8));
+      if (!params?.plate && plates.length) selectReal(plates[0], "Default view (Tracking page)");
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Arriving from another module with a plate (Alerts → Trace, Cameras → Trace): start tracing it
   const autoTraced = useRef(false);
   useEffect(() => {
-    if (autoTraced.current || !params?.plate || !localVehicles[params.plate]) return;
-    autoTraced.current = true;
-    trace(params.plate);
-  }, [params, trace]);
+    if (autoTraced.current || !params?.plate || backend === "checking") return;
+    if (backend === "online") {
+      autoTraced.current = true;
+      traceReal(params.plate.toUpperCase());
+    } else if (localVehicles[params.plate]) {
+      autoTraced.current = true;
+      trace(params.plate);
+    }
+  }, [params, trace, traceReal, backend]);
 
   const handleTraceSubmit = (e) => {
     e.preventDefault();
     const q = query.trim().toUpperCase();
     if (!q) return;
+    if (backend === "online" && q !== DEMO_PLATE) {
+      traceReal(q.replace(/[^A-Z0-9]/g, ""));
+      return;
+    }
     const key = vehicles[q] ? q : Object.keys(vehicles).find((p) => p.includes(q));
     if (!key) {
       setNotice(q);
@@ -484,6 +613,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
   };
 
   const selectVehicle = (p) => {
+    if (backend === "online" && p !== DEMO_PLATE) return selectReal(p);
     resetPlayback();
     setPlate(p);
     setQuery(p);
@@ -571,7 +701,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
   const panelFrom = transition ? observations[transition.from]?.camera : null;
   const panelTo = transition ? observations[transition.to]?.camera : null;
   const showDemoPanel = isDemoVehicle && activePanel && (playbackState === "playing" || playbackState === "paused");
-  const deviating = isDeviation(vehicle);
+  const deviating = vehicle.real ? !!vehicle.cloned : isDeviation(vehicle);
 
   return (
     <div className="tracking-page flex w-full flex-col gap-5 pb-10">
@@ -627,15 +757,27 @@ export default function TrackingPage({ navigate, openModal, params }) {
         </div>
 
         {notice && (
-          <p className="tn-new-item mt-3 rounded-xl border border-amber-500/30 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700" role="status">
-            No stored trajectory for <span className="font-mono">{notice}</span> yet — it will appear once two or more cameras read the plate.
-          </p>
+          <div className="tn-new-item mt-3 rounded-xl border border-amber-500/30 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700" role="status">
+            No stored trajectory for <span className="font-mono">{notice}</span>
+            {backend === "online" ? " in the trajectory database." : " yet — it will appear once two or more cameras read the plate."}
+            {noticeDetail && <span className="ml-1 font-semibold">{noticeDetail}</span>}
+            {suggestions.length > 0 && (
+              <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                Did you mean:
+                {suggestions.map((sug) => (
+                  <button key={sug} type="button" onClick={() => traceReal(sug)} className="tn-press rounded-md bg-white px-2 py-0.5 font-mono text-[10px] font-black text-blue-600 hover:bg-blue-50">
+                    {sug}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Quick Sample Plates */}
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-400">Sample Plates:</span>
-          {Object.keys(vehicles).map((p) => (
+          <span className="text-[9px] font-extrabold uppercase tracking-wider text-gray-400">{backend === "online" ? "Stored Journeys:" : "Sample Plates:"}</span>
+          {(backend === "online" ? [...realPlates, DEMO_PLATE] : Object.keys(vehicles)).map((p) => (
             <button
               key={p}
               onClick={() => selectVehicle(p)}
@@ -643,6 +785,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
               className={`tn-press rounded-lg px-2.5 py-1 font-mono text-[10px] font-bold ${plate === p ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               {p}
+              {backend === "online" && p === DEMO_PLATE && <span className="ml-1 opacity-60">(demo)</span>}
             </button>
           ))}
         </div>
@@ -703,6 +846,11 @@ export default function TrackingPage({ navigate, openModal, params }) {
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <MapPin size={15} className="text-blue-600" />
               <h3 className="text-[10px] font-extrabold uppercase tracking-wider">GIS Trajectory Map</h3>
+              {vehicle.real && (
+                <span className="rounded-md bg-indigo-500/10 px-2 py-0.5 font-mono text-[10px] font-black text-indigo-500" data-tip="Route served from PostgreSQL + PostGIS; this lookup is in the audit log" data-tip-pos="bottom">
+                  PostGIS{vehicle.source === "simulated" ? " · simulated run" : vehicle.source === "seed_backdrop" ? " · synthetic backdrop" : ""} · {vehicle.queryMs} ms · audit #{vehicle.audit?.id}
+                </span>
+              )}
               {currentObservation && (
                 <span key={hop} className="tn-new-item rounded-md bg-cyan-500/15 px-2 py-0.5 font-mono text-[10px] font-black text-cyan-500">
                   @ {currentObservation.camera.replace(" #", "-")} · {currentObservation.time}
@@ -734,10 +882,19 @@ export default function TrackingPage({ navigate, openModal, params }) {
             <MapBoundary>
               <MapContainer center={points[0]} zoom={13} scrollWheelZoom style={{ width: "100%", height: "100%" }}>
                 <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <FitRoute points={points} trigger={fit} />
-
-                {/* Full reconstructed route (subdued) */}
-                <Polyline positions={points} pathOptions={{ color: "#9ca3af", weight: 3, opacity: 0.45, dashArray: "4 8" }} />
+                {vehicle.real && vehicle.geojson ? (
+                  <>
+                    {/* Real route: GeoJSON LineString from PostGIS (ST_AsGeoJSON of the stored trajectory_line) */}
+                    <GeoJSON key={vehicle.trajectoryId} data={vehicle.geojson} style={() => ({ color: vehicle.cloned ? "#ef4444" : "#6366f1", weight: 4, opacity: 0.55 })} />
+                    <FitGeoJSON data={vehicle.geojson} trigger={fit} />
+                  </>
+                ) : (
+                  <>
+                    <FitRoute points={points} trigger={fit} />
+                    {/* Full reconstructed route (subdued) */}
+                    <Polyline positions={points} pathOptions={{ color: "#9ca3af", weight: 3, opacity: 0.45, dashArray: "4 8" }} />
+                  </>
+                )}
 
                 {/* Travelled route — reveals progressively during playback */}
                 {travelled.length > 1 && <Polyline positions={travelled} pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.9, dashArray: "8 7" }} />}
@@ -764,6 +921,25 @@ export default function TrackingPage({ navigate, openModal, params }) {
                     </Marker>
                   );
                 })}
+
+                {/* Real journeys: one marker per stored waypoint (database coordinates) */}
+                {vehicle.real &&
+                  vehicle.hops.map((h, i) => (
+                    <Marker key={`wp-${vehicle.trajectoryId}-${i}`} position={[h[7], h[8]]} icon={waypointIcon(i + 1, i === vehicle.hops.length - 1)} zIndexOffset={950}>
+                      <Popup>
+                        <div className="min-w-[180px] p-1">
+                          <b className="font-mono text-[10px] text-blue-600">
+                            #{i + 1} · {h[0].replace(" #", "-")}
+                          </b>
+                          <p className="mt-1 text-xs font-bold">{h[1]}</p>
+                          <p className="text-[10px] text-gray-500">
+                            {h[2]} · plate {h[10]?.plate ?? "unread"} · OCR {h[4]}
+                          </p>
+                          {h[9] && <img src={h[9]} alt={`Plate crop at ${h[0]}`} className="mt-1 h-10 w-full rounded bg-gray-900 object-contain" />}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
 
                 {/* Moving vehicle */}
                 {started && vehiclePosition && <Marker position={vehiclePosition} icon={VEHICLE_ICON} zIndexOffset={1000} />}
@@ -923,6 +1099,12 @@ export default function TrackingPage({ navigate, openModal, params }) {
                   <span className="text-[9px] font-bold text-gray-400">{h[2]}</span>
                 </div>
                 <h4 className="text-xs font-black text-gray-800">{h[1]}</h4>
+                {h[9] && <img src={h[9]} alt={`Plate crop at ${h[0]}`} className="mt-2 h-10 w-full rounded-md bg-gray-900 object-contain" />}
+                {h[10] && (
+                  <p className="mt-1 font-mono text-[9px] font-bold text-gray-500">
+                    read: {h[10].plate ?? "— (no plate)"} · {h[10].source}
+                  </p>
+                )}
                 <div className="mt-3 grid grid-cols-3 border-t border-gray-200/60 pt-3 text-[8px] font-bold text-gray-500">
                   <span>{h[3]}</span>
                   <span>{h[5]}</span>

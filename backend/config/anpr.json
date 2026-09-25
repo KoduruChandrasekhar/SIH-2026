@@ -1,0 +1,64 @@
+{
+  "$comment": [
+    "TraceNet Phase 2 — ANPR / OCR tuning. Every key is optional; missing keys use the defaults in backend/anpr/config.py.",
+    "Pipeline: vehicle track -> plate candidate -> Q-score (no OCR) -> top-K crops -> CLAHE -> OCR (-> bilateral fallback) -> validation -> consensus.",
+    "Sizes are in source-frame pixels."
+  ],
+
+  "candidate_sample_fps": 10.0,
+  "min_vehicle_width_px": 60,
+  "min_vehicle_height_px": 40,
+  "min_track_hits": 3,
+  "track_lost_seconds": 1.5,
+
+  "plate_detector": "auto",
+  "plate_model_path": null,
+  "plate_model_confidence": 0.25,
+  "lower_search_fraction": 0.40,
+  "expand_to_full_vehicle": true,
+  "aspect_ratio_min": 2.5,
+  "aspect_ratio_max": 5.5,
+  "class_aspect_ratio_min": { "motorcycle": 1.4 },
+  "min_plate_rel_width": 0.08,
+  "max_plate_rel_width": 0.85,
+  "min_rectangularity": 0.55,
+  "max_detect_skew_deg": 30.0,
+  "min_char_transitions": 6,
+  "crop_padding": 0.08,
+
+  "q_weight_area": 0.35,
+  "q_weight_sharpness": 0.45,
+  "q_weight_exposure": 0.20,
+  "q_weight_skew": 0.30,
+  "q_area_ref_px": 6000,
+  "q_sharpness_ref": 400.0,
+  "min_plate_width_px": 40,
+  "min_plate_height_px": 12,
+  "min_sharpness": 25.0,
+  "max_skew_deg": 20.0,
+  "min_q_score": 0.20,
+
+  "top_k_ocr": 3,
+  "early_ocr": true,
+  "early_ocr_min_q": 0.70,
+
+  "ocr_engine": "paddle",
+  "ocr_det_model": "PP-OCRv6_medium_det",
+  "ocr_rec_model": "PP-OCRv6_medium_rec",
+  "ocr_fallback_threshold": 0.85,
+  "min_read_confidence": 0.40,
+  "ocr_min_height_px": 128,
+  "ocr_border_fraction": 0.15,
+  "clahe_clip_limit": 2.0,
+  "clahe_tile_grid": 8,
+  "bilateral_d": 9,
+  "bilateral_sigma_color": 75.0,
+  "bilateral_sigma_space": 75.0,
+
+  "consensus_similarity": 0.80,
+  "resolve_confidence": 0.85,
+  "min_plate_confidence": 0.75,
+
+  "evidence_frame_max_width": 1280,
+  "evidence_jpeg_quality": 90
+}

@@ -30,7 +30,7 @@ import { MapContainer, TileLayer, Tooltip as MapTooltip, CircleMarker, Circle, P
 import Navbar from "../components/Navbar";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
 import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
-import { fetchDashboard } from "../api";
+import { fetchDashboard, fetchMacroAnalytics } from "../api";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, hourlyTraffic, junctionReadings } from "../data";
 import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../demoData";
 import { formatClock, pctChange, simNowSec, useLiveSim } from "../sim/liveSim";
@@ -61,6 +61,37 @@ const normaliseTrend = (rows, key, target) => rows?.map((r) => ({ hour: r.time ?
 
 const densityColor = (d) => (d > 80 ? "#ef4444" : d > 50 ? "#f97316" : "#10b981");
 const densityStatus = (d) => (d > 80 ? "High" : d > 50 ? "Med" : "Low");
+// Phase 5 (real data): BCI % — red ≥ 70 (severe), orange ≥ 40, green below
+const bciColor = (b) => (b == null ? "#94a3b8" : b >= 70 ? "#ef4444" : b >= 40 ? "#f97316" : "#10b981");
+const bciLabel = (b) => (b == null ? "No speed data" : b >= 70 ? "Severe" : b >= 40 ? "Moderate" : "Free flow");
+const hhmm = (iso) => (iso ? iso.slice(11, 16) : "—");
+
+// Polars heatmap features → the dashboard's camera-node shape (latest hour, else 24 h rollup)
+function macroToNodes(macro) {
+  const latest = Object.fromEntries((macro.latest?.features ?? []).map((f) => [f.properties.camera_id, f.properties]));
+  return macro.heat.features.map((f) => {
+    const day = f.properties;
+    const now = latest[day.camera_id];
+    const p = now && now.bci_score != null ? now : day;
+    const [lng, lat] = f.geometry.coordinates;
+    return {
+      id: day.camera_id,
+      camId: day.camera_id.replace("-", " #"),
+      code: day.camera_id,
+      name: day.camera_name,
+      zone: day.road_name,
+      lat,
+      lng,
+      real: true,
+      speed: p.avg_speed != null ? String(Math.round(p.avg_speed)) : "—",
+      densityValue: p.bci_score != null ? Math.round(p.bci_score * 100) : null,
+      trend: p === now ? `hour from ${hhmm(day.latest_hour)}` : "24 h rollup",
+      trafficChange: `${day.vehicle_count} veh`,
+      since: "the last 24 h",
+      peak: day.peak_bci != null ? `${hhmm(day.peak_hour)} · BCI ${day.peak_bci.toFixed(2)}` : null,
+    };
+  });
+}
 const NOW_HOUR = Number(SNAPSHOT_TIME.slice(0, 2));
 
 // Flow lines between connected cameras (demo network edges)
@@ -89,6 +120,8 @@ function FocusCamera({ cam }) {
 export default function DashboardPage({ navigate, openModal }) {
   const [camerasData, setCamerasData] = useState(localCamerasData);
   const [apiTrends, setApiTrends] = useState(null);
+  const [macro, setMacro] = useState(null); // Phase 5 Polars analytics (null → local demo data)
+  const realLoaded = useRef(false); // once real analytics arrive, the legacy mock payload must not overwrite them
   const [selectedId, setSelectedId] = useState(localCamerasData[0].id);
   const chart = useChartTheme();
   const sim = useLiveSim();
@@ -97,7 +130,7 @@ export default function DashboardPage({ navigate, openModal }) {
   // Fetch from API with fallback
   useEffect(() => {
     fetchDashboard().then((data) => {
-      if (!data) return;
+      if (!data || realLoaded.current) return;
       if (data.cameras) {
         setCamerasData(data.cameras);
         setSelectedId(data.cameras[0].id);
@@ -111,6 +144,27 @@ export default function DashboardPage({ navigate, openModal }) {
       apiLoaded.current = true;
     });
   }, []);
+
+  // Phase 5: real macro analytics (server recomputes every ~45 s; poll every 30 s)
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetchMacroAnalytics().then((m) => {
+        if (!alive || !m) return;
+        realLoaded.current = true;
+        setMacro(m);
+        const nodes = macroToNodes(m);
+        setCamerasData(nodes);
+        setSelectedId((cur) => (nodes.some((n) => n.id === cur) ? cur : nodes[0].id));
+      });
+    load();
+    const id = setInterval(load, 30000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+  const real = Boolean(macro);
 
   // --- Live clock (sim time, 1 s) + "updated Ns ago" since the last data tick ---
   const [clock, setClock] = useState(simNowSec);
@@ -128,6 +182,10 @@ export default function DashboardPage({ navigate, openModal }) {
   const liveCameras = useMemo(
     () =>
       camerasData.map((c) => {
+        if (c.real) {
+          const speed = parseInt(c.speed, 10);
+          return { ...c, liveDensity: c.densityValue ?? 0, liveSpeed: Number.isNaN(speed) ? null : speed, color: bciColor(c.densityValue), status: bciLabel(c.densityValue) };
+        }
         const live = c.camId ? sim.junctions[c.camId] : null;
         const density = live?.density ?? c.densityValue;
         const speed = live?.speed ?? parseInt(c.speed, 10);
@@ -167,9 +225,22 @@ export default function DashboardPage({ navigate, openModal }) {
       ),
     [net]
   );
-  const flowTrendsData = apiTrends?.flow ?? today;
-  const densityTrendsData = apiTrends?.density ?? today;
-  const congestionTrendsData = apiTrends?.delay ?? today;
+  const realTrends = useMemo(
+    () => macro?.hourly.map((h) => ({ hour: h.hour, flow: h.vehicles, density: h.bci != null ? Math.round(h.bci * 100) : null, delay: h.delay })),
+    [macro]
+  );
+  const flowTrendsData = realTrends ?? apiTrends?.flow ?? today;
+  const densityTrendsData = realTrends ?? apiTrends?.density ?? today;
+  const congestionTrendsData = realTrends ?? apiTrends?.delay ?? today;
+  const trendNowTick = real ? macro.hourly.at(-1)?.hour : nowTick;
+  // Flow lines: real O-D pairs (top 8 by volume) between camera coordinates
+  const odLines = useMemo(() => {
+    if (!macro) return null;
+    const at = Object.fromEntries(liveCameras.map((c) => [c.code, [c.lat, c.lng]]));
+    const flows = (macro.od?.flows ?? []).slice(0, 8);
+    const max = Math.max(1, ...flows.map((f) => f.vehicle_volume));
+    return flows.filter((f) => at[f.source] && at[f.destination]).map((f) => ({ positions: [at[f.source], at[f.destination]], weight: 1.5 + (4 * f.vehicle_volume) / max, key: `${f.source}-${f.destination}` }));
+  }, [macro, liveCameras]);
 
   const activityCam = liveCameras.find((c) => c.camId === sim.activityCamera);
 
@@ -207,13 +278,52 @@ export default function DashboardPage({ navigate, openModal }) {
             <span className="tn-pulse tn-pulse--green h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
             <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-emerald-600">Live City Flow</span>
             <span className="ml-0.5 font-mono text-[10px] font-bold text-emerald-500">{formatClock(clock)} IST</span>
-            <span className="hidden font-mono text-[9px] font-bold text-emerald-600/70 sm:inline">· updated {updatedAgo}s ago</span>
+            <span className="hidden font-mono text-[9px] font-bold text-emerald-600/70 sm:inline">
+              {real ? `· Polars ${hhmm(macro.summary.computed_at)}` : `· updated ${updatedAgo}s ago`}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Network KPIs (live) */}
       <section aria-label="Network indicators" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {real ? (
+          <>
+            <Kpi icon={Gauge} label="Network avg speed" value={macro.summary.average_city_speed != null ? `${macro.summary.average_city_speed.toFixed(1)} km/h` : "—"} sub={`24 h · ${macro.summary.speed_samples} leg speeds`} delay="delay-100" />
+            <Kpi
+              icon={Activity}
+              label="Traffic volume"
+              value={<AnimatedNumber value={macro.summary.vehicles_latest_hour} format={(v) => `${Math.round(v).toLocaleString("en-IN")} veh/h`} />}
+              sub={`${macro.summary.vehicles_24h.toLocaleString("en-IN")} vehicles in 24 h`}
+              delay="delay-100"
+            />
+            <Kpi
+              icon={MapIcon}
+              label="City congestion (BCI)"
+              value={macro.summary.city_bci != null ? `${Math.round(macro.summary.city_bci * 100)}%` : "—"}
+              sub={`≥70% = severe · peak ${macro.summary.peak_congestion ? `${macro.summary.peak_congestion.camera_id} ${hhmm(macro.summary.peak_congestion.hour)}` : "—"}`}
+              tone={macro.summary.city_bci >= 0.7 ? "text-red-500" : "text-gray-900"}
+              delay="delay-200"
+            />
+            <Kpi
+              icon={AlertTriangle}
+              label="Active alerts"
+              value={macro.summary.cloned_alerts.last_24h + macro.summary.severe_now.length}
+              sub={`${macro.summary.cloned_alerts.last_24h} cloned plate · ${macro.summary.severe_now.length} severe junction`}
+              tone="text-amber-500"
+              delay="delay-200"
+            />
+            <Kpi
+              icon={ScanLine}
+              label={`OCR read rate (target >${OCR_ACCURACY_TARGET}%)`}
+              value={macro.summary.city_ocr_yield != null ? `${(macro.summary.city_ocr_yield * 100).toFixed(1)}%` : "—"}
+              sub="confidence > 0.80 · 24 h"
+              tone="text-emerald-600"
+              delay="delay-300"
+            />
+          </>
+        ) : (
+          <>
         <Kpi
           icon={Gauge}
           label="Network avg speed"
@@ -248,6 +358,8 @@ export default function DashboardPage({ navigate, openModal }) {
           tone="text-emerald-600"
           delay="delay-300"
         />
+          </>
+        )}
       </section>
 
       {/* TOP SECTION: Map & Analytics Panel */}
@@ -262,15 +374,15 @@ export default function DashboardPage({ navigate, openModal }) {
 
             {/* Map Legend */}
             <div className="tn-legend" role="note" aria-label="Density legend">
-              <span className="tn-legend-title">Density:</span>
+              <span className="tn-legend-title">{real ? "BCI:" : "Density:"}</span>
               <span className="tn-legend-item">
-                <span className="h-2 w-2 rounded-full bg-red-500" /> High
+                <span className="h-2 w-2 rounded-full bg-red-500" /> {real ? "≥0.7" : "High"}
               </span>
               <span className="tn-legend-item">
-                <span className="h-2 w-2 rounded-full bg-orange-500" /> Med
+                <span className="h-2 w-2 rounded-full bg-orange-500" /> {real ? "≥0.4" : "Med"}
               </span>
               <span className="tn-legend-item">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Low
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> {real ? "<0.4" : "Low"}
               </span>
             </div>
           </div>
@@ -282,13 +394,17 @@ export default function DashboardPage({ navigate, openModal }) {
                 <FocusCamera cam={selected} />
 
                 {/* Flow lines between connected cameras */}
-                {flowLineEdges.map((positions, idx) => (
-                  <Polyline
-                    key={`flow-${idx}`}
-                    positions={positions}
-                    pathOptions={{ color: "#3b82f6", weight: 2, opacity: 0.35, dashArray: "8 12", className: "dashboard-flow-line" }}
-                  />
-                ))}
+                {odLines
+                  ? odLines.map((l) => (
+                      <Polyline key={`od-${l.key}`} positions={l.positions} pathOptions={{ color: "#3b82f6", weight: l.weight, opacity: 0.4, dashArray: "8 12", className: "dashboard-flow-line" }} />
+                    ))
+                  : flowLineEdges.map((positions, idx) => (
+                      <Polyline
+                        key={`flow-${idx}`}
+                        positions={positions}
+                        pathOptions={{ color: "#3b82f6", weight: 2, opacity: 0.35, dashArray: "8 12", className: "dashboard-flow-line" }}
+                      />
+                    ))}
 
                 {/* Density zones: radius/colour follow the live reading (small, slow changes) */}
                 {liveCameras.map((cam) => (
@@ -329,7 +445,7 @@ export default function DashboardPage({ navigate, openModal }) {
                       <MapTooltip direction="top" offset={[0, -8]}>
                         <strong>{cam.code ?? cam.id.split(" ")[0]}</strong> · {cam.name ?? ""}
                         <br />
-                        {cam.liveSpeed} km/h · {cam.liveDensity}% capacity
+                        {cam.real ? `${cam.liveSpeed ?? "—"} km/h · BCI ${cam.densityValue != null ? (cam.densityValue / 100).toFixed(2) : "—"}` : `${cam.liveSpeed} km/h · ${cam.liveDensity}% capacity`}
                       </MapTooltip>
                     </CircleMarker>
                   );
@@ -381,13 +497,13 @@ export default function DashboardPage({ navigate, openModal }) {
                   <Gauge size={14} className="text-blue-500" /> Avg Speed
                 </span>
                 <span className="text-3xl font-black tracking-tight text-gray-900">
-                  <AnimatedNumber value={selected.liveSpeed} format={(v) => Math.round(v)} /> <span className="text-sm font-bold text-gray-500">km/h</span>
+                  {selected.liveSpeed != null ? <AnimatedNumber value={selected.liveSpeed} format={(v) => Math.round(v)} /> : "—"} <span className="text-sm font-bold text-gray-500">km/h</span>
                 </span>
               </div>
 
               <div className="metric-tile tn-kpi flex flex-col rounded-[20px] border border-gray-100 bg-white/80 p-5 shadow-sm">
                 <span className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                  <Activity size={14} style={{ color: selected.color }} /> Density
+                  <Activity size={14} style={{ color: selected.color }} /> {selected.real ? "Congestion (BCI)" : "Density"}
                 </span>
                 <span className="congestion-transition text-3xl font-black tracking-tight" style={{ color: selected.color }}>
                   <AnimatedNumber value={selected.liveDensity} format={(v) => `${Math.round(v)}%`} />
@@ -404,7 +520,7 @@ export default function DashboardPage({ navigate, openModal }) {
                 </span>
               </div>
               <div className="flex items-center justify-between p-3">
-                <span className="text-xs font-bold text-gray-500">Volume (since {selected.since}):</span>
+                <span className="text-xs font-bold text-gray-500">{selected.real ? `Volume (${selected.since}):` : `Volume (since ${selected.since}):`}</span>
                 <span
                   className={`congestion-transition flex items-center gap-1 rounded-lg border border-gray-100 bg-white px-2.5 py-1.5 text-[11px] font-black shadow-sm ${
                     selected.trafficChange.includes("+") ? "text-red-500" : "text-emerald-500"
@@ -428,8 +544,17 @@ export default function DashboardPage({ navigate, openModal }) {
           <div>
             <h3 className="text-sm font-black text-gray-900">ANPR camera network</h3>
             <p className="text-[11px] font-bold text-gray-500">
-              {kpi.online} of {cameraRegistry.length} cluster cameras reporting · {kpi.offline} offline ·{" "}
-              <AnimatedNumber value={readsLastHour} /> plate reads in the last hour
+              {real ? (
+                <>
+                  {liveCameras.filter((c) => c.trafficChange !== "0 veh").length} of {liveCameras.length} database cameras reporting in 24 h ·{" "}
+                  <AnimatedNumber value={macro.summary.vehicles_latest_hour} /> vehicles in the latest hour
+                </>
+              ) : (
+                <>
+                  {kpi.online} of {cameraRegistry.length} cluster cameras reporting · {kpi.offline} offline ·{" "}
+                  <AnimatedNumber value={readsLastHour} /> plate reads in the last hour
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -444,7 +569,7 @@ export default function DashboardPage({ navigate, openModal }) {
 
       {/* BOTTOM SECTION: today's network trends — the current hour updates live */}
       <div className="grid w-full gap-5 lg:grid-cols-3">
-        <TrendCard icon={Activity} iconClass="text-blue-500" title="Traffic Flow Trends" subtitle="Vehicles per hour across the cluster · today so far">
+        <TrendCard icon={Activity} iconClass="text-blue-500" title="Traffic Flow Trends" subtitle={real ? "Vehicles per hour across the cluster · last 24 h (Polars)" : "Vehicles per hour across the cluster · today so far"}>
           <AreaChart data={flowTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
@@ -454,35 +579,38 @@ export default function DashboardPage({ navigate, openModal }) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
             <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={hourTicks(4)} interval={0} dy={6} />
-            <YAxis domain={[0, 20000]} ticks={[0, 5000, 10000, 15000, 20000]} axisLine={false} tickLine={false} tick={chart.tick} width={42} tickFormatter={(v) => `${v / 1000}k`} label={{ value: "veh/h", angle: -90, position: "insideLeft", style: chart.axisLabel }} />
+            <YAxis domain={real ? [0, "auto"] : [0, 20000]} ticks={real ? undefined : [0, 5000, 10000, 15000, 20000]} axisLine={false} tickLine={false} tick={chart.tick} width={42} tickFormatter={(v) => (real ? v : `${v / 1000}k`)} label={{ value: "veh/h", angle: -90, position: "insideLeft", style: chart.axisLabel }} />
             <Tooltip cursor={chart.cursorLine} content={<ChartTooltip units={{ flow: "veh/h" }} />} />
-            <ReferenceLine x={nowTick} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "now", position: "top", style: chart.axisLabel }} />
+            <ReferenceLine x={trendNowTick} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "now", position: "top", style: chart.axisLabel }} />
             <Area type="monotone" dataKey="flow" name="Volume" stroke="#3b82f6" strokeWidth={2.5} fill="url(#colorFlow)" activeDot={{ r: 4 }} animationDuration={600} />
           </AreaChart>
         </TrendCard>
 
-        <TrendCard icon={MapIcon} iconClass="text-purple-500" title="Traffic Density Trends" subtitle="Road capacity utilisation (%) · today so far">
+        <TrendCard icon={MapIcon} iconClass="text-purple-500" title={real ? "Congestion Index Trends" : "Traffic Density Trends"} subtitle={real ? "BCI = 1 − v / 60 km/h (%) · last 24 h" : "Road capacity utilisation (%) · today so far"}>
           <BarChart data={densityTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
             <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={hourTicks(4)} interval={0} dy={6} />
             <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={chart.tick} width={42} tickFormatter={(v) => `${v}%`} />
             <Tooltip cursor={{ fill: chart.cursor }} content={<ChartTooltip units={{ density: "%" }} />} />
-            <ReferenceLine y={85} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "congested", position: "insideTopLeft", style: { ...chart.axisLabel, fill: "#ef4444" } }} />
-            <Bar dataKey="density" name="Capacity used" radius={[3, 3, 0, 0]} maxBarSize={14} animationDuration={600}>
+            <ReferenceLine y={real ? 70 : 85} stroke="#ef4444" strokeDasharray="4 4" label={{ value: real ? "severe" : "congested", position: "insideTopLeft", style: { ...chart.axisLabel, fill: "#ef4444" } }} />
+            <Bar dataKey="density" name={real ? "BCI" : "Capacity used"} radius={[3, 3, 0, 0]} maxBarSize={14} animationDuration={600}>
               {densityTrendsData.map((entry) => (
-                <Cell key={entry.hour} fill={entry.density >= 85 ? "#ef4444" : entry.density >= 70 ? "#f97316" : entry.density >= 50 ? "#eab308" : "#10b981"} />
+                <Cell
+                  key={entry.hour}
+                  fill={real ? bciColor(entry.density) : entry.density >= 85 ? "#ef4444" : entry.density >= 70 ? "#f97316" : entry.density >= 50 ? "#eab308" : "#10b981"}
+                />
               ))}
             </Bar>
           </BarChart>
         </TrendCard>
 
-        <TrendCard icon={AlertTriangle} iconClass="text-orange-500" title="Congestion Trends" subtitle="Average delay per trip (minutes) · today so far">
+        <TrendCard icon={AlertTriangle} iconClass="text-orange-500" title="Congestion Trends" subtitle={real ? "Average delay per leg vs free-flow (minutes) · last 24 h" : "Average delay per trip (minutes) · today so far"}>
           <LineChart data={congestionTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
             <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={hourTicks(4)} interval={0} dy={6} />
-            <YAxis domain={[0, 25]} ticks={[0, 5, 10, 15, 20, 25]} axisLine={false} tickLine={false} tick={chart.tick} width={42} label={{ value: "min", angle: -90, position: "insideLeft", style: chart.axisLabel }} />
+            <YAxis domain={real ? [0, "auto"] : [0, 25]} ticks={real ? undefined : [0, 5, 10, 15, 20, 25]} axisLine={false} tickLine={false} tick={chart.tick} width={42} label={{ value: "min", angle: -90, position: "insideLeft", style: chart.axisLabel }} />
             <Tooltip cursor={chart.cursorLine} content={<ChartTooltip units={{ delay: "min delay" }} />} />
-            <ReferenceLine x={nowTick} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "now", position: "top", style: chart.axisLabel }} />
+            <ReferenceLine x={trendNowTick} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "now", position: "top", style: chart.axisLabel }} />
             <Line type="monotone" dataKey="delay" name="Avg delay" stroke="#f97316" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} animationDuration={600} />
           </LineChart>
         </TrendCard>

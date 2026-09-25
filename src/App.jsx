@@ -7,6 +7,8 @@ import TrafficPage from "./pages/TrafficPage";
 import AlertsPage from "./pages/AlertsPage";
 import LoginPage from "./pages/LoginPage";
 import { X } from "lucide-react";
+import { AlertsProvider } from "./alerts/AlertsContext";
+import { ensureSession } from "./auth";
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -26,6 +28,11 @@ export default function App() {
   const closeModal = () => {
     setModal({ isOpen: false, title: "", content: "" });
   };
+
+  // Phase 6: sign in as the demo officer on load (no login wall); the JWT is injected into API calls
+  useEffect(() => {
+    ensureSession();
+  }, []);
 
   // Each page starts at the top (the homepage is a long scrolling page)
   useEffect(() => {
@@ -54,6 +61,7 @@ export default function App() {
   };
 
   return (
+    <AlertsProvider onOpenAlerts={() => navigate("alerts")}>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 text-gray-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* The homepage renders full-bleed (cinematic hero); other pages keep the centered container */}
       {/* keyed wrapper → a short fade/rise on every module change (no full-screen loader) */}
@@ -95,5 +103,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </AlertsProvider>
   );
 }
