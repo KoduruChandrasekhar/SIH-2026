@@ -643,6 +643,24 @@ export default function TrackingPage({ navigate, openModal, params }) {
     setPlaybackState(index === points.length - 1 ? "complete" : "paused");
   };
 
+  // Historical playback: drag anywhere along the stored trajectory (hop + fraction of the leg)
+  const scrubTo = (value) => {
+    cancelRun();
+    const last = points.length - 1;
+    const v = Math.max(0, Math.min(last, value));
+    const hopAt = Math.min(Math.floor(v), last);
+    const frac = hopAt === last ? 0 : v - hopAt;
+    const a = points[hopAt];
+    const b = points[Math.min(hopAt + 1, last)];
+    resumeFrom.current = { hop: hopAt, progress: frac };
+    setCurrentHopIndex(hopAt);
+    setSegmentProgress(frac);
+    setVehiclePosition([a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac]);
+    setActivePanel(null);
+    setTransition(null);
+    setPlaybackState(v >= last ? "complete" : "paused");
+  };
+
   const copyPlate = async () => {
     try {
       await navigator.clipboard.writeText(vehicle.plate);
@@ -1056,6 +1074,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
         isComplete={playbackState === "complete"}
         deviationSegs={deviationSegs}
         onSeek={seekToHop}
+        onScrub={scrubTo}
         onPlay={resumePlayback}
         onPause={pausePlayback}
         onRestart={() => trace(plate)}

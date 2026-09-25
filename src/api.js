@@ -314,3 +314,23 @@ export async function addToWatchlist(plate, reason, threatLevel = "HIGH") {
 export async function fetchDashboard() {
   return apiFetch("/api/dashboard");
 }
+
+// ─── Live CCTV (MediaMTX restream) ───────────────────────────────────────────
+
+/** GET /api/v1/streams → { streams: [{ camera_id, live, hls_url, rtsp_url, webrtc_url, origin }] } or null */
+export async function fetchStreams() {
+  return apiFetch("/api/v1/streams");
+}
+
+// ─── Admin console (camera_admin) ────────────────────────────────────────────
+
+export const fetchAdminUsers = () => apiFetch("/api/v1/admin/users");
+export const createAdminUser = (user) => apiSend("/api/v1/admin/users", "POST", user);
+export const updateAdminUser = (username, changes) => apiSend(`/api/v1/admin/users/${encodeURIComponent(username)}`, "PATCH", changes);
+export const fetchPermissionMatrix = () => apiFetch("/api/v1/admin/permissions");
+export const fetchAdminEvents = (limit = 20) => apiFetch(`/api/v1/admin/events?limit=${limit}`);
+export const fetchPipelineStatus = () => apiFetch("/api/v1/pipeline/status");
+export const fetchAnalyticsRuns = () => apiFetch("/api/v1/analytics/runs");
+export const refreshAnalytics = () => apiSend("/api/v1/analytics/refresh", "POST");
+/** Start / stop one camera's ingestion worker (camera_admin). */
+export const controlCamera = (cameraId, action) => apiSend(`/api/ingestion/cameras/${encodeURIComponent(cameraId)}/${action}`, "POST");

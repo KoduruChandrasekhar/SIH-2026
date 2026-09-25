@@ -96,32 +96,38 @@ def sightings_from_anpr_run(payload: dict[str, Any], reid: ReIDExtractor,
             index += 1
         cap.release()
 
-    out = []
-    for obs in observations:
-        status = obs.get("plate_status", "NOT_VISIBLE")
-        detected = status == "DETECTED"
-        out.append(Sighting(
-            sighting_id=obs["observation_id"],
-            camera_id=camera_id,
-            timestamp=parse_timestamp(obs["timestamp"]),
-            plate_text=(obs.get("plate") or "") if detected else "",
-            ocr_confidence=float(obs.get("ocr_confidence") or 0.0) if detected else 0.0,
-            appearance_embedding=embeddings.get(obs["observation_id"]),
-            vehicle_bbox=list(obs.get("vehicle_bbox") or []),
-            integrity_flag=FLAG_BY_STATUS.get(status, IntegrityFlag.NO_PLATE_DETECTED),
-            vehicle_class=obs.get("vehicle_class"),
-            first_seen=parse_timestamp(obs["first_seen"]) if obs.get("first_seen") else None,
-            last_seen=parse_timestamp(obs["last_seen"]) if obs.get("last_seen") else None,
-            source="phase2",
-            meta={"track_id": obs.get("track_id"), "plate_status": status, "status_reason": obs.get("status_reason"),
-                  "best_frame": obs.get("best_frame"), "consensus_text": obs.get("consensus_text"),
-                  "q_score": obs.get("q_score") or 0.0,
-                  # Phase 2 evidence URL (served by /api/anpr/evidence) — the plate crop for the timeline
-                  "crop_path": (f"/api/anpr/evidence/{camera_id}/{obs['best_crop_file']}"
-                                if obs.get("best_crop_file") else None),
-                  "reid": reid.name},
-        ))
-    return out
+    return [sighting_from_observation(obs, camera_id, embeddings.get(obs["observation_id"]), reid.name)
+            for obs in observations]
+
+
+def sighting_from_observation(obs: dict[str, Any], camera_id: str, embedding: Optional[np.ndarray] = None,
+                              reid_name: Optional[str] = None, source: str = "phase2") -> Sighting:
+    """One Phase 2 ANPR observation (dict form) → Phase 3 Sighting. Only DETECTED plates carry text."""
+    status = obs.get("plate_status", "NOT_VISIBLE")
+    detected = status == "DETECTED"
+    return Sighting(
+        sighting_id=obs["observation_id"],
+        camera_id=camera_id,
+        timestamp=parse_timestamp(obs["timestamp"]),
+        plate_text=(obs.get("plate") or "") if detected else "",
+        ocr_confidence=float(obs.get("ocr_confidence") or 0.0) if detected else 0.0,
+        appearance_embedding=embedding,
+        vehicle_bbox=list(obs.get("vehicle_bbox") or []),
+        integrity_flag=FLAG_BY_STATUS.get(status, IntegrityFlag.NO_PLATE_DETECTED),
+        vehicle_class=obs.get("vehicle_class"),
+        first_seen=parse_timestamp(obs["first_seen"]) if obs.get("first_seen") else None,
+        last_seen=parse_timestamp(obs["last_seen"]) if obs.get("last_seen") else None,
+        source=source,
+        meta={"track_id": obs.get("track_id"), "plate_status": status, "status_reason": obs.get("status_reason"),
+              "best_frame": obs.get("best_frame"), "consensus_text": obs.get("consensus_text"),
+              "q_score": obs.get("q_score") or 0.0,
+              # raw OCR text of a malformed read (INVALID_FORMAT alert evidence)
+              **({"raw_text": obs.get("raw_ocr") or obs.get("consensus_text")} if status == "INVALID_FORMAT" else {}),
+              # Phase 2 evidence URL (served by /api/anpr/evidence) — the plate crop for the timeline
+              "crop_path": (f"/api/anpr/evidence/{camera_id}/{obs['best_crop_file']}"
+                            if obs.get("best_crop_file") else None),
+              "reid": reid_name},
+    )
 
 
 def extract_sightings(reid: ReIDExtractor, cameras: Optional[Iterable[str]] = None,

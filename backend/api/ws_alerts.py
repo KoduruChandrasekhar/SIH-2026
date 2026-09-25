@@ -2,8 +2,11 @@
 TraceNet Phase 6 — live alerts: WebSocket feed, sighting ingest, watchlist.
 
     WS   /ws/alerts?token=<JWT>                law_enforcement · snapshot on connect, then live JSON alerts
-    POST /api/v1/ingest/sightings              camera_admin    · sightings → live fusion → alerts → broadcast
+    POST /api/v1/ingest/sightings              camera_admin    · sightings → RabbitMQ q.fusion → fusion worker
+                                                                 → alerts (Redis Pub/Sub) → broadcast;
+                                                                 direct in-process fusion when the broker is down
     POST /api/v1/ingest/reset                  camera_admin    · clear one source's fused rows + live state
+    GET  /api/v1/pipeline/status               camera_admin    · transport, queue depth, worker stats
     GET  /api/v1/alerts/live                   law_enforcement · recent alerts in the UI shape
     GET  /api/v1/watchlist                     law_enforcement
     POST /api/v1/watchlist                     law_enforcement · add / update (enforced on the next sighting)
@@ -27,6 +30,7 @@ from pydantic import BaseModel, Field
 from backend.alerts.bus import get_bus
 from backend.alerts.live_service import get_live_service, recent_alerts
 from backend.alerts.payloads import alert_message
+from backend.alerts.pipeline import PipelineUnavailable, get_pipeline
 
 from .auth import ROLE_CAMERA_ADMIN, ROLE_LAW_ENFORCEMENT, User, decode_token, require_roles
 from .db import current_url
@@ -49,22 +53,26 @@ class IngestBatch(BaseModel):
 
 
 @router.post("/api/v1/ingest/sightings")
-async def ingest_sightings(batch: IngestBatch, user: User = Depends(require_roles(ROLE_CAMERA_ADMIN))):
-    """Sightings (Phase 3 contract; embedding as base64 float32 or a base64 PNG/JPEG `vehicle_crop_b64`)."""
-    service = await asyncio.to_thread(_service)
-    bus = get_bus()
-    cameras = service.cameras()
-    results = []
-    for item in batch.sightings:
-        try:
-            result = await asyncio.to_thread(service.process, item)
-        except (KeyError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=f"Bad sighting {item.get('sighting_id')}: {exc}") from exc
-        for payload in result["alerts"]:
-            await bus.publish(alert_message(payload, cameras))
-        results.append(result)
-    return {"processed": len(results), "ingested_by": user.username, "results": results,
-            "alerts": sum(len(r["alerts"]) for r in results)}
+async def ingest_sightings(batch: IngestBatch, wait: bool = Query(True, description="wait for the fusion results"),
+                           user: User = Depends(require_roles(ROLE_CAMERA_ADMIN))):
+    """Sightings (Phase 3 contract; embedding as base64 float32 or a base64 PNG/JPEG `vehicle_crop_b64`).
+
+    Broker mode publishes to RabbitMQ q.fusion; `wait=false` returns 202-style `queued` immediately."""
+    pipeline = get_pipeline()
+    try:
+        results = await pipeline.submit(batch.sightings, wait=wait)
+    except PipelineUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:                            # broker dropped between startup and now
+        raise HTTPException(status_code=503, detail=f"Ingest pipeline error: {type(exc).__name__}: {exc}") from exc
+    if results is None:
+        return {"queued": len(batch.sightings), "ingested_by": user.username, "transport": pipeline.transport}
+    for item, result in zip(batch.sightings, results):
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status", 500),
+                                detail=f"Bad sighting {item.get('sighting_id')}: {result['error']}")
+    return {"processed": len(results), "ingested_by": user.username, "transport": pipeline.transport,
+            "results": results, "alerts": sum(len(r["alerts"]) for r in results)}
 
 
 class ResetRequest(BaseModel):
@@ -73,8 +81,18 @@ class ResetRequest(BaseModel):
 
 @router.post("/api/v1/ingest/reset")
 async def ingest_reset(body: ResetRequest, _: User = Depends(require_roles(ROLE_CAMERA_ADMIN))):
-    service = await asyncio.to_thread(_service)
-    return await asyncio.to_thread(service.reset, body.source)
+    try:
+        result = await get_pipeline().control("reset", source=body.source)
+    except PipelineUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if "error" in result:
+        raise HTTPException(status_code=result.get("status", 500), detail=result["error"])
+    return result
+
+
+@router.get("/api/v1/pipeline/status")
+async def pipeline_status(_: User = Depends(require_roles(ROLE_CAMERA_ADMIN))):
+    return await get_pipeline().status()
 
 
 # ─── alerts ──────────────────────────────────────────────────────────────────
@@ -116,6 +134,7 @@ async def watchlist(_: User = Depends(require_roles(ROLE_LAW_ENFORCEMENT))):
 async def watchlist_add(body: WatchlistEntry, user: User = Depends(require_roles(ROLE_LAW_ENFORCEMENT))):
     service = await asyncio.to_thread(_service)
     row = await asyncio.to_thread(service.watchlist.add, body.plate, body.threat_level, body.reason, user.username)
+    await _refresh_worker_watchlist()
     return {"added": _entry(row), "active_entries": len(service.watchlist.entries())}
 
 
@@ -124,7 +143,17 @@ async def watchlist_remove(plate: str, _: User = Depends(require_roles(ROLE_LAW_
     service = await asyncio.to_thread(_service)
     if not await asyncio.to_thread(service.watchlist.remove, plate):
         raise HTTPException(status_code=404, detail=f"{plate} is not on the watchlist")
+    await _refresh_worker_watchlist()
     return {"removed": plate.upper()}
+
+
+async def _refresh_worker_watchlist() -> None:
+    """The fusion worker may be another process: refresh its cache, ordered before the next sighting."""
+    if get_pipeline().transport == "broker":
+        try:
+            await get_pipeline().control("watchlist_refresh", timeout=10)
+        except Exception:
+            log.warning("watchlist refresh could not reach the fusion worker (its cache refreshes within 30 s)")
 
 
 # ─── WebSocket ───────────────────────────────────────────────────────────────

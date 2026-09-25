@@ -1,10 +1,29 @@
 import { Play, Pause, RotateCcw, Check } from "lucide-react";
 
+// "09:14:08" / "09:14" → seconds of day (null when the label is not a clock time)
+const clockSeconds = (t) => {
+  const m = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(t ?? ""));
+  return m ? +m[1] * 3600 + +m[2] * 60 + +(m[3] ?? 0) : null;
+};
+const fmtClock = (s) => [Math.floor(s / 3600) % 24, Math.floor(s / 60) % 60, Math.floor(s) % 60].map((v) => String(v).padStart(2, "0")).join(":");
+
+/** Wall-clock time at a fractional position along the journey (interpolated between hop times). */
+function timeAt(observations, pos) {
+  const i = Math.min(Math.floor(pos), observations.length - 1);
+  const a = clockSeconds(observations[i]?.time);
+  const b = clockSeconds(observations[Math.min(i + 1, observations.length - 1)]?.time);
+  if (a == null) return observations[i]?.time ?? "—";
+  if (b == null || b < a) return fmtClock(a);
+  return fmtClock(a + (b - a) * (pos - i));
+}
+
 /**
  * Journey timeline — one node per camera hop.
  * done: filled + check · active: highlighted ring · upcoming: hollow.
  * The fill follows the vehicle continuously (hop index + progress along the current leg);
  * legs listed in `deviationSegs` are tinted amber.
+ * Historical playback: the scrubber below the nodes moves the vehicle anywhere along the stored
+ * trajectory (hop index + fraction of the leg); Play resumes from there.
  */
 export default function JourneyTimeline({
   observations,
@@ -17,9 +36,12 @@ export default function JourneyTimeline({
   onPlay,
   onPause,
   onRestart,
+  onScrub,
 }) {
   const last = observations.length - 1;
   const progress = isComplete ? 1 : currentIndex < 0 ? 0 : Math.min(1, (currentIndex + segmentProgress) / Math.max(last, 1));
+  const position = isComplete ? last : currentIndex < 0 ? 0 : Math.min(last, currentIndex + segmentProgress);
+  const leg = Math.min(Math.floor(position), Math.max(last - 1, 0));
 
   return (
     <div className="fade-up delay-300 overflow-hidden rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,.04)] backdrop-blur-xl">
@@ -93,6 +115,29 @@ export default function JourneyTimeline({
           </ol>
         </div>
       </div>
+
+      {onScrub && last > 0 && (
+        <div className="mt-1 flex items-center gap-3 border-t border-gray-100 pt-3">
+          <span className="w-[4.5rem] shrink-0 text-[9px] font-extrabold uppercase tracking-widest text-gray-400">Playback</span>
+          <input
+            type="range"
+            min={0}
+            max={last}
+            step={0.01}
+            value={position}
+            onChange={(e) => onScrub(parseFloat(e.target.value))}
+            aria-label="Scrub through the recorded journey"
+            aria-valuetext={`${timeAt(observations, position)}, ${observations[leg].camera.replace(" #", "-")} towards ${observations[Math.min(leg + 1, last)].camera.replace(" #", "-")}`}
+            className="h-1.5 flex-1 cursor-pointer accent-blue-600"
+          />
+          <span className="shrink-0 text-right font-mono text-[10px] font-bold text-gray-600">
+            {timeAt(observations, position)}
+            <span className="ml-1.5 font-sans font-semibold text-gray-400">
+              {observations[leg].camera.replace(" #", "-")} → {observations[Math.min(leg + 1, last)].camera.replace(" #", "-")}
+            </span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

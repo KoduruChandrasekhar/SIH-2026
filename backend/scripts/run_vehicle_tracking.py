@@ -19,6 +19,15 @@ Phase 2 — add ANPR/OCR on the same tracks:
 
     python backend/scripts/run_vehicle_tracking.py --camera CAM-403 --anpr \
         --no-video --max-frames 300
+
+Live pipeline - publish every finished transit to RabbitMQ q.fusion (the fusion worker fuses it,
+raises alerts and writes PostGIS; timestamps follow the wall clock):
+
+    python backend/scripts/run_vehicle_tracking.py --camera CAM-401 --anpr --publish --no-video
+
+Live CCTV over RTSP (MediaMTX restream, auto-reconnect; Ctrl-C to stop):
+
+    python backend/scripts/run_vehicle_tracking.py --camera CAM-401 --rtsp --anpr --publish --duration 120
 """
 
 import argparse
@@ -88,8 +97,8 @@ def resolve_camera_video(camera_id: str) -> Path:
 # Phase 2 — ANPR
 # ---------------------------------------------------------
 
-def build_anpr_pipeline(args, camera_id: str, video_path: Path):
-    """ANPR pipeline for this camera, timed on the Phase 1 replay clock."""
+def build_anpr_pipeline(args, camera_id: str, video_path: Path, fps: float = None, video_name: str = None):
+    """ANPR pipeline for this camera, timed on the Phase 1 replay clock (or the wall clock)."""
 
     import cv2
 
@@ -113,9 +122,10 @@ def build_anpr_pipeline(args, camera_id: str, video_path: Path):
     except Exception:
         camera = None
 
-    cap = cv2.VideoCapture(str(video_path))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    cap.release()
+    if fps is None:
+        cap = cv2.VideoCapture(str(video_path))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        cap.release()
 
     if camera is not None:
         meta = {
@@ -130,6 +140,17 @@ def build_anpr_pipeline(args, camera_id: str, video_path: Path):
     else:
         meta = {"camera_id": camera_id}
         start = None
+    if getattr(args, "clock", None) == "live":
+        from datetime import datetime, timezone
+
+        start = datetime.now(timezone.utc)          # live feed: observation time = wall clock
+
+    sink = None
+    if getattr(args, "publish", False):
+        from backend.anpr.fusion_bridge import FusionPublisher
+
+        sink = FusionPublisher()
+        print(f"[TraceNet] publishing transits to RabbitMQ {sink.rt.queue} ({sink.rt.amqp_url.split('@')[-1]})")
 
     print("[TraceNet] Loading ANPR (plate detector + OCR)...")
     t0 = time.time()
@@ -140,8 +161,10 @@ def build_anpr_pipeline(args, camera_id: str, video_path: Path):
         config=config,
         camera_meta=meta,
         start_time=start,
-        video_name=video_path.name,
+        video_name=video_name or video_path.name,
+        observation_sink=sink,
     )
+    pipeline.fusion_publisher = sink
 
     print(
         f"[TraceNet] ANPR ready in {time.time() - t0:.1f}s | "
@@ -196,6 +219,104 @@ def print_anpr_report(payload: dict) -> None:
 # ---------------------------------------------------------
 # Main
 # ---------------------------------------------------------
+
+def run_rtsp(args) -> int:
+    """Live mode: RTSP stream -> ingestion worker (reconnects) -> YOLO + ByteTrack -> ANPR [-> q.fusion].
+
+    The ingestion thread keeps only the newest sampled frame: when detection is slower than the
+    stream, older frames are dropped instead of building up latency (live-camera behaviour)."""
+
+    import os
+    import threading
+
+    os.environ["TRACENET_INGEST_SOURCE"] = "rtsp"
+    from backend.ingestion.config import load_cameras
+    from backend.ingestion.worker import CameraWorker
+
+    camera_id = args.camera.upper()
+    try:
+        camera = load_cameras(only=[camera_id], include_disabled=True)[0]
+    except Exception as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        return 1
+
+    print()
+    print("=" * 65)
+    print("  TraceNet - live RTSP camera")
+    print("=" * 65)
+    print(f"  Camera   : {camera_id} ({camera.name})")
+    print(f"  Stream   : {camera.source}")
+    print(f"  Sampling : {camera.processing_fps} fps (newest frame wins)")
+    print(f"  ANPR     : {'on' if args.anpr else 'off'}   publish: {'q.fusion' if args.publish else 'off'}")
+    print("=" * 65)
+
+    tracker = VehicleTracker(model_path=args.model, confidence=args.confidence,
+                             output_dir=str(OUTPUT_DIR), public_dir=str(PUBLIC_CAMERA_DIR))
+
+    # load every model BEFORE the stream starts (PaddleOCR can take a minute on a cold start)
+    pipeline = None
+    if args.anpr:
+        import cv2
+
+        probe = cv2.VideoCapture(camera.source, cv2.CAP_FFMPEG)
+        fps = probe.get(cv2.CAP_PROP_FPS) if probe.isOpened() else 0
+        probe.release()
+        pipeline = build_anpr_pipeline(args, camera_id, Path(camera.source), fps=fps or 25.0, video_name=camera.source)
+
+    latest = {"packet": None}
+    ready = threading.Event()
+
+    def sink(packet):
+        latest["packet"] = packet
+        ready.set()
+
+    worker = CameraWorker(camera, sink=sink)
+    worker.start()
+
+    processed = 0
+    started = time.time()
+    last_report = started
+    try:
+        while True:
+            if args.duration and time.time() - started >= args.duration:
+                break
+            if args.max_frames and processed >= args.max_frames:
+                break
+            if not ready.wait(1.0):
+                if not worker.is_alive():
+                    print("[ERROR] ingestion stopped:", worker.snapshot().error, file=sys.stderr)
+                    break
+                continue
+            ready.clear()
+            packet = latest["packet"]
+            detections = tracker.track_frame(packet.frame)
+            if pipeline is not None:
+                pipeline.process_packet(packet, detections)
+            processed += 1
+            if time.time() - last_report >= 10:
+                last_report = time.time()
+                snap = worker.snapshot()
+                pub = pipeline.fusion_publisher.stats() if pipeline and pipeline.fusion_publisher else None
+                print(f"  [{time.strftime('%H:%M:%S')}] state={snap.state.value} received={snap.frames_processed} "
+                      f"analysed={processed} reconnects={snap.reconnects} "
+                      f"transits={len(pipeline.observations) if pipeline else '-'}"
+                      + (f" published={pub['published']} pending={pub['pending']}" if pub else ""))
+    except KeyboardInterrupt:
+        print("\n  stopping...")
+    finally:
+        worker.stop()
+        worker.join(10)
+
+    snap = worker.snapshot()
+    print(f"  stream: {snap.frames_processed} frames received, {processed} analysed, {snap.reconnects} reconnect(s)")
+    if pipeline is not None:
+        anpr = pipeline.finish()
+        print_anpr_report(anpr)
+        if pipeline.fusion_publisher is not None:
+            pipeline.fusion_publisher.close()
+            print(f"  Published to q.fusion   : {pipeline.fusion_publisher.stats()}")
+    return 0
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -270,6 +391,32 @@ def main():
     )
 
     parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Publish each finished transit to RabbitMQ q.fusion (live fusion + alerts)",
+    )
+
+    parser.add_argument(
+        "--clock",
+        choices=["replay", "live"],
+        default=None,
+        help="Observation timestamps: camera replay clock, or wall clock (default: live with --publish)",
+    )
+
+    parser.add_argument(
+        "--rtsp",
+        action="store_true",
+        help="Read the camera's live RTSP stream (TRACENET_RTSP_BASE, default rtsp://localhost:8554/<CAM>)",
+    )
+
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=0,
+        help="--rtsp: stop after this many seconds (default: until Ctrl-C)",
+    )
+
+    parser.add_argument(
         "--plate-model",
         type=str,
         default=None,
@@ -277,6 +424,14 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.publish and not args.anpr:
+        parser.error("--publish needs --anpr")
+    if args.rtsp and not args.camera:
+        parser.error("--rtsp needs --camera")
+    if args.clock is None:
+        args.clock = "live" if (args.publish or args.rtsp) else "replay"
+    if args.rtsp:
+        return run_rtsp(args)
 
     # -----------------------------------------------------
     # Resolve input
@@ -411,6 +566,9 @@ def main():
     if pipeline is not None:
         anpr = pipeline.finish()
         print_anpr_report(anpr)
+        if pipeline.fusion_publisher is not None:
+            pipeline.fusion_publisher.close()
+            print(f"  Published to q.fusion   : {pipeline.fusion_publisher.stats()}")
 
     # -----------------------------------------------------
     # Final result

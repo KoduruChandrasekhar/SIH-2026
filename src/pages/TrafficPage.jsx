@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import Navbar from "../components/Navbar";
+import HeatLayer from "../components/HeatLayer";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
 import { BCI_COLOR, bciStatus, fetchMacroAnalytics, fetchTrafficCorridors, fetchTrafficOD } from "../api";
 import { SNAPSHOT_TIME, cameraById, corridorsFeed, hourlyTraffic, trafficSummary } from "../data";
@@ -125,6 +126,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
   const [baseCorridors, setCorridors] = useState(localCorridors);
   const [odRoutes, setOdRoutes] = useState(localOdRoutes);
   const [macro, setMacro] = useState(null); // Phase 5 Polars analytics (null → local demo data)
+  const [heatMetric, setHeatMetric] = useState("congestion"); // heat layer weight: congestion (BCI) | volume
   const realLoaded = useRef(false); // once real analytics arrive, legacy mock responses must not overwrite them
   // A corridor can be preselected from another module (e.g. Alerts → View Flow)
   const [selectedId, setSelectedId] = useState(() => params?.corridor ?? localCorridors[0].id);
@@ -181,6 +183,13 @@ export default function TrafficPage({ navigate, openModal, params }) {
       }),
     [baseCorridors, sim.corridors]
   );
+  // Heat layer: one weighted point per ANPR junction from the Polars analytics (BCI, or 24 h volume)
+  const heatPoints = useMemo(() => {
+    const maxVolume = Math.max(1, ...corridors.map((c) => c.volume24h ?? 0));
+    return corridors
+      .filter((c) => c.real && c.lat != null)
+      .map((c) => [c.lat, c.lng, heatMetric === "volume" ? (c.volume24h ?? 0) / maxVolume : Math.max(0.05, c.bci ?? 0)]);
+  }, [corridors, heatMetric]);
   const selectedCorridor = corridors.find((c) => c.id === selectedId) ?? corridors[0];
   const selectedRoute = (selectedCorridor.cameras ?? []).map((id) => cameraById[id]).filter(Boolean).map((c) => [c.lat, c.lng]);
 
@@ -325,10 +334,27 @@ export default function TrafficPage({ navigate, openModal, params }) {
                   Live Density Heatmap
                 </h3>
               </div>
+              <div className="flex items-center gap-2">
+              {real && (
+                <div role="group" aria-label="Heatmap metric" className="flex rounded-full bg-gray-100 p-0.5 text-[9px] font-bold">
+                  {[["congestion", "Congestion"], ["volume", "Volume"]].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setHeatMetric(key)}
+                      aria-pressed={heatMetric === key}
+                      className={`rounded-full px-2 py-0.5 transition-colors ${heatMetric === key ? "bg-white text-orange-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <span ref={syncRef} className="flex items-center gap-1.5 rounded-full bg-orange-100 px-2 py-0.5 text-[9px] font-bold text-orange-600" data-tip={real ? `Polars analytics · sources: ${Object.entries(macro.summary.data_sources ?? {}).map(([k, v]) => `${k} ${v}`).join(", ")}` : "Corridor readings re-sync every 5 s"} data-tip-pos="bottom">
                 <span className="tn-pulse tn-pulse--orange h-1.5 w-1.5 rounded-full bg-orange-500" aria-hidden="true" />
                 <Zap size={10} /> {real ? `Polars · ${hhmm(macro.summary.computed_at)} IST` : "Auto-Sync Active"}
               </span>
+              </div>
             </div>
 
             <div className="relative flex-1 w-full rounded-[20px] overflow-hidden border border-gray-200/60 shadow-inner z-10">
@@ -344,6 +370,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                {real && <HeatLayer points={heatPoints} />}
                 <FocusCorridor corridor={{ ...selectedCorridor, fromParams }} route={selectedRoute} />
                 {selectedRoute.length > 1 && (
                   <>
@@ -359,7 +386,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
                     pathOptions={{
                       color: corridor.id === selectedCorridor.id ? "#fff" : corridor.color,
                       fillColor: corridor.color,
-                      fillOpacity: corridor.id === selectedCorridor.id ? 0.5 : 0.3,
+                      // real analytics: the heat layer carries the colour; circles stay as clickable outlines
+                      fillOpacity: real ? (corridor.id === selectedCorridor.id ? 0.14 : 0.04) : corridor.id === selectedCorridor.id ? 0.5 : 0.3,
                       weight: corridor.id === selectedCorridor.id ? 2.5 : 1.5,
                     }}
                     eventHandlers={{

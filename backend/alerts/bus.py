@@ -6,9 +6,9 @@ TraceNet Phase 6 — alert message bus + WebSocket connection manager.
                                                              ▼
                                                every connected /ws/alerts socket
 
-Same process: the asyncio.Queue carries alerts directly. Separate processes (e.g. a Phase 3
-fusion worker): when Redis is reachable, publish() goes through Redis Pub/Sub channel
-`tracenet.alerts` and a subscriber task feeds the queue, so every API instance broadcasts it.
+Same process: the asyncio.Queue carries alerts directly. Separate processes (the fusion worker):
+when Redis is reachable, publish() goes through Redis Pub/Sub channel `tracenet.alerts`
+(`<namespace>.alerts`) and a subscriber task feeds the queue, so every API instance broadcasts it.
 Other processes can call `publish_sync()` (Redis only).
 """
 
@@ -49,8 +49,9 @@ class ConnectionManager:
 
 
 class AlertBus:
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self, redis_url: Optional[str] = None, channel: str = REDIS_CHANNEL):
         self.redis_url = redis_url
+        self.channel = channel
         self.queue: Optional[asyncio.Queue] = None
         self.manager = ConnectionManager()
         self.backend = "memory"
@@ -94,19 +95,33 @@ class AlertBus:
     async def publish(self, message: dict[str, Any]) -> None:
         self.published += 1
         if self._redis is not None:
-            await self._redis.publish(REDIS_CHANNEL, json.dumps(message, default=str))
-        elif self.queue is not None:
+            try:
+                await self._redis.publish(self.channel, json.dumps(message, default=str))
+                return
+            except Exception as exc:                # Redis restarting: deliver locally rather than drop
+                log.warning("alert bus: Redis publish failed (%s) - delivering in-process", type(exc).__name__)
+        if self.queue is not None:
             try:
                 self.queue.put_nowait(message)
             except asyncio.QueueFull:
                 log.warning("alert queue full — dropping %s", message.get("alert_id"))
 
     async def _redis_subscriber(self) -> None:
-        pubsub = self._redis.pubsub()
-        await pubsub.subscribe(REDIS_CHANNEL)
-        async for item in pubsub.listen():
-            if item.get("type") == "message":
-                await self.queue.put(json.loads(item["data"]))
+        backoff = 1.0
+        while True:                                 # resubscribe after a Redis restart
+            try:
+                pubsub = self._redis.pubsub()
+                await pubsub.subscribe(self.channel)
+                backoff = 1.0
+                async for item in pubsub.listen():
+                    if item.get("type") == "message":
+                        await self.queue.put(json.loads(item["data"]))
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                log.warning("alert bus: Redis subscription lost (%s) - retrying in %.0f s", type(exc).__name__, backoff)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30.0)
 
     async def _broadcaster(self) -> None:
         while True:
@@ -117,12 +132,12 @@ class AlertBus:
                 log.exception("broadcast failed")
 
 
-def publish_sync(message: dict[str, Any], redis_url: str) -> bool:
+def publish_sync(message: dict[str, Any], redis_url: str, channel: str = REDIS_CHANNEL) -> bool:
     """For other processes: publish an alert to every API instance via Redis. False if unavailable."""
     try:
         import redis
 
-        redis.Redis.from_url(redis_url, socket_connect_timeout=0.5).publish(REDIS_CHANNEL, json.dumps(message, default=str))
+        redis.Redis.from_url(redis_url, socket_connect_timeout=0.5).publish(channel, json.dumps(message, default=str))
         return True
     except Exception:
         return False
@@ -134,7 +149,8 @@ _bus: Optional[AlertBus] = None
 def get_bus() -> AlertBus:
     global _bus
     if _bus is None:
-        from backend.fusion.config import load_fusion_config
+        from backend.fusion.runtime import runtime
 
-        _bus = AlertBus(load_fusion_config().redis_url)
+        rt = runtime()
+        _bus = AlertBus(rt.redis_url, rt.alert_channel)
     return _bus

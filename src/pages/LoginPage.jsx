@@ -27,7 +27,7 @@ export default function LoginPage({ navigate }) {
       const session = await login(username, password);
       const expected = role === "police" ? "law_enforcement" : "camera_admin";
       if (session.role !== expected) setError(`Signed in as ${session.role.replace("_", " ")}.`);
-      navigate("dashboard");
+      navigate(session.role === "camera_admin" ? "admin" : "dashboard");
     } catch (err) {
       setError(err.message);
     } finally {

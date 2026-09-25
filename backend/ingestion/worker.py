@@ -92,6 +92,42 @@ class CameraWorker(threading.Thread):
         now = datetime.now(timezone.utc)
         return now, max(0.0, time.monotonic() - self._t0)
 
+    # ── live reconnection ─────────────────────────────────────────────
+
+    def _live_reconnects(self) -> bool:
+        return self.camera.source_type is SourceType.RTSP and self.camera.reconnect
+
+    def _reconnect(self) -> bool:
+        """Re-open a dropped live stream with exponential backoff (1 s up to reconnect_max_backoff).
+        True once the stream is open again; False when stopped or out of attempts."""
+        cam = self.camera
+        if self._source is not None:
+            self._source.close()
+            self._source = None
+        self._set(state=CameraState.RECONNECTING)
+        delay, attempt = 1.0, 0
+        while not self._stop.is_set():
+            attempt += 1
+            if cam.max_reconnect_attempts and attempt > cam.max_reconnect_attempts:
+                return False
+            log.warning("camera reconnecting camera=%s attempt=%s", cam.camera_id, attempt)
+            try:
+                source = create_source(cam)
+                source.open()
+                self._source = source
+                with self._lock:
+                    self.status.reconnects += 1
+                    self.status.state = CameraState.ONLINE
+                    self.status.error = None
+                log.info("camera reconnected camera=%s after %s attempt(s)", cam.camera_id, attempt)
+                return True
+            except Exception as exc:
+                self._set(error=f"reconnect {attempt}: {exc}")
+            if self._stop.wait(delay):
+                return False
+            delay = min(delay * 2, cam.reconnect_max_backoff)
+        return False
+
     # ── main loop ─────────────────────────────────────────────────────
     def run(self) -> None:  # noqa: C901 - explicit state machine is clearer inline
         cam = self.camera
@@ -108,10 +144,16 @@ class CameraWorker(threading.Thread):
             self._source = create_source(cam)
             self._source.open()
         except SourceError as exc:
-            self._set(state=CameraState.ERROR, error=str(exc),
-                      stopped_at=datetime.now(timezone.utc).isoformat())
-            log.error("source failed camera=%s error=%s", cam.camera_id, exc)
-            return
+            if not self._live_reconnects():
+                self._set(state=CameraState.ERROR, error=str(exc),
+                          stopped_at=datetime.now(timezone.utc).isoformat())
+                log.error("source failed camera=%s error=%s", cam.camera_id, exc)
+                return
+            # a live camera that is down at start-up: keep trying (it may come back)
+            self._set(error=str(exc))
+            if not self._reconnect():
+                self._set(state=CameraState.OFFLINE, stopped_at=datetime.now(timezone.utc).isoformat())
+                return
         except Exception as exc:  # unexpected: still contained to this camera
             self._set(state=CameraState.ERROR, error=f"{type(exc).__name__}: {exc}",
                       stopped_at=datetime.now(timezone.utc).isoformat())
@@ -196,8 +238,12 @@ class CameraWorker(threading.Thread):
                     with self._lock:
                         self.status.read_errors += 1
                     if consecutive_errors >= cam.max_consecutive_read_errors:
-                        self._set(state=CameraState.OFFLINE,
-                                  error=f"no frames after {consecutive_errors} read attempts")
+                        self._set(error=f"no frames after {consecutive_errors} read attempts")
+                        if self._live_reconnects() and self._reconnect():
+                            consecutive_errors = 0
+                            next_emit = time.monotonic()
+                            continue
+                        self._set(state=CameraState.OFFLINE)
                         log.error("camera offline camera=%s consecutive_errors=%s",
                                   cam.camera_id, consecutive_errors)
                         break

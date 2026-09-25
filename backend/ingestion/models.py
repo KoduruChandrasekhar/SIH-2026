@@ -33,6 +33,7 @@ class CameraState(str, Enum):
     STARTING = "STARTING"    # opening the source
     ONLINE = "ONLINE"        # frames arriving normally
     DEGRADED = "DEGRADED"    # frames still arriving but reads are failing/stalling
+    RECONNECTING = "RECONNECTING"  # live stream lost; re-opening it with backoff
     COMPLETED = "COMPLETED"  # recorded source reached end of stream
     ERROR = "ERROR"          # source could not be opened/read
     OFFLINE = "OFFLINE"      # stopped, or gave up after repeated failures
@@ -61,6 +62,9 @@ class CameraConfig:
     realtime: bool = True            # pace replay to wall-clock
     loop: bool = False               # restart recorded sources at EOF
     max_consecutive_read_errors: int = 15
+    reconnect: bool = True           # live (rtsp) sources: re-open a dropped stream instead of stopping
+    reconnect_max_backoff: float = 30.0   # seconds between attempts, doubling from 1 s
+    max_reconnect_attempts: int = 0  # 0 = keep trying until stopped
     replay_start_time: str = "2026-09-19T18:45:00+05:30"
     source_note: Optional[str] = None
 
@@ -169,6 +173,7 @@ class CameraStatus:
     stopped_at: Optional[str] = None
     error: Optional[str] = None
     loops_completed: int = 0
+    reconnects: int = 0              # successful re-opens of a dropped live stream
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

@@ -82,6 +82,12 @@ backend/output/anpr/
 # Phase 3 fusion store, sighting dumps and scenario DB (regenerated)
 backend/output/fusion/
 
+# Synthetic multi-camera dataset + evaluation (backend/scripts/generate_dataset.py / evaluate_dataset.py)
+backend/output/dataset/
+
+# MediaMTX stream files (backend/scripts/prepare_streams.py)
+backend/output/streams/
+
 # Keep the output directory itself
 !backend/output/.gitkeep
 

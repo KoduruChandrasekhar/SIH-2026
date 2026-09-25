@@ -1,7 +1,7 @@
 """
 TraceNet Phase 6 — live fusion service inside the API process.
 
-    POST /api/v1/ingest/sightings ──► LiveFusionService.process(sighting)
+    FusionWorker (q.fusion) / direct ingest ──► LiveFusionService.process(sighting)
         ├─ appearance embedding (sent as a vector, or computed here from a PNG/JPEG vehicle crop)
         ├─ Phase 3 FusionEngine (Redis / in-memory state) → Phase 4 PostGIS writer
         ├─ CLONED_PLATE   ← FusionEngine kinematic anomaly (> 150 km/h)
@@ -32,6 +32,7 @@ from backend.fusion.postgres_writer import PostgresTrajectoryWriter
 from backend.fusion.redis_state import create_state
 from backend.fusion.reid_matcher import create_reid_extractor
 from backend.fusion.road_network import RoadNetwork
+from backend.fusion.runtime import runtime
 
 from .payloads import blacklist_alert, invalid_format_alert
 from .watchlist import WatchlistCache
@@ -54,7 +55,8 @@ class LiveFusionService:
         self.processed = 0
 
     def _new_engine(self) -> None:
-        self.state = create_state(self.cfg.redis_url, self.cfg.active_window_seconds, prefix="tracenet-live")
+        rt = runtime()
+        self.state = create_state(rt.redis_url, self.cfg.active_window_seconds, prefix=rt.live_prefix)
         self.engine = FusionEngine(self.cfg, self.state, self.road, self.writer, source="phase2")
 
     def cameras(self) -> dict[str, dict[str, Any]]:

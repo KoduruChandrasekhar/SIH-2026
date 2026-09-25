@@ -151,9 +151,10 @@ class RtspFrameSource(FrameSource):
     uses the FFmpeg backend so recorded-only environments still work.
     """
 
-    def __init__(self, camera: CameraConfig, latency_ms: int = 200):
+    def __init__(self, camera: CameraConfig, latency_ms: int = 200, timeout_ms: int = 5000):
         super().__init__(camera)
         self.latency_ms = latency_ms
+        self.timeout_ms = timeout_ms
         self.backend: str = "ffmpeg"
 
     def _gst_pipeline(self) -> str:
@@ -179,7 +180,13 @@ class RtspFrameSource(FrameSource):
                 capture = None
 
         if capture is None:
-            capture = cv2.VideoCapture(self.camera.source, cv2.CAP_FFMPEG)
+            # 5 s open/read timeouts (FFmpeg's default is 30 s): a dead stream is detected quickly
+            # and the worker's reconnect loop takes over
+            params = [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, self.timeout_ms, cv2.CAP_PROP_READ_TIMEOUT_MSEC, self.timeout_ms]
+            try:
+                capture = cv2.VideoCapture(self.camera.source, cv2.CAP_FFMPEG, params)
+            except (TypeError, cv2.error):              # OpenCV < 4.6: no open parameters
+                capture = cv2.VideoCapture(self.camera.source, cv2.CAP_FFMPEG)
             self.backend = "ffmpeg"
 
         if not capture.isOpened():

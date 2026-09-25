@@ -34,7 +34,9 @@ adbc-driver-postgresql>=1.0
 pyjwt>=2.8
 websockets>=12
 
+# Live pipeline: redis / pika above; MediaMTX runs in docker-compose (no Python dependency)
+
 # Phase 1 tests (dev only)
 pytest>=8.0.0
-httpx>=0.27.0  # fastapi TestClient
+httpx>=0.27.0  # fastapi TestClient + the /api/v1/streams MediaMTX probe
 fakeredis>=2.20  # Phase 3 Redis-state tests

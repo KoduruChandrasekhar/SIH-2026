@@ -6,6 +6,7 @@ import TrackingPage from "./pages/TrackingPage";
 import TrafficPage from "./pages/TrafficPage";
 import AlertsPage from "./pages/AlertsPage";
 import LoginPage from "./pages/LoginPage";
+import AdminPage from "./pages/AdminPage";
 import { X } from "lucide-react";
 import { AlertsProvider } from "./alerts/AlertsContext";
 import { ensureSession } from "./auth";
@@ -52,6 +53,8 @@ export default function App() {
         return <TrafficPage navigate={navigate} openModal={openModal} params={params} />;
       case "alerts":
         return <AlertsPage navigate={navigate} openModal={openModal} params={params} />;
+      case "admin":
+        return <AdminPage navigate={navigate} openModal={openModal} params={params} />;
       case "login":
         return <LoginPage navigate={navigate} openModal={openModal} params={params} />;
       case "home":

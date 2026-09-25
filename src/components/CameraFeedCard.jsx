@@ -4,6 +4,7 @@ import { Camera, VideoOff, X } from "lucide-react";
 import { OCR_ACCURACY_TARGET } from "../data";
 import { formatAge } from "../sim/liveSim";
 import { AnimatedNumber } from "./motion/Motion";
+import { attachHls, useLiveStream } from "../streams";
 
 const TRACK_DATA = [
   { tracks: ["TRACK-017", "TRACK-024"] },
@@ -66,6 +67,11 @@ export default function CameraFeedCard({
   const videoSrc =
     camera.videoFeed || `/camera-feeds/${camId}.mp4`;
 
+  // Live CCTV: MediaMTX RTSP restream over HLS when available, else the recorded MP4
+  const stream = useLiveStream(camId);
+  const [liveFailed, setLiveFailed] = useState(false);
+  const useLive = Boolean(stream) && !liveFailed;
+
   // Real YOLO11 + ByteTrack annotated video
   const modalVideoSrc =
     `/camera-feeds/${camId}_annotated.mp4`;
@@ -78,7 +84,26 @@ export default function CameraFeedCard({
   useEffect(() => {
     const video = videoRef.current;
 
-    if (!video) return;
+    if (!video || !useLive || !showVideo) return;
+
+    let cleanup = () => {};
+    let cancelled = false;
+    setBuffering(true);
+    attachHls(video, stream.hls_url, () => setLiveFailed(true)).then((detach) => {
+      if (cancelled) return detach();
+      cleanup = detach;
+      video.play().catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [useLive, showVideo, stream?.hls_url]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video || useLive) return;
 
     if (showVideo) {
       video.play().catch((err) => {
@@ -93,7 +118,7 @@ export default function CameraFeedCard({
         video.currentTime = 0;
       }
     }
-  }, [showVideo, alwaysPlay]);
+  }, [showVideo, alwaysPlay, useLive]);
 
   const handleVideoError = useCallback(() => {
     setVideoFailed(true);
@@ -218,8 +243,9 @@ export default function CameraFeedCard({
               {/* Camera video */}
               {!videoFailed && (
                 <video
+                  key={useLive ? "live" : "replay"}
                   ref={videoRef}
-                  src={videoSrc}
+                  src={useLive ? undefined : videoSrc}
                   poster={posterFor(videoSrc)}
                   muted
                   loop
@@ -263,10 +289,12 @@ export default function CameraFeedCard({
                     {camId}
                   </span>
 
-                  <span className="cam-overlay-live-label rounded px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-widest">
+                  <span className="cam-overlay-live-label rounded px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-widest" title={useLive ? `${stream.rtsp_url} — ${stream.origin}` : undefined}>
                     {status === "degraded"
                       ? "DEGRADED"
-                      : "LIVE"}
+                      : useLive
+                        ? "LIVE · RTSP"
+                        : "LIVE"}
                   </span>
                 </div>
 
@@ -278,6 +306,8 @@ export default function CameraFeedCard({
                   </span>
                 </div>
 
+                {/* Illustrative overlay for the recorded preview only — never drawn over the live stream */}
+                {!useLive && (<>
                 {/* Vehicle 1 */}
                 <div
                   className="cam-bbox cam-bbox-vehicle absolute"
@@ -347,6 +377,7 @@ export default function CameraFeedCard({
                       : ""}
                   </span>
                 </div>
+                </>)}
 
                 {/* FPS */}
                 <div className="absolute bottom-2 right-2">

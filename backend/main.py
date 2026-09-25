@@ -62,7 +62,18 @@ async def lifespan(_app: FastAPI):
         await bus.start()
     except Exception:
         logging.getLogger("tracenet.api").exception("alert bus failed to start")
+    pipeline = None
+    try:
+        from backend.alerts.pipeline import get_pipeline, reset_pipeline
+
+        reset_pipeline()                    # transport is decided per startup (RabbitMQ/Redis up or not)
+        pipeline = get_pipeline()
+        await pipeline.start()
+    except Exception:
+        logging.getLogger("tracenet.api").exception("ingest pipeline failed to start")
     yield
+    if pipeline is not None:
+        await pipeline.stop()
     if bus is not None:
         await bus.stop()
     if scheduler is not None:
@@ -358,6 +369,18 @@ app.include_router(analytics_router)
 from backend.api.ws_alerts import router as alerts_router
 
 app.include_router(alerts_router)
+
+# ─────────────────────────────────────────────────────────────
+# Live CCTV: MediaMTX restream directory (RTSP / HLS / WebRTC URLs)
+# ─────────────────────────────────────────────────────────────
+from backend.api.streams import router as streams_router  # noqa: E402
+
+app.include_router(streams_router)
+
+# Admin console: user & role management, permission matrix, admin event log (camera_admin)
+from backend.api.users import router as users_router  # noqa: E402
+
+app.include_router(users_router)
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────

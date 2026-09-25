@@ -206,6 +206,12 @@ class FusionEngine:
             m.reject_reason = "kinematically_infeasible"
         elif s_confident and c_confident and text_sim < cfg.plate_link_min_text_similarity:
             m.reject_reason = "plate_mismatch"
+        elif (s_confident and v.get("canonical_plate")
+              and text_similarity(s.plate_text, v["canonical_plate"]) < cfg.plate_link_min_text_similarity):
+            # the vehicle's plate is already established by a confident read: a different confident plate
+            # is a different vehicle, even when its LAST sighting was plate-less (ghost weights would
+            # otherwise let appearance alone link two look-alike vehicles)
+            m.reject_reason = "canonical_plate_mismatch"
         elif ghost and visual_sim < cfg.ghost_min_visual_similarity:
             m.reject_reason = "weak_appearance"
         elif ghost and v["last_camera_id"] == s.camera_id and start - c_end > cfg.ghost_same_camera_max_gap_seconds:

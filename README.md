@@ -917,3 +917,22 @@ python -m pytest backend/tests/test_phase6_realtime.py -v
 ```
 
 **Full documentation: [docs/PHASE6_REALTIME.md](docs/PHASE6_REALTIME.md)**
+
+---
+
+# 🧩 Prototype completion — broker pipeline, live CCTV, dataset, admin console
+
+* **Broker pipeline:** Redis + RabbitMQ run by default. Ingest publishes to `q.fusion` (single active consumer, dead-letter queue), and the fusion worker (embedded, or `python -m backend.fusion.worker`) fuses, raises alerts over Redis Pub/Sub and returns results through Redis. `run_vehicle_tracking.py --anpr --publish` feeds real ANPR transits into the same queue.
+* **Live CCTV:** MediaMTX restreams every camera over RTSP / HLS / WebRTC. Ingestion reads RTSP with auto-reconnect (`TRACENET_INGEST_SOURCE=rtsp`, or `run_vehicle_tracking.py --rtsp`), and the Cameras page plays the live HLS stream.
+* **Frontend:** a Leaflet heat layer from Polars analytics (Congestion / Volume), a playback scrubber on Tracking, and an Admin console (users & roles, camera control, pipeline health, live permission matrix) for `camera_admin`.
+* **Synthetic dataset:** `generate_dataset.py` renders a 6-camera dataset with exact ground truth (ghost, clone, blacklist and tampered scenarios). `evaluate_dataset.py [--e2e]` scores fusion, and optionally YOLO + ANPR, against it.
+
+```bash
+docker compose up -d
+python backend/scripts/prepare_streams.py && docker compose up -d mediamtx
+python -m uvicorn backend.main:app --port 8000
+npm run dev
+python backend/scripts/generate_dataset.py && python backend/scripts/evaluate_dataset.py
+```
+
+**Status, results and setup notes for the GPU / weights items: [docs/COMPLETION_PLAN.md](docs/COMPLETION_PLAN.md)**

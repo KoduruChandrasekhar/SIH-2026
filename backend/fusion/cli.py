@@ -3,8 +3,8 @@ TraceNet Phase 3 — fusion worker / demo CLI.
 
     python -m backend.fusion.cli --scenarios              # 4 golden scenarios (simulated input)
     python -m backend.fusion.cli --demo                   # replay the real Phase 2 sightings (direct mode)
-    python -m backend.fusion.cli --demo --mode broker     # publish to RabbitMQ tracenet.events, consume q.fusion
-    python -m backend.fusion.cli --worker                 # long-running q.fusion consumer
+    python -m backend.fusion.cli --demo --mode broker     # replay through RabbitMQ (private queue q.fusion.replay)
+    python -m backend.fusion.cli --worker                 # the live q.fusion consumer (= python -m backend.fusion.worker)
     python -m backend.fusion.cli --extract                # (re)build sighting dumps from Phase 2 runs
 
 Redis and RabbitMQ are used when reachable; otherwise the in-memory state and direct
@@ -124,10 +124,12 @@ def run_demo(args, cfg) -> int:
     transport = "direct"
     if args.mode == "broker":
         if broker_available(cfg.amqp_url):
-            n = publish_sightings(sightings, cfg.amqp_url, cfg.amqp_exchange, cfg.amqp_queue)
-            print(f"[fusion] published {n} sightings to {cfg.amqp_exchange}")
-            consumed = consume_sightings(engine.process, cfg.amqp_url, cfg.amqp_exchange, cfg.amqp_queue)
-            print(f"[fusion] consumed {consumed} sightings from {cfg.amqp_queue}")
+            # a private exchange/queue: the live q.fusion belongs to the API's fusion worker
+            exchange, queue = f"{cfg.amqp_exchange}.replay", f"{cfg.amqp_queue}.replay"
+            n = publish_sightings(sightings, cfg.amqp_url, exchange, queue)
+            print(f"[fusion] published {n} sightings to {exchange}")
+            consumed = consume_sightings(engine.process, cfg.amqp_url, exchange, queue)
+            print(f"[fusion] consumed {consumed} sightings from {queue}")
             transport = "broker"
         else:
             print("[fusion] RabbitMQ not reachable - falling back to direct pipeline mode")
@@ -163,21 +165,10 @@ def run_demo(args, cfg) -> int:
 
 
 def run_worker(cfg, args) -> int:
-    if not broker_available(cfg.amqp_url):
-        print("[fusion] RabbitMQ not reachable at", cfg.amqp_url.split("@")[-1],
-              "— start RabbitMQ, or use --demo (direct mode).")
-        return 2
-    state = create_state(cfg.redis_url, cfg.active_window_seconds, cfg.redis_prefix, use_redis=not args.no_redis)
-    store = open_store(args.store or "auto")
-    engine = FusionEngine(cfg, state, RoadNetwork(), store, source="phase2")
-    print(f"[fusion] worker consuming {cfg.amqp_queue} (state: {state.backend}); Ctrl-C to stop")
-    try:
-        while True:
-            consume_sightings(engine.process, cfg.amqp_url, cfg.amqp_exchange, cfg.amqp_queue, idle_timeout=30)
-    except KeyboardInterrupt:
-        pass
-    store.close()
-    return 0
+    """The live q.fusion consumer (PostGIS, watchlist, alerts on Redis) - see backend/fusion/worker.py."""
+    from backend.fusion.worker import main as worker_main
+
+    return worker_main(["-v"] if args.verbose else [])
 
 
 def main(argv=None) -> int:

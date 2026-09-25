@@ -27,7 +27,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import cv2
 import numpy as np
@@ -75,6 +75,7 @@ class _Track:
     best_vehicle_bbox: list[float] = field(default_factory=list)
     best_vehicle_frame: int = 0
     best_vehicle_offset: float = 0.0
+    best_vehicle_crop: Optional[np.ndarray] = None    # kept only when an observation sink is attached
     searched: int = 0
     candidates_found: int = 0
     candidates_accepted: int = 0
@@ -99,6 +100,7 @@ class ANPRPipeline:
         start_time: Optional[datetime] = None,
         video_name: Optional[str] = None,
         load_ocr: bool = True,
+        observation_sink: Optional[Callable[[ANPRObservation, Optional[np.ndarray]], None]] = None,
     ):
         self.camera_id = camera_id.upper()
         self.fps = fps if fps and fps > 0 else 30.0
@@ -107,6 +109,8 @@ class ANPRPipeline:
         self.start_time = start_time or datetime.fromisoformat(DEFAULT_REPLAY_START)
         self.video_name = video_name
         self.output_root = output_root
+        # called once per finished transit with (observation, best vehicle crop) - e.g. the q.fusion publisher
+        self.observation_sink = observation_sink
 
         self.detector = plate_detector or create_plate_detector(self.cfg)
         self.ocr = ocr_engine
@@ -125,6 +129,10 @@ class ANPRPipeline:
         self.started_at = datetime.now(timezone.utc).isoformat()
 
         self.sample_step = max(1, int(round(self.fps / self.cfg.candidate_sample_fps))) if self.cfg.candidate_sample_fps > 0 else 1
+        # plate searches are paced on media time, not frame index: an upstream sampler (the ingestion
+        # worker keeps every Nth frame of a live stream) must not starve them. Same result on full video.
+        self.sample_interval = self.sample_step / self.fps
+        self._last_sample_offset: Optional[float] = None
         self.lost_frames = max(1, int(round(self.cfg.track_lost_seconds * self.fps)))
 
         self.tracks: dict[int, _Track] = {}
@@ -160,8 +168,10 @@ class ANPRPipeline:
         offset = frame_index / self.fps if media_offset is None else media_offset
         st = self.stats
         st["frames_processed"] += 1
-        sampled = frame_index % self.sample_step == 0
+        last = self._last_sample_offset
+        sampled = last is None or offset < last or offset - last >= self.sample_interval * 0.999
         if sampled:
+            self._last_sample_offset = offset
             st["frames_sampled_for_plates"] += 1
 
         for det in detections:
@@ -174,7 +184,7 @@ class ANPRPipeline:
             if track is None:
                 track = self.tracks[tid] = _Track(track_id=tid, first_frame=frame_index, first_offset=offset)
                 st["unique_tracks"] += 1
-            self._update_track(track, det, frame_index, offset)
+            self._update_track(track, det, frame_index, offset, frame)
             if sampled and not track.ocr_done:
                 self._search_plate(track, frame, det, frame_index, offset)
 
@@ -223,7 +233,8 @@ class ANPRPipeline:
 
     # ── tracking bookkeeping ─────────────────────────────────────────────
 
-    def _update_track(self, track: _Track, det: dict, frame_index: int, offset: float) -> None:
+    def _update_track(self, track: _Track, det: dict, frame_index: int, offset: float,
+                      frame: Optional[np.ndarray] = None) -> None:
         track.hits += 1
         track.last_frame, track.last_offset = frame_index, offset
         track.classes[det.get("class_name", "vehicle")] += 1
@@ -233,6 +244,12 @@ class ANPRPipeline:
             track.best_vehicle_area = area
             track.best_vehicle_bbox = list(det["bbox"])
             track.best_vehicle_frame, track.best_vehicle_offset = frame_index, offset
+            if self.observation_sink is not None and frame is not None:
+                H, W = frame.shape[:2]
+                cx1, cy1 = max(0, int(x1)), max(0, int(y1))
+                cx2, cy2 = min(W, int(round(x2))), min(H, int(round(y2)))
+                if cx2 - cx1 >= 4 and cy2 - cy1 >= 4:
+                    track.best_vehicle_crop = frame[cy1:cy2, cx1:cx2].copy()
 
     def _expire(self, frame_index: int) -> None:
         for tid in [t for t, tr in self.tracks.items() if frame_index - tr.last_frame > self.lost_frames]:
@@ -424,3 +441,9 @@ class ANPRPipeline:
             camera=self.camera_meta,
             reads=track.reads,
         ))
+        if self.observation_sink is not None:
+            try:
+                self.observation_sink(self.observations[-1], track.best_vehicle_crop)
+            except Exception:                       # a sink failure never stops the camera pipeline
+                log.exception("observation sink failed for track %s", track.track_id)
+            track.best_vehicle_crop = None

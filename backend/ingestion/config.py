@@ -4,11 +4,16 @@ TraceNet Phase 1 — camera configuration loading.
 Camera metadata lives in backend/config/cameras.json (not scattered through code).
 Relative source paths are resolved against the repository root, so no absolute,
 machine-specific paths are baked in.
+
+Live CCTV: TRACENET_INGEST_SOURCE=rtsp switches every camera to its RTSP stream -
+`rtsp_url` from cameras.json, else <TRACENET_RTSP_BASE>/<camera_id> (default rtsp://localhost:8554,
+the MediaMTX restreamer in docker-compose).
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -44,6 +49,9 @@ def _camera_from_entry(entry: dict[str, Any], defaults: dict[str, Any], replay_s
     raw_source = entry.get("source_path") or entry.get("source_url")
     if not raw_source:
         raise ConfigError(f"Camera {camera_id} has no source_path/source_url")
+    if os.environ.get("TRACENET_INGEST_SOURCE", "").strip().lower() == "rtsp":
+        base = os.environ.get("TRACENET_RTSP_BASE", "rtsp://localhost:8554").rstrip("/")
+        source_type, raw_source = SourceType.RTSP, entry.get("rtsp_url") or f"{base}/{camera_id}"
 
     return CameraConfig(
         camera_id=camera_id,
@@ -63,6 +71,9 @@ def _camera_from_entry(entry: dict[str, Any], defaults: dict[str, Any], replay_s
         max_consecutive_read_errors=int(
             entry.get("max_consecutive_read_errors", defaults.get("max_consecutive_read_errors", 15))
         ),
+        reconnect=bool(entry.get("reconnect", defaults.get("reconnect", True))),
+        reconnect_max_backoff=float(entry.get("reconnect_max_backoff", defaults.get("reconnect_max_backoff", 30.0))),
+        max_reconnect_attempts=int(entry.get("max_reconnect_attempts", defaults.get("max_reconnect_attempts", 0))),
         replay_start_time=entry.get("replay_start_time", replay_start),
         source_note=entry.get("source_note"),
     )

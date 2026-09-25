@@ -122,7 +122,7 @@ export default function CamerasPage({ navigate, openModal, params }) {
   }, [cameraList, sim.cameras]);
 
   // Ingestion state wins over the demo dataset whenever the Phase 1 backend is up
-  const INGEST_STATE_TO_STATUS = { ONLINE: "online", STARTING: "online", DEGRADED: "degraded", COMPLETED: "online", ERROR: "offline", OFFLINE: "offline", IDLE: null };
+  const INGEST_STATE_TO_STATUS = { ONLINE: "online", STARTING: "online", DEGRADED: "degraded", RECONNECTING: "degraded", COMPLETED: "online", ERROR: "offline", OFFLINE: "offline", IDLE: null };
   const withIngestion = (c) => {
     const row = ingestion?.[c.code];
     if (!row) return c;

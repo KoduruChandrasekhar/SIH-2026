@@ -253,6 +253,21 @@ def test_weak_appearance_ghost_does_not_link(engine):
     assert d.link == "new" and d.best.reject_reason == "weak_appearance"
 
 
+def test_established_plate_blocks_a_different_confident_plate_after_a_ghost_sighting(engine):
+    """Found by the synthetic dataset: vehicle A's plate is read, then A is seen plate-less (glare). A
+    look-alike vehicle with a DIFFERENT confident plate must not join A's trajectory just because A's last
+    sighting had no plate (ghost weights put all the weight on appearance)."""
+    engine.process(sighting("A1", "CAM-410", 2, "TS04NC2034", 0.94, vehicle="ghost", view=0))
+    ghost = engine.process(sighting("A2", "CAM-406", 14, vehicle="ghost", view=1))           # glare, no plate
+    assert ghost.link == "fusion"
+    other = engine.process(sighting("B1", "CAM-411", 24, "MH07BG2705", 0.93, vehicle="ghost", view=1))
+    assert other.link == "new" and other.global_vehicle_id != ghost.global_vehicle_id
+    assert other.best.reject_reason == "canonical_plate_mismatch"
+    # a one-character OCR misread of the SAME plate still links (hero trace 3 -> 8)
+    misread = engine.process(sighting("A3", "CAM-401", 30, "TS04NC2084", 0.88, vehicle="ghost", view=0))
+    assert misread.global_vehicle_id == ghost.global_vehicle_id
+
+
 def test_low_confidence_misread_raises_no_clone_alert(engine):
     engine.process(sighting("A", "CAM-410", 0, "MH12AB9999", 0.95))
     d = engine.process(sighting("B", "CAM-401", 0.5, "MH12AB9999", 0.40, vehicle="clone_b"))

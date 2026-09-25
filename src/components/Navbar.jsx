@@ -9,6 +9,7 @@ import {
   Moon,
   Navigation,
   Route,
+  ShieldCheck,
   Sun,
   TrafficCone,
   X,
@@ -17,9 +18,11 @@ import {
 import tracenetLogo from "../assets/tracenet-logo.jpg"; 
 import { useTheme } from "../ThemeContext";
 import { useAlerts } from "../alerts/AlertsContext";
+import { useSession } from "../useSession";
 
 export default function Navbar({ page, navigate, openModal }) {
   const { unread, connected } = useAlerts();
+  const session = useSession();
   const { theme, toggleTheme } = useTheme();
   // Below xl the links collapse behind a menu button
   const [menuOpen, setMenuOpen] = useState(false);
@@ -188,6 +191,7 @@ export default function Navbar({ page, navigate, openModal }) {
         {item("Cameras", Cctv, "cameras")}
         {item("Tracking", Navigation, "tracking")}
         {item("Traffic", TrafficCone, "traffic")}
+        {session?.role === "camera_admin" && item("Admin", ShieldCheck, "admin")}
 
         {/* Alerts Route Button with Red FX */}
         <button
@@ -249,7 +253,9 @@ export default function Navbar({ page, navigate, openModal }) {
         {/* Operator Login Button */}
         <button
           onClick={() => go("login")}
-          aria-label="Operator login"
+          aria-label={session ? `Signed in as ${session.username} — switch user` : "Operator login"}
+          data-tip={session ? `${session.name} · ${session.role === "camera_admin" ? "Admin" : "Operator"}` : undefined}
+          data-tip-pos="bottom"
           className="
             group
             relative
@@ -273,7 +279,7 @@ export default function Navbar({ page, navigate, openModal }) {
           "
         >
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <span className="relative z-10 hidden sm:inline">Login</span>
+          <span className="relative z-10 hidden sm:inline">{session ? session.username : "Login"}</span>
           <LogIn
             size={16}
             className="relative z-10 transition-transform duration-300 group-hover:translate-x-1"

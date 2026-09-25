@@ -172,3 +172,37 @@ CREATE TABLE IF NOT EXISTS watchlist (
 INSERT INTO watchlist (plate, threat_level, reason, added_by)
 VALUES ('DL01XY0001', 'HIGH', 'Demo target: stolen vehicle (FIR 0001/2026)', 'seed')
 ON CONFLICT (plate) DO NOTHING;
+
+-- ─── RBAC: user directory (completion plan 3.3) ──────────────────────────────
+-- The JWT identity provider reads users from here (a built-in copy of the two demo accounts is the
+-- fallback when the database is down). Passwords: salted PBKDF2-SHA256, 200 000 rounds - never plaintext.
+-- A token is only valid while its user is active and still holds the role written in the token.
+CREATE TABLE IF NOT EXISTS users (
+    username      VARCHAR(32) PRIMARY KEY,
+    name          VARCHAR(80) NOT NULL,
+    role          VARCHAR(24) NOT NULL CHECK (role IN ('camera_admin', 'law_enforcement')),
+    salt          CHAR(32)    NOT NULL,
+    password_hash CHAR(64)    NOT NULL,
+    active        BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_by    VARCHAR(32) NOT NULL DEFAULT 'seed',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- demo accounts: admin / admin123 (camera_admin), officer / police123 (law_enforcement)
+INSERT INTO users (username, name, role, salt, password_hash) VALUES
+    ('admin',   'System Administrator', 'camera_admin',
+     '90014a5516d9e385e7bcb66953c9b3c6', 'd3da518c90342e32d566344e26475b280cee9a9ee480d531c1170f4a85e05e12'),
+    ('officer', 'Police Operator',      'law_enforcement',
+     'c0275de44270af820e4ee733197b2d6e', '293ad1fa89028f913c310cc32606cda8378766478b90f3713c88f09c9e6037ba')
+ON CONFLICT (username) DO NOTHING;
+
+-- administrative actions (user created / role changed / deactivated / password reset)
+CREATE TABLE IF NOT EXISTS admin_events (
+    id         BIGSERIAL PRIMARY KEY,
+    at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actor      VARCHAR(32) NOT NULL,
+    action     VARCHAR(32) NOT NULL,
+    target     VARCHAR(64),
+    detail     JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_admin_events_at ON admin_events (at DESC);

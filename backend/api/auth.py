@@ -1,11 +1,15 @@
 """
 TraceNet Phase 6 — JWT authentication + role-based access control.
 
-Demo identity provider (no user database): two accounts, passwords stored as salted
-PBKDF2-SHA256 hashes (not plaintext).
+Identity provider: the `users` table (salted PBKDF2-SHA256 hashes, never plaintext), managed by
+camera_admin users from the Admin console (backend/api/users.py). Seeded demo accounts:
 
-    admin   / admin123   → camera_admin      camera & ingestion configuration, sighting ingest
+    admin   / admin123   → camera_admin      camera & ingestion configuration, sighting ingest, users
     officer / police123  → law_enforcement   plate lookups, trajectories, alerts, watchlist
+
+When PostgreSQL is unreachable the two demo accounts are served from a built-in copy, so login keeps
+working. A token is accepted only while its user exists, is active and still holds the token's role -
+deactivating a user or changing a role takes effect within the 5 s directory cache.
 
     POST /api/v1/auth/login   {"username", "password"} → {"access_token", "token_type", "role", …}
     GET  /api/v1/auth/me
@@ -20,6 +24,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import secrets
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -56,6 +62,9 @@ _USERS = {
 _PBKDF2_ROUNDS = 200_000
 
 
+ROLES = (ROLE_CAMERA_ADMIN, ROLE_LAW_ENFORCEMENT)
+
+
 @dataclass(frozen=True)
 class User:
     username: str
@@ -63,16 +72,79 @@ class User:
     name: str
 
 
+@dataclass(frozen=True)
+class UserRecord:
+    username: str
+    name: str
+    role: str
+    salt: str
+    password_hash: str
+    active: bool = True
+
+
+def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
+    salt = salt or secrets.token_hex(16)
+    return salt, hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), _PBKDF2_ROUNDS).hex()
+
+
+_BOOTSTRAP = {u: UserRecord(u, name, role, salt, digest) for u, (salt, digest, role, name) in _USERS.items()}
+
+
+class UserDirectory:
+    """users table, cached for a few seconds; the built-in demo accounts when the database is down."""
+
+    TTL = 5.0
+    RETRY_AFTER_FAILURE = 30.0
+
+    def __init__(self):
+        self._users: dict[str, UserRecord] = dict(_BOOTSTRAP)
+        self._loaded_at = 0.0
+        self._url: Optional[str] = None
+        self._lock = threading.Lock()
+        self.backend = "bootstrap"
+
+    def _refresh(self, url: str) -> None:
+        try:
+            import psycopg
+
+            with psycopg.connect(url, connect_timeout=2) as conn:
+                rows = conn.execute("SELECT username, name, role, salt, password_hash, active FROM users").fetchall()
+            self._users = {r[0]: UserRecord(r[0], r[1], r[2], r[3].strip(), r[4].strip(), r[5]) for r in rows}
+            self.backend = "postgis"
+            self._loaded_at = time.monotonic()
+        except Exception as exc:
+            if self.backend != "bootstrap":
+                log.warning("user directory unavailable (%s) - using the built-in demo accounts", type(exc).__name__)
+            self._users, self.backend = dict(_BOOTSTRAP), "bootstrap"
+            self._loaded_at = time.monotonic() - self.TTL + self.RETRY_AFTER_FAILURE
+        self._url = url
+
+    def get(self, username: str) -> Optional[UserRecord]:
+        from .db import current_url
+
+        url = current_url()
+        with self._lock:
+            if url != self._url or time.monotonic() - self._loaded_at > self.TTL:
+                self._refresh(url)
+            return self._users.get((username or "").strip().lower())
+
+    def invalidate(self) -> None:
+        with self._lock:
+            self._loaded_at = 0.0
+
+
+DIRECTORY = UserDirectory()
+
+
 def authenticate(username: str, password: str) -> Optional[User]:
-    entry = _USERS.get((username or "").strip().lower())
-    if entry is None:
+    rec = DIRECTORY.get(username)
+    if rec is None or not rec.active:
         hashlib.pbkdf2_hmac("sha256", b"x", b"y" * 16, _PBKDF2_ROUNDS)   # same work for unknown users
         return None
-    salt, digest, role, name = entry
-    candidate = hashlib.pbkdf2_hmac("sha256", (password or "").encode(), bytes.fromhex(salt), _PBKDF2_ROUNDS).hex()
-    if not hmac.compare_digest(candidate, digest):
+    _, candidate = hash_password(password or "", rec.salt)
+    if not hmac.compare_digest(candidate, rec.password_hash):
         return None
-    return User(username.strip().lower(), role, name)
+    return User(rec.username, rec.role, rec.name)
 
 
 def create_token(user: User, ttl: int = TOKEN_TTL_SECONDS) -> str:
@@ -85,9 +157,10 @@ def decode_token(token: str) -> User:
     """Validated user from a token; raises jwt.PyJWTError on any problem."""
     claims = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], issuer=JWT_ISSUER,
                         options={"require": ["sub", "role", "exp", "iat"]})
-    if claims["sub"] not in _USERS or _USERS[claims["sub"]][2] != claims["role"]:
-        raise jwt.InvalidTokenError("unknown subject or role")
-    return User(claims["sub"], claims["role"], claims.get("name", claims["sub"]))
+    rec = DIRECTORY.get(claims["sub"])
+    if rec is None or not rec.active or rec.role != claims["role"]:
+        raise jwt.InvalidTokenError("unknown or inactive subject, or role changed")
+    return User(rec.username, rec.role, rec.name)
 
 
 _bearer = HTTPBearer(auto_error=False)
@@ -112,6 +185,7 @@ def require_roles(*roles: str):
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"Role '{user.role}' may not access this resource")
         return user
 
+    dependency.tracenet_roles = roles or ROLES        # read by the Admin console's permission matrix
     return dependency
 
 
