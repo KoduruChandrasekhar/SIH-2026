@@ -38,19 +38,6 @@ export const cameraRegistry = REGISTRY.map((c) => ({ ...c, code: c.id.replace(" 
 
 export const cameraById = Object.fromEntries(cameraRegistry.map((c) => [c.id, c]));
 
-// Legacy shape used by CameraFeedCard / backend-compatible consumers
-export const cameras = cameraRegistry.map((c) => ({
-  id: c.id,
-  location: c.name,
-  latitude: c.lat,
-  longitude: c.lng,
-  status: c.status === "offline" ? "Offline" : "Online",
-  resolution: c.resolution,
-  fps: c.fps,
-  lastPlateRead: c.lastPlate,
-  videoFeed: c.videoFeed,
-}));
-
 export const systemMetrics = {
   totalNodesActive: 254, // city-wide ANPR nodes (the cluster above is 12 of them)
   networkUptime: "99.6%",

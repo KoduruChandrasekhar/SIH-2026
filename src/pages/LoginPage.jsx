@@ -49,11 +49,6 @@ export default function LoginPage({ navigate }) {
         </button>
       </div>
 
-      {/* Background Animated Blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-gray-50/50">
-        <div className="animate-blob absolute left-[20%] top-[10%] h-[500px] w-[500px] rounded-full bg-blue-200/40 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[20%] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-200/40 mix-blend-multiply blur-[100px] filter" />
-      </div>
 
       {/* Main Login Card */}
       <div className="fade-up relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[32px] border border-white/80 bg-white/60 shadow-[0_8px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl md:flex-row">

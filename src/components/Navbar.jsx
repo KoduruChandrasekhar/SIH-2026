@@ -8,7 +8,7 @@ import {
   Menu,
   Moon,
   Navigation,
-  Route,
+  Search,
   ShieldCheck,
   Sun,
   TrafficCone,
@@ -19,6 +19,7 @@ import tracenetLogo from "../assets/tracenet-logo.jpg";
 import { useTheme } from "../ThemeContext";
 import { useAlerts } from "../alerts/AlertsContext";
 import { useSession } from "../useSession";
+import { isMac, openCommandPalette } from "./fx/CommandPalette";
 
 export default function Navbar({ page, navigate, openModal }) {
   const { unread, connected } = useAlerts();
@@ -59,14 +60,18 @@ export default function Navbar({ page, navigate, openModal }) {
           overflow-hidden
           ${
             isActive
-              ? "bg-blue-600/10 text-blue-700 shadow-[inset_0_0_0_1px_rgba(37,99,235,0.2)]"
+              ? "text-blue-700"
               : "text-[#636366] hover:bg-blue-50 hover:text-blue-600"
           }
         `}
       >
+        {/* Active pill — one view-transition-name, so it slides between tabs on page change */}
+        {isActive && <span className="tn-nav-pill" aria-hidden="true" />}
         <Icon
           size={16}
           className={`
+            relative
+            z-10
             transition-all
             duration-300
             ${isActive ? "text-blue-600" : "group-hover:text-blue-600"}
@@ -89,6 +94,7 @@ export default function Navbar({ page, navigate, openModal }) {
   return (
     <header
       className="
+        tn-navbar
         relative
         flex
         flex-col
@@ -214,12 +220,13 @@ export default function Navbar({ page, navigate, openModal }) {
             overflow-hidden
             ${
               isAlertsActive
-                ? "bg-red-500/10 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
+                ? "text-red-600"
                 : "text-[#636366] hover:bg-red-500/10 hover:text-red-600 hover:shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]"
             }
           `}
         >
-          <span className="relative">
+          {isAlertsActive && <span className="tn-nav-pill tn-nav-pill--alert" aria-hidden="true" />}
+          <span className="relative z-10">
             <Bell size={16} className="text-red-500" />
             {unread > 0 && (
               <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black leading-none text-white" aria-label={`${unread} new alerts`}>
@@ -234,6 +241,23 @@ export default function Navbar({ page, navigate, openModal }) {
         </button>
 
         <div className="mx-1.5 hidden h-5 w-[1px] rounded-full bg-gray-200 sm:block" />
+
+        {/* Command palette */}
+        <button
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            openCommandPalette();
+          }}
+          className="tn-cmdk-trigger"
+          aria-label="Open command palette"
+          aria-keyshortcuts={isMac ? "Meta+K" : "Control+K"}
+          data-tip="Search modules, cameras, plates"
+          data-tip-pos="bottom"
+        >
+          <Search size={15} aria-hidden="true" />
+          <kbd>{isMac ? "⌘" : "Ctrl"} K</kbd>
+        </button>
 
         {/* Theme Toggle Button */}
         <button

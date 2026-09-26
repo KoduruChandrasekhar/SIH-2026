@@ -54,7 +54,7 @@ const makeResighting = () => {
 const SEVERITY = {
   CRITICAL: { color: "#ef4444", badge: "bg-red-500 text-white", icon: "bg-red-100 text-red-600", border: "border-red-500/80", ring: "ring-red-500/20" },
   HIGH: { color: "#f97316", badge: "bg-orange-500 text-white", icon: "bg-orange-100 text-orange-600", border: "border-orange-500/80", ring: "ring-orange-500/20" },
-  MEDIUM: { color: "#eab308", badge: "bg-amber-500 text-white", icon: "bg-amber-100 text-amber-600", border: "border-amber-500/80", ring: "ring-amber-500/20" },
+  MEDIUM: { color: "#eab308", badge: "bg-amber-500 text-amber-950", icon: "bg-amber-100 text-amber-600", border: "border-amber-500/80", ring: "ring-amber-500/20" },
 };
 const sev = (a) => SEVERITY[a.severity] ?? SEVERITY.MEDIUM;
 const ANOMALY_CATEGORIES = ["Trajectory Anomaly", "Unusual Stop / Loitering", "Cloned Plate", "Invalid / Tampered Plate"];
@@ -272,11 +272,6 @@ export default function AlertsPage({ navigate, openModal }) {
 
   return (
     <div className="relative flex w-full flex-col gap-6 pb-10">
-      {/* Background Blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-red-300/25 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-orange-300/25 mix-blend-multiply blur-[100px] filter" />
-      </div>
 
       {/* Floating Action Toast */}
       {toastMessage && (
@@ -687,7 +682,7 @@ export default function AlertsPage({ navigate, openModal }) {
                                 e.stopPropagation();
                                 navigate("traffic", item.corridorId ? { corridor: item.corridorId } : null);
                               }}
-                              className="tn-press flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-amber-600 group-hover:shadow-md"
+                              className="tn-press flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-amber-950 hover:bg-amber-400 group-hover:shadow-md"
                               aria-label={`View traffic flow${item.corridorId ? ` for ${item.corridorId}` : ""}`}
                             >
                               <Gauge size={12} /> View Flow

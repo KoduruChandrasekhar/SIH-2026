@@ -48,6 +48,7 @@ PROJECT_ROOT = SCRIPT_DIR.parent.parent
 BACKEND_DIR = PROJECT_ROOT / "backend"
 OUTPUT_DIR = BACKEND_DIR / "output"
 PUBLIC_CAMERA_DIR = PROJECT_ROOT / "public" / "camera-feeds"
+REGIONAL_MODEL = BACKEND_DIR / "models" / "uvh26_yolo11s.pt"   # IISc UVH-26 YOLOv11-S (Apache-2.0)
 
 # Allow importing backend.ai / backend.anpr / backend.ingestion
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -250,7 +251,7 @@ def run_rtsp(args) -> int:
     print(f"  ANPR     : {'on' if args.anpr else 'off'}   publish: {'q.fusion' if args.publish else 'off'}")
     print("=" * 65)
 
-    tracker = VehicleTracker(model_path=args.model, confidence=args.confidence,
+    tracker = VehicleTracker(model_path=args.model, confidence=args.confidence, iou=args.iou, imgsz=args.imgsz,
                              output_dir=str(OUTPUT_DIR), public_dir=str(PUBLIC_CAMERA_DIR))
 
     # load every model BEFORE the stream starts (PaddleOCR can take a minute on a cold start)
@@ -345,8 +346,23 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="yolo11n.pt",
-        help="YOLO model. Default: yolo11n.pt",
+        default=str(REGIONAL_MODEL) if REGIONAL_MODEL.exists() else "yolo11n.pt",
+        help="YOLO weights. Default: backend/models/uvh26_yolo11s.pt (IISc UVH-26, Indian classes) when present, "
+             "else yolo11n.pt (COCO)",
+    )
+
+    parser.add_argument(
+        "--iou",
+        type=float,
+        default=0.7,
+        help="NMS IoU threshold (tune with backend/training/yolo/tune_nms.py). Default: 0.7",
+    )
+
+    parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=None,
+        help="Inference size (default: the model's training size; 960-1280 helps small vehicles)",
     )
 
     parser.add_argument(
@@ -508,6 +524,8 @@ def main():
         tracker = VehicleTracker(
             model_path=args.model,
             confidence=args.confidence,
+            iou=args.iou,
+            imgsz=args.imgsz,
             output_dir=str(OUTPUT_DIR),
             public_dir=str(PUBLIC_CAMERA_DIR),
         )

@@ -122,6 +122,26 @@ python backend/scripts/evaluate_dataset.py --e2e      # YOLO11 + ByteTrack + ANP
 | BLACKLIST_HIT | detected (3 hits), 0 false |
 | INVALID_FORMAT | 2 / 2, 0 on other transits |
 
+### End-to-end evaluation (`--e2e`: YOLO11n + ByteTrack + geometric plate detector + PaddleOCR on the 6 videos, then fusion)
+
+CPU only: about 3 fps for detection plus OCR, roughly 70 minutes for 263 s of video.
+
+| Metric | Result |
+|---|---|
+| Transit detection recall | **40 / 40** (76 extra observations: parked vehicles in the median backgrounds, tracker fragments) |
+| Plate reading on legible plates | **34 / 34 read, 34 exact** (precision 1.0) |
+| Glare plates read as a plate | 0 |
+| Tampered plates flagged INVALID_FORMAT | 2 / 2 |
+| Identity, pairwise precision / recall / F1 | **1.0 / 0.94 / 0.97** (13/14 vehicles with one ID, 0 merged) |
+| Ghost links | 3 / 4 (one plate-less glare transit of V02 started a new ID) |
+| CLONED_PLATE / BLACKLIST_HIT | detected, 0 false |
+| INVALID_FORMAT on other transits | 4: the 4 glare transits (a washed-out plate still yields a partial, malformed OCR read) |
+
+What this says for the pipeline:
+* Detection and plate reading are reliable on the synthetic plates.
+* The remaining errors are at the "unreadable plate" boundary: glare that leaves a few characters raises INVALID_FORMAT instead of NO_PLATE_DETECTED, and one plate-less re-link fell below the 0.90 appearance guard (the handcrafted Re-ID limit, plan 1.4).
+* A minimum OCR confidence or character count before INVALID_FORMAT alerts would remove these false alerts.
+
 **Bug found by the dataset (fixed).** A vehicle whose plate was already confirmed, but whose *last* sighting was plate-less, was scored with ghost weights. Appearance alone then linked a look-alike vehicle carrying a *different* confident plate: identity F1 was 0.91, with one merged and one fragmented vehicle. New guard `canonical_plate_mismatch` in `FusionEngine.score_pair`, with a regression test in `test_phase3_fusion.py`.
 
 ## 5. Items that need hardware, weights or data (setup notes)

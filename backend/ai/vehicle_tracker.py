@@ -38,7 +38,7 @@ import cv2
 from ultralytics import YOLO
 
 
-# COCO class IDs for traffic-relevant vehicles
+# COCO class IDs for traffic-relevant vehicles (the default yolo11n.pt)
 VEHICLE_CLASS_IDS = {2, 3, 5, 7}
 
 VEHICLE_CLASS_NAMES = {
@@ -48,6 +48,21 @@ VEHICLE_CLASS_NAMES = {
     7: "truck",
 }
 
+# Detector class name (lower-case) → the vehicle class the rest of TraceNet uses. Works for COCO weights and
+# for regionally trained weights, e.g. the IISc UVH-26 YOLOv11 models (14 Indian classes). The detector's
+# own label is kept in each detection as `fine_class`.
+CLASS_NAME_MAP = {
+    # COCO
+    "car": "car", "motorcycle": "motorcycle", "bus": "bus", "truck": "truck", "bicycle": "bicycle",
+    # UVH-26
+    "hatchback": "car", "sedan": "car", "suv": "car", "muv": "car", "van": "car",
+    "two-wheeler": "motorcycle", "three-wheeler": "auto_rickshaw",
+    "mini-bus": "bus", "tempo-traveller": "bus",
+    "lcv": "truck", "others": None,
+}
+# vehicles that carry a registration plate (bicycles are detected by UVH models but not tracked for ANPR)
+TRACKED_CLASSES = ("car", "motorcycle", "auto_rickshaw", "bus", "truck")
+
 
 # Annotation colours (BGR)
 CLASS_COLORS = {
@@ -55,6 +70,7 @@ CLASS_COLORS = {
     "motorcycle": (0, 165, 255),
     "bus": (255, 100, 0),
     "truck": (0, 0, 220),
+    "auto_rickshaw": (0, 220, 220),
 }
 
 DEFAULT_COLOR = (200, 200, 200)
@@ -69,9 +85,22 @@ class VehicleTracker:
         confidence: float = 0.3,
         output_dir: str = "backend/output",
         public_dir: str = "public/camera-feeds",
+        iou: float = 0.7,
+        imgsz: Optional[int] = None,
+        tracked_classes: tuple[str, ...] = TRACKED_CLASSES,
+        tracker_config: str = "bytetrack.yaml",
     ):
+        """
+        confidence  detection confidence threshold (also ByteTrack's high-score band starts from this)
+        iou         NMS IoU threshold: raise it (0.75-0.8) in dense two-wheeler traffic so adjacent vehicles
+                    are not suppressed as duplicates; lower it (0.5-0.6) if one vehicle yields twin boxes
+        imgsz       inference size (None = the model's training size); 960-1280 helps far/small vehicles
+        """
         self.model_path = model_path
         self.confidence = confidence
+        self.iou = iou
+        self.imgsz = imgsz
+        self.tracker_config = tracker_config
         self.output_dir = Path(output_dir)
         self.public_dir = Path(public_dir)
 
@@ -89,17 +118,36 @@ class VehicleTracker:
 
         print("[TraceNet] Model loaded successfully")
 
+        # class ids to keep, from the model's own label list (COCO or regional)
+        names = self.model.names if isinstance(self.model.names, dict) else dict(enumerate(self.model.names))
+        self.class_map: dict[int, str] = {}
+        self.fine_names: dict[int, str] = {}
+        for cls_id, name in names.items():
+            mapped = CLASS_NAME_MAP.get(str(name).strip().lower())
+            if mapped in tracked_classes:
+                self.class_map[int(cls_id)] = mapped
+                self.fine_names[int(cls_id)] = str(name)
+        if not self.class_map:
+            raise RuntimeError(
+                f"Model '{model_path}' has no vehicle classes TraceNet knows ({sorted(names.values())[:8]} …); "
+                "extend CLASS_NAME_MAP in backend/ai/vehicle_tracker.py"
+            )
+        self.class_ids = sorted(self.class_map)
+
     def track_frame(self, frame) -> list[dict]:
         """Run YOLO + ByteTrack on one frame (tracker state persists across calls)."""
+        kwargs = {"imgsz": self.imgsz} if self.imgsz else {}
         results = self.model.track(
             frame,
             persist=True,
-            tracker="bytetrack.yaml",
+            tracker=self.tracker_config,
             conf=self.confidence,
-            classes=list(VEHICLE_CLASS_IDS),
+            iou=self.iou,
+            classes=self.class_ids,
             verbose=False,
+            **kwargs,
         )
-        return self._extract_detections(results)
+        return self._extract_detections(results, self.class_map, self.fine_names)
 
     def process_video(
         self,
@@ -463,8 +511,11 @@ class VehicleTracker:
             pass
 
     @staticmethod
-    def _extract_detections(results) -> list[dict]:
-        """Extract vehicle detections from YOLO results."""
+    def _extract_detections(results, class_map: Optional[dict[int, str]] = None,
+                            fine_names: Optional[dict[int, str]] = None) -> list[dict]:
+        """Extract vehicle detections from YOLO results (COCO ids when no class map is given)."""
+        class_map = class_map if class_map is not None else VEHICLE_CLASS_NAMES
+        fine_names = fine_names or {}
 
         detections = []
 
@@ -480,7 +531,7 @@ class VehicleTracker:
         for i in range(len(boxes)):
             cls_id = int(boxes.cls[i].item())
 
-            if cls_id not in VEHICLE_CLASS_IDS:
+            if cls_id not in class_map:
                 continue
 
             confidence = round(
@@ -507,7 +558,8 @@ class VehicleTracker:
             detections.append(
                 {
                     "track_id": track_id,
-                    "class_name": VEHICLE_CLASS_NAMES[cls_id],
+                    "class_name": class_map[cls_id],
+                    "fine_class": fine_names.get(cls_id, class_map[cls_id]),
                     "confidence": confidence,
                     "bbox": bbox,
                 }

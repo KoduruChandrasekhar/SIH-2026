@@ -6,7 +6,8 @@
  * sessionStorage and is injected into every API call by src/api.js. A 401 triggers one re-login.
  */
 
-const API_BASE = "http://localhost:8000";
+import { API_BASE, BACKEND_ENABLED, DEMO_AUTO_LOGIN } from "./config";
+
 const STORE_KEY = "tracenet.session";
 // Demo identity provider (backend/api/auth.py). Not a secret: documented demo accounts.
 const DEMO_OFFICER = { username: "officer", password: "police123" };
@@ -43,6 +44,7 @@ export function onSessionChange(fn) {
 
 /** POST /api/v1/auth/login. Returns the session, or throws Error(message). */
 export async function login(username, password) {
+  if (!BACKEND_ENABLED) throw new Error("No backend is connected — this deployment runs on the demo dataset");
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -59,6 +61,7 @@ export async function login(username, password) {
 /** Ensure a valid session, signing in as the demo officer if needed. Null when the backend is offline. */
 export async function ensureSession() {
   if (session && session.exp > Date.now() / 1000 + 60) return session;
+  if (!BACKEND_ENABLED || !DEMO_AUTO_LOGIN) return null;
   if (!pending) {
     pending = login(DEMO_OFFICER.username, DEMO_OFFICER.password)
       .catch(() => null)
@@ -67,10 +70,6 @@ export async function ensureSession() {
       });
   }
   return pending;
-}
-
-export function logout() {
-  setSession(null);
 }
 
 /** Force a fresh officer login (after a 401, e.g. the backend restarted with a new JWT secret). */

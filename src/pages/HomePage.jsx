@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import HeroSection from "../components/home/HeroSection";
 import FeatureModules from "../components/home/FeatureModules";
 import CommandMap from "../components/home/CommandMap";
+import NetworkPulse from "../components/home/NetworkPulse";
+import TrajectoryStory from "../components/home/TrajectoryStory";
 import usePrefersReducedMotion from "../hooks/usePrefersReducedMotion";
 import { alertsFeed, systemMetrics, trafficSummary } from "../data";
 import { fetchAlerts, fetchDashboard, fetchTraffic } from "../api";
@@ -42,7 +44,9 @@ export default function HomePage({ navigate, openModal }) {
   const reducedMotion = usePrefersReducedMotion();
   const telemetry = useHomeTelemetry();
   const [mapMode, setMapMode] = useState("overview");
+  const homeRef = useRef(null);
   const contentRef = useRef(null);
+  const pulseRef = useRef(null);
 
   // Stable callback refs for the four feature modules
   const moduleEls = useRef({});
@@ -73,7 +77,7 @@ export default function HomePage({ navigate, openModal }) {
 
   // Reveal cards / map as they enter the viewport (class toggled directly — no re-renders)
   useEffect(() => {
-    const root = contentRef.current;
+    const root = homeRef.current;
     if (!root || reducedMotion) return;
     const targets = root.querySelectorAll("[data-reveal]");
     root.classList.add("tn-reveal-ready");
@@ -91,20 +95,24 @@ export default function HomePage({ navigate, openModal }) {
     return () => io.disconnect();
   }, [reducedMotion]);
 
-  const enterCommandCenter = () => {
-    contentRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  // The hero's scroll cue leads into the live network first
+  const exploreNetwork = () => {
+    pulseRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
   };
 
   return (
     // The homepage is always rendered in TraceNet's dark command-center palette
-    <div data-theme="dark" className="tn-home">
+    <div ref={homeRef} data-theme="dark" className="tn-home">
       <div className="tn-home-nav">
         <div className="mx-auto max-w-[1400px] px-3 pt-3 sm:px-6 lg:px-8">
           <Navbar page="home" navigate={navigate} openModal={openModal} />
         </div>
       </div>
 
-      <HeroSection navigate={navigate} onEnter={enterCommandCenter} reducedMotion={reducedMotion} />
+      <HeroSection navigate={navigate} onEnter={exploreNetwork} reducedMotion={reducedMotion} />
+
+      <NetworkPulse sectionRef={pulseRef} />
+      <TrajectoryStory />
 
       <main
         ref={contentRef}
@@ -117,11 +125,15 @@ export default function HomePage({ navigate, openModal }) {
             {/* LEFT — feature modules */}
             <div className="lg:col-span-5">
               <header data-reveal className="mb-10 max-w-[30rem]">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.3em] text-blue-400">Command Center</p>
-                <h2 id="tn-cc-title" className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
-                  One intelligence layer across every camera in the city.
+                <p className="tn-eyebrow">
+                  <span className="tn-eyebrow-dot" aria-hidden="true" />
+                  Command Center
+                </p>
+                <h2 id="tn-cc-title" className="tn-section-title">
+                  One intelligence layer
+                  <span>across every camera.</span>
                 </h2>
-                <p className="mt-3 text-sm leading-relaxed text-slate-400">
+                <p className="tn-section-body">
                   From the city overview down to a single vehicle's path — each module below drives the live GIS view.
                 </p>
               </header>

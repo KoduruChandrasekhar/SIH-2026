@@ -1,32 +1,41 @@
-import { Component, useEffect, useRef } from "react";
+import { Component, useEffect, useLayoutEffect, useRef } from "react";
 import { ArrowDownRight, ArrowUpRight, MapPinOff, RotateCw } from "lucide-react";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Number that eases from its previous value to the new one (rAF, writes the DOM directly —
- * no React re-render per frame). Only animates when `value` actually changes.
+ * no React re-render per frame). On mount it counts up from 0 (`countUp={false}` to skip);
+ * after that it only animates when `value` actually changes.
  */
-export function AnimatedNumber({ value, format = (v) => v.toLocaleString("en-IN"), duration = 600, className }) {
+export function AnimatedNumber({ value, format = (v) => v.toLocaleString("en-IN"), duration = 600, countUp = true, className }) {
   const ref = useRef(null);
-  const shown = useRef(value);
+  // The rendered text is fixed at mount: React never rewrites it, the effect owns textContent
+  const initial = useRef(countUp && typeof value === "number" && value !== 0 && !reducedMotion() ? 0 : value);
+  const shown = useRef(initial.current);
+  const mounted = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el || value == null || Number.isNaN(value)) return;
     const from = shown.current ?? value;
+    const first = !mounted.current;
+    mounted.current = true;
     if (from === value || reducedMotion()) {
       shown.current = value;
       el.textContent = format(value);
       return;
     }
+    // integer targets never show fractional frames ("1,234.567")
+    const integer = Number.isInteger(value);
+    const ms = first ? Math.max(duration, 900) : duration;
     let raf;
     const start = performance.now();
     const frame = (now) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
+      const t = Math.min(1, (now - start) / ms);
+      const eased = 1 - Math.pow(1 - t, first ? 4 : 3);
       shown.current = from + (value - from) * eased;
-      el.textContent = format(t === 1 ? value : shown.current);
+      el.textContent = format(t === 1 ? value : integer ? Math.round(shown.current) : shown.current);
       if (t < 1) raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -35,7 +44,7 @@ export function AnimatedNumber({ value, format = (v) => v.toLocaleString("en-IN"
       cancelAnimationFrame(raf);
       shown.current = value;
       el.textContent = format(value);
-    }, duration + 80);
+    }, ms + 80);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(settle);
@@ -45,7 +54,7 @@ export function AnimatedNumber({ value, format = (v) => v.toLocaleString("en-IN"
 
   return (
     <span ref={ref} className={className}>
-      {value == null ? "—" : format(value)}
+      {value == null ? "—" : format(initial.current ?? value)}
     </span>
   );
 }

@@ -27,11 +27,12 @@ import {
   ReferenceLine,
 } from "recharts";
 import { MapContainer, TileLayer, Tooltip as MapTooltip, CircleMarker, Circle, Polyline, useMap } from "react-leaflet";
+import FlowLayer, { flowLinks } from "../components/FlowLayer";
 import Navbar from "../components/Navbar";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
 import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
 import { fetchDashboard, fetchMacroAnalytics } from "../api";
-import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, hourlyTraffic, junctionReadings } from "../data";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, corridorsFeed, hourlyTraffic, junctionReadings } from "../data";
 import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../demoData";
 import { formatClock, pctChange, simNowSec, useLiveSim } from "../sim/liveSim";
 
@@ -92,6 +93,9 @@ function macroToNodes(macro) {
     };
   });
 }
+// live-flow links for the map (static network; congestion from the shared corridor data)
+const DASHBOARD_FLOW = flowLinks(corridorsFeed);
+
 const NOW_HOUR = Number(SNAPSHOT_TIME.slice(0, 2));
 
 // Flow lines between connected cameras (demo network edges)
@@ -246,11 +250,6 @@ export default function DashboardPage({ navigate, openModal }) {
 
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10 min-h-screen">
-      {/* Background Subtle Blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-gray-50/50">
-        <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-blue-200/20 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-indigo-200/20 mix-blend-multiply blur-[100px] filter" />
-      </div>
 
       {/* Navbar */}
       <div className="w-full">
@@ -392,6 +391,8 @@ export default function DashboardPage({ navigate, openModal }) {
               <MapContainer center={[17.475, 78.405]} zoom={13} scrollWheelZoom={false} style={{ width: "100%", height: "100%" }}>
                 <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <FocusCamera cam={selected} />
+                {/* live traffic particles along the camera links, paced/coloured by corridor congestion */}
+                <FlowLayer links={DASHBOARD_FLOW} />
 
                 {/* Flow lines between connected cameras */}
                 {odLines

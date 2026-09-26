@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "tracenet-prod-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4173", "--strictPort"],
+      "port": 4173
+    },
+    {
       "name": "tracenet-api",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "uvicorn", "backend.main:app", "--port", "8000"],

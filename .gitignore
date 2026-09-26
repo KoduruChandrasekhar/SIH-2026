@@ -88,6 +88,15 @@ backend/output/dataset/
 # MediaMTX stream files (backend/scripts/prepare_streams.py)
 backend/output/streams/
 
+# Detector fine-tuning: datasets, runs, generated scale-specific P2 configs; TensorRT shape caches
+backend/training/yolo/datasets/
+backend/training/yolo/runs/
+backend/training/yolo/yolo11[nsmlx]-p2.yaml
+backend/models/trt_cache/
+
+# Standalone benchmark scratch area
+test_eval_tmp/
+
 # Keep the output directory itself
 !backend/output/.gitkeep
 

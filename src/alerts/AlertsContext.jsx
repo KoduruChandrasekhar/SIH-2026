@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ShieldAlert, Zap, X } from "lucide-react";
-import { WS_BASE } from "../api";
+import { BACKEND_ENABLED, WS_BASE } from "../config";
 import { ensureSession, getToken, onSessionChange, refreshSession } from "../auth";
 
 /**
@@ -32,6 +32,7 @@ export function AlertsProvider({ children, onOpenAlerts }) {
   }, []);
 
   useEffect(() => {
+    if (!BACKEND_ENABLED) return undefined; // demo build: no alert stream to connect to
     let ws = null;
     let retry = 0;
     let timer = null;

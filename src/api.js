@@ -5,11 +5,28 @@
  */
 
 import { ensureSession, getToken, refreshSession } from "./auth";
+import { API_BASE, BACKEND_ENABLED } from "./config";
 
-const API_BASE = "http://localhost:8000";
+// Tracker vehicle classes (backend/ai/vehicle_tracker.py CLASS_NAME_MAP) → the labels the UI shows.
+// The UVH-26 detector adds auto_rickshaw; its LCV / mini-bus labels arrive already mapped to truck / bus.
+const VEHICLE_CLASS_LABELS = {
+  car: "Car",
+  motorcycle: "Two-wheeler",
+  auto_rickshaw: "Auto",
+  bus: "Bus",
+  truck: "Truck",
+  bicycle: "Bicycle",
+};
+
+export function vehicleClassLabel(cls) {
+  if (!cls) return "—";
+  const key = String(cls).trim().toLowerCase();
+  return VEHICLE_CLASS_LABELS[key] ?? key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
 
 // Phase 6: every call carries the JWT (Authorization: Bearer …); a 401 re-authenticates once.
 async function request(endpoint, { method = "GET", body, retry = true } = {}) {
+  if (!BACKEND_ENABLED) throw new Error("No backend configured (VITE_API_BASE_URL)");
   const token = getToken() ?? (await ensureSession())?.token;
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -45,29 +62,15 @@ export async function apiSend(endpoint, method, body) {
   }
 }
 
-export const WS_BASE = API_BASE.replace(/^http/, "ws");
-
 // <img src> cannot send headers: protected evidence images take the JWT as ?token=
 const withToken = (url) => {
   const token = getToken();
   return url && token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
 };
 
-export async function fetchHealth() {
-  return apiFetch("/api/health");
-}
-
 export async function fetchVehicles() {
   const data = await apiFetch("/api/vehicles");
   return data?.vehicles ?? null;
-}
-
-export async function fetchVehicle(plate) {
-  return apiFetch(`/api/vehicles/${encodeURIComponent(plate)}`);
-}
-
-export async function fetchVehicleTrajectory(plate) {
-  return apiFetch(`/api/vehicles/${encodeURIComponent(plate)}/trajectory`);
 }
 
 export async function fetchTraffic() {
@@ -102,20 +105,12 @@ export async function fetchIngestionCameras() {
   return data?.cameras ?? null;
 }
 
-export async function fetchIngestionStatus() {
-  return apiFetch("/api/ingestion/status");
-}
-
 /**
  * Phase 2 ANPR: real observations produced by the ANPR pipeline for one camera.
  * Returns null when the backend is offline or the camera has no ANPR run yet.
  */
 export async function fetchCameraAnpr(cameraId) {
   return apiFetch(`/api/cameras/${encodeURIComponent(cameraId)}/anpr`);
-}
-
-export async function fetchAnpr(status) {
-  return apiFetch(`/api/anpr${status ? `?status=${encodeURIComponent(status)}` : ""}`);
 }
 
 export const anprEvidenceUrl = (path) => (path ? withToken(`${API_BASE}${path}`) : null);
@@ -224,7 +219,7 @@ export function trajectoryToVehicle(data) {
     geojson: journey.geojson ? { type: "Feature", geometry: journey.geojson, properties: { trajectory_id: journey.trajectory_id } } : null,
     plate: data.plate,
     globalId: `${journey.global_vehicle_id.slice(0, 8)}…${journey.global_vehicle_id.slice(-4)}`,
-    type: wps.find((w) => w.vehicle_class)?.vehicle_class ?? "—",
+    type: vehicleClassLabel(wps.find((w) => w.vehicle_class)?.vehicle_class),
     color: "—",
     confidence: confidences.length ? pct(Math.max(...confidences)) : "—",
     status,
@@ -291,21 +286,7 @@ export async function fetchMacroAnalytics() {
 export const bciStatus = (bci) => (bci == null ? "No data" : bci >= 0.7 ? "Severe" : bci >= 0.55 ? "High" : bci >= 0.4 ? "Moderate" : "Low");
 export const BCI_COLOR = { Severe: "#ef4444", High: "#f97316", Moderate: "#eab308", Low: "#22c55e", "No data": "#94a3b8" };
 
-/** Percent change of the last complete hour vs the one before, for one camera's hourly series. */
-export function hourTrend(series) {
-  const s = (series ?? []).filter((h) => h.vehicles > 0);
-  if (s.length < 3) return "—";
-  const [prev, last] = [s.at(-3).vehicles, s.at(-2).vehicles]; // the newest hour is still filling
-  const pct = prev ? Math.round(((last - prev) / prev) * 100) : 0;
-  return `${pct >= 0 ? "+" : ""}${pct}%`;
-}
-
 /* ─── Phase 6: live alerts & watchlist ─── */
-
-export async function fetchLiveAlerts(limit = 50) {
-  const data = await apiFetch(`/api/v1/alerts/live?limit=${limit}`);
-  return data?.alerts ?? null;
-}
 
 export async function addToWatchlist(plate, reason, threatLevel = "HIGH") {
   return apiSend("/api/v1/watchlist", "POST", { plate, reason, threat_level: threatLevel });

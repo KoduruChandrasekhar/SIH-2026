@@ -263,16 +263,6 @@ export const CAMERA_NETWORK_EDGES = [
 // The demo vehicle's route through the camera network
 export const DEMO_ROUTE_PATH = ["CAM #401", "CAM #402", "CAM #403", "CAM #406"];
 
-// ─── Macro Analytics (for Parallel Processing) ────────────────
-export const DEMO_MACRO_ANALYTICS = {
-  vehicleCount: 1547,
-  density: 78.4,
-  avgSpeed: 36.2,
-  flowRate: 842,
-  odPairs: 24,
-  congestionIndex: 0.72,
-};
-
 // ─── Watchlist (for Alerts page propagation) ──────────────────
 export const WATCHLIST_CAMERAS = [
   "CAM #401",

@@ -435,31 +435,23 @@ The frontend is designed to integrate with an AI backend containing components s
 # 📁 Project Structure
 
 ```text
-trace-net/
-│
-├── public/
-│
+TraceNet/
+├── index.html, vite.config.js, package.json   React + Vite frontend (deployed to Vercel)
+├── vercel.json, .vercelignore, .env.example   frontend deployment config
+├── public/                   hero clips, camera feeds + posters (served as static files)
 ├── src/
-│   │
-│   ├── components/
-│   │   ├── Modal.jsx
-│   │   ├── Navbar.jsx
-│   │   └── Shell.jsx
-│   │
-│   ├── pages/
-│   │   ├── HomePage.jsx
-│   │   └── DashboardPage.jsx
-│   │
-│   ├── data.js
-│   ├── App.jsx
-│   ├── index.css
-│   └── main.jsx
-│
-├── index.html
-├── package.json
-├── package-lock.json
-├── vite.config.js
-└── README.md
+│   ├── main.jsx, App.jsx     entry, page switching + view transitions
+│   ├── config.js             backend URL / demo-mode switches (VITE_* env vars)
+│   ├── api.js, auth.js       REST client + JWT session (offline fallbacks)
+│   ├── data.js, demoData.js  bundled demo dataset
+│   ├── pages/                Home, Dashboard, Cameras, Tracking, Traffic, Alerts, Admin, Login
+│   ├── components/           feature panels, charts/, home/, motion/, fx/ (palette, backdrop, effects)
+│   ├── alerts/, sim/, hooks/ live alert stream, demo live simulation, shared hooks
+│   └── index.css             Tailwind v4 + theme tokens + component styles
+├── backend/                  FastAPI API, ANPR / fusion / analytics pipeline, tests
+├── db/                       PostGIS schema
+├── docker/, docker-compose.yml  PostGIS, Redis, RabbitMQ, MediaMTX
+└── docs/                     phase-by-phase design notes
 ```
 
 ---
@@ -542,6 +534,27 @@ npm run build
 ```bash
 npm run preview
 ```
+
+---
+
+# ☁️ Deploying the Frontend (Vercel)
+
+The repo root is the Vite app, so Vercel needs no root-directory change: import the repo, keep the
+**Vite** preset (`vercel.json` pins `npm ci`, `npm run build` and the `dist` output) and deploy.
+`.vercelignore` keeps `backend/`, `db/`, `docs/`, Python scripts and model weights out of the upload.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VITE_API_BASE_URL` | *(empty)* | Backend origin, e.g. `https://api.example.org` (https). Empty = self-contained demo on the bundled dataset, no API calls. |
+| `VITE_DEMO_AUTO_LOGIN` | `true` | Sign in automatically as the demo officer; `false` requires the Login page. |
+
+Set them under **Project → Settings → Environment Variables** and redeploy (Vite bakes them in at build
+time). To connect a deployed backend, also allow the site's origin there:
+`TRACENET_CORS_ORIGINS=https://<your-app>.vercel.app` (and optionally `TRACENET_CORS_ORIGIN_REGEX` for
+preview URLs) — see `backend/.env.example`.
+
+The AI-annotated clips (`public/camera-feeds/*_annotated.mp4`) are generated locally and git-ignored;
+without them the camera viewer shows the recorded feed instead.
 
 ---
 
@@ -936,3 +949,16 @@ python backend/scripts/generate_dataset.py && python backend/scripts/evaluate_da
 ```
 
 **Status, results and setup notes for the GPU / weights items: [docs/COMPLETION_PLAN.md](docs/COMPLETION_PLAN.md)**
+
+---
+
+# ⚡ OCR acceleration · regional detector · automated benchmark
+
+* **OCR:**
+  * GPU + TensorRT → GPU → CPU fallback chain (`ocr_device: auto`, PaddleOCR 3.x `device` / `use_tensorrt` / `precision`).
+  * A hybrid recognition-only read path: about 6x faster median on CPU at the same plate accuracy.
+  * A `PP-OCRv5_mobile_rec` + oneDNN profile at about 50–70 ms per crop on CPU.
+* **Detector:** IISc UVH-26 YOLOv11-S weights (Indian classes, Apache-2.0). On UVH-26 validation frames, recall rose from 31 % to 79 %: two-wheelers 9 % → 74 %, auto-rickshaws 33 % → 86 %. Fine-tuning kit in `backend/training/yolo/`: data prep, class-weighted training, P2 head, NMS sweep.
+* **Benchmark:** `run_automated_anpr_benchmark.py` takes a YouTube slice (`--url`, yt-dlp + ffmpeg), a local video or a frames folder, runs track → plate → OCR, and reports KPIs to `test_eval_tmp/automated_benchmark_results.json`.
+
+**Details and measurements: [docs/UPGRADES_OCR_DETECTOR_BENCHMARK.md](docs/UPGRADES_OCR_DETECTOR_BENCHMARK.md)**

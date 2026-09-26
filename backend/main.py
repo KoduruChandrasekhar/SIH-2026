@@ -100,17 +100,27 @@ app = FastAPI(
 )
 
 # ─── CORS ────────────────────────────────────────────────────────────────────
-# Allow the Vite dev server and common local origins
+# The Vite dev server and common local origins, plus the deployed frontend:
+#   TRACENET_CORS_ORIGINS=https://tracenet.vercel.app,https://tracenet.example.org
+#   TRACENET_CORS_ORIGIN_REGEX=https://tracenet-.*\.vercel\.app      (Vercel preview deployments)
+_LOCAL_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:4173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:4173",
+    "http://127.0.0.1:3000",
+]
+from backend.db.config import setting  # env var, else backend/.env
+
+_EXTRA_ORIGINS = [o.strip().rstrip("/") for o in setting("TRACENET_CORS_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=_LOCAL_ORIGINS + _EXTRA_ORIGINS,
+    allow_origin_regex=setting("TRACENET_CORS_ORIGIN_REGEX", "") or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

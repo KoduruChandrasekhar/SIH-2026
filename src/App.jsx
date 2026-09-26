@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
 import CamerasPage from "./pages/CamerasPage";
@@ -10,6 +11,9 @@ import AdminPage from "./pages/AdminPage";
 import { X } from "lucide-react";
 import { AlertsProvider } from "./alerts/AlertsContext";
 import { ensureSession } from "./auth";
+import AmbientBackdrop from "./components/fx/AmbientBackdrop";
+import CommandPalette from "./components/fx/CommandPalette";
+import useInteractionFX from "./components/fx/useInteractionFX";
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -17,8 +21,23 @@ export default function App() {
   // { camera } → Cameras. Existing navigate("page") calls keep working unchanged.
   const [params, setParams] = useState(null);
   const navigate = useCallback((target, nextParams = null) => {
-    setParams(nextParams);
-    setPage(target);
+    const commit = () => {
+      setParams(nextParams);
+      setPage(target);
+    };
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!document.startViewTransition || reduced) {
+      commit();
+      return;
+    }
+    // Native view transition: the old page crossfades out, the navbar stays put and its active pill slides
+    const root = document.documentElement;
+    root.classList.add("tn-vt");
+    const vt = document.startViewTransition(() => {
+      flushSync(commit);
+      window.scrollTo(0, 0);
+    });
+    vt.finished.finally(() => root.classList.remove("tn-vt"));
   }, []);
   const [modal, setModal] = useState({ isOpen: false, title: "", content: "" });
 
@@ -29,6 +48,9 @@ export default function App() {
   const closeModal = () => {
     setModal({ isOpen: false, title: "", content: "" });
   };
+
+  // Cursor spotlight on cards, KPI tilt, button ripples
+  useInteractionFX();
 
   // Phase 6: sign in as the demo officer on load (no login wall); the JWT is injected into API calls
   useEffect(() => {
@@ -65,16 +87,23 @@ export default function App() {
 
   return (
     <AlertsProvider onOpenAlerts={() => navigate("alerts")}>
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 text-gray-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+    <div className="isolate min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 text-gray-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+      {/* Reading progress (pure CSS scroll-driven animation) */}
+      <div className="tn-scroll-progress" aria-hidden="true" />
+      {/* Module pages sit on the ambient backdrop; the homepage paints its own */}
+      {page !== "home" && <AmbientBackdrop page={page} />}
+
       {/* The homepage renders full-bleed (cinematic hero); other pages keep the centered container */}
       {/* keyed wrapper → a short fade/rise on every module change (no full-screen loader) */}
       {page === "home" ? (
         <div key={page} className="tn-page-enter">{renderPage()}</div>
       ) : (
-        <div key={page} className="tn-page-enter mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <div key={page} className="tn-page-enter tn-inner mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
           {renderPage()}
         </div>
       )}
+
+      <CommandPalette navigate={navigate} page={page} />
 
       {/* Global Popup Modal Component */}
       {modal.isOpen && (

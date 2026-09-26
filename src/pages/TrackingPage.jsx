@@ -844,7 +844,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
                   </span>
                 </button>
                 {i < observations.length - 1 && (
-                  <span className={`flex items-center gap-1 text-[10px] font-bold ${deviationSegs.includes(i) ? "text-amber-500" : "text-gray-400"}`}>
+                  <span className={`flex items-center gap-1 text-[10px] font-bold ${deviationSegs.includes(i) ? "tn-text-warn" : "text-gray-400"}`}>
                     <ArrowRight size={14} aria-hidden="true" /> {observations[i + 1].distance}
                   </span>
                 )}

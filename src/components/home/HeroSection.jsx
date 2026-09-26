@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Navigation, Pause, Play } from "lucide-react";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraRegistry, hourlyTraffic, systemMetrics } from "../../data";
+import { useDecodeText, useMagnetic } from "../fx/textFx";
 
 // ── Hero media sequence ─────────────────────────────────────────────
 // Three story stages, four clips: the street stage shows the cameras, then what they see.
@@ -56,6 +57,39 @@ export default function HeroSection({ navigate, onEnter, reducedMotion }) {
   const [paused, setPaused] = useState(reducedMotion);
 
   useEffect(() => setPaused(reducedMotion), [reducedMotion]);
+
+  // Mouse parallax: -1…1 offsets written as CSS variables (no re-renders); CSS moves the layers
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el || reducedMotion) return;
+    let raf = 0;
+    let px = 0;
+    let py = 0;
+    const apply = () => {
+      raf = 0;
+      el.style.setProperty("--hx", px.toFixed(3));
+      el.style.setProperty("--hy", py.toFixed(3));
+    };
+    const onMove = (e) => {
+      if (e.pointerType !== "mouse") return;
+      const r = el.getBoundingClientRect();
+      px = ((e.clientX - r.left) / r.width - 0.5) * 2;
+      py = ((e.clientY - r.top) / r.height - 0.5) * 2;
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    const onLeave = () => {
+      px = 0;
+      py = 0;
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    el.addEventListener("pointermove", onMove, { passive: true });
+    el.addEventListener("pointerleave", onLeave);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
+    };
+  }, [reducedMotion]);
 
   // Only decode video while the hero is on screen and the tab is visible
   useEffect(() => {
@@ -156,6 +190,11 @@ export default function HeroSection({ navigate, onEnter, reducedMotion }) {
   }, [playing, active, stage]);
 
   const copy = STAGES[stage];
+  // each stage's headline and data ticker "lock on" like a plate read
+  const headingRef = useDecodeText(copy.heading, { duration: 800, delay: 150 });
+  const tickerRef = useDecodeText(copy.ticker, { duration: 1100, delay: 350 });
+  const primaryRef = useMagnetic();
+  const secondaryRef = useMagnetic();
 
   return (
     <section ref={heroRef} aria-labelledby="tn-hero-title" className="tn-hero" data-stage={stage}>
@@ -202,17 +241,21 @@ export default function HeroSection({ navigate, onEnter, reducedMotion }) {
               <span className="tn-hero-label-dot" aria-hidden="true" />
               {copy.label}
             </p>
-            <h2 className="tn-hero-heading">{copy.heading}</h2>
+            <h2 className="tn-hero-heading" aria-label={copy.heading}>
+              <span ref={headingRef} aria-hidden="true">{copy.heading}</span>
+            </h2>
             <p className="tn-hero-body">{copy.body}</p>
-            <p className="tn-hero-ticker">{copy.ticker}</p>
+            <p className="tn-hero-ticker" aria-label={copy.ticker}>
+              <span ref={tickerRef} aria-hidden="true">{copy.ticker}</span>
+            </p>
           </div>
 
           <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <button type="button" onClick={() => navigate("dashboard")} className="tn-btn-primary">
+            <button ref={primaryRef} type="button" onClick={() => navigate("dashboard")} className="tn-btn-primary tn-btn-glow">
               Open Command Center
               <ArrowRight size={16} className="tn-btn-arrow" />
             </button>
-            <button type="button" onClick={() => navigate("tracking")} className="tn-btn-secondary">
+            <button ref={secondaryRef} type="button" onClick={() => navigate("tracking")} className="tn-btn-secondary">
               <Navigation size={15} />
               Track a Vehicle
             </button>
@@ -246,8 +289,8 @@ export default function HeroSection({ navigate, onEnter, reducedMotion }) {
           </div>
         </div>
 
-        <button type="button" onClick={onEnter} className="tn-scroll-cue" aria-label="Scroll to enter the command center">
-          <span>Scroll to enter</span>
+        <button type="button" onClick={onEnter} className="tn-scroll-cue" aria-label="Scroll to explore the live camera network">
+          <span>Scroll to explore</span>
           <ChevronDown size={16} className="tn-scroll-cue-arrow" />
         </button>
       </div>

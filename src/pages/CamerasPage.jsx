@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import Navbar from "../components/Navbar";
 import CameraFeedCard from "../components/CameraFeedCard";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
-import { anprToOcrEvidence, fetchCameraAnpr, fetchCameras, fetchIngestionCameras } from "../api";
+import { anprToOcrEvidence, fetchCameraAnpr, fetchCameras, fetchIngestionCameras, vehicleClassLabel } from "../api";
 import OCRPanel from "../components/OCRPanel";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraById, cameraRegistry, hourlyTraffic } from "../data";
 import { AnimatedNumber } from "../components/motion/Motion";
@@ -331,7 +331,7 @@ function CameraDetail({ camera, live, simSec, onClose, navigate }) {
           .map((o) => ({
             time: o.timestamp.slice(11, 19),
             plate: o.plate ?? `${o.consensus_text || "—"} · ${o.plate_status.replace("_", " ").toLowerCase()}`,
-            cls: o.vehicle_class,
+            cls: vehicleClassLabel(o.vehicle_class),
             conf: o.ocr_confidence != null ? o.ocr_confidence * 100 : null,
             obs: o,
           }))

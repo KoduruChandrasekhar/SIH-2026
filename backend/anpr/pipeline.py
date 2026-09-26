@@ -117,8 +117,9 @@ class ANPRPipeline:
         self.ocr_error: Optional[str] = None
         if self.ocr is None and load_ocr:
             try:
-                self.ocr = create_ocr_engine(self.cfg.ocr_engine, det_model=self.cfg.ocr_det_model,
-                                             rec_model=self.cfg.ocr_rec_model)
+                from .recognizer import build_ocr_engine
+
+                self.ocr = build_ocr_engine(self.cfg)
             except OCRUnavailable as exc:
                 # Keep processing: every transit with plate crops will honestly report OCR_FAILED.
                 self.ocr_error = str(exc)

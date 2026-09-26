@@ -32,6 +32,7 @@ import {
 } from "recharts";
 import Navbar from "../components/Navbar";
 import HeatLayer from "../components/HeatLayer";
+import FlowLayer, { flowLinks } from "../components/FlowLayer";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
 import { BCI_COLOR, bciStatus, fetchMacroAnalytics, fetchTrafficCorridors, fetchTrafficOD } from "../api";
 import { SNAPSHOT_TIME, cameraById, corridorsFeed, hourlyTraffic, trafficSummary } from "../data";
@@ -45,6 +46,11 @@ const localOdRoutes = trafficSummary.odRoutes;
 const STATUS_COLOR = { Severe: "#ef4444", High: "#f97316", Moderate: "#eab308", Low: "#22c55e" };
 const countOf = (label) => parseInt(String(label).replace(/\D/g, ""), 10) || 0;
 const statusFor = (d) => (d >= 85 ? "Severe" : d >= 70 ? "High" : d >= 50 ? "Moderate" : "Low");
+// Status badges sit on the corridor colour: dark text on the light ones (yellow, green), white on red / orange
+const badgeText = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(String(hex).slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#1c1917" : "#fff";
+};
 
 // Phase 5: Polars analytics → the page's corridor shape. One "corridor" per camera junction;
 // readings use the latest hour with speed evidence, falling back to the 24 h rollup.
@@ -191,6 +197,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
       .map((c) => [c.lat, c.lng, heatMetric === "volume" ? (c.volume24h ?? 0) / maxVolume : Math.max(0.05, c.bci ?? 0)]);
   }, [corridors, heatMetric]);
   const selectedCorridor = corridors.find((c) => c.id === selectedId) ?? corridors[0];
+  const flowCorridorLinks = useMemo(() => flowLinks(corridors), [corridors]);
   const selectedRoute = (selectedCorridor.cameras ?? []).map((id) => cameraById[id]).filter(Boolean).map((c) => [c.lat, c.lng]);
 
   const exportReport = () => {
@@ -233,12 +240,6 @@ export default function TrafficPage({ navigate, openModal, params }) {
   return (
     <div className="relative flex w-full flex-col gap-6 pb-10">
       
-      {/* Background Blobs (Orange/Yellow Theme for Traffic) */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-orange-300/25 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-yellow-300/25 mix-blend-multiply blur-[100px] filter" />
-      </div>
-
       {/* Navbar */}
       <div className="w-full">
         <Navbar page="traffic" navigate={navigate} openModal={openModal} />
@@ -371,6 +372,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
                 />
 
                 {real && <HeatLayer points={heatPoints} />}
+                {/* live traffic: particles pace and colour follow each corridor's speed and congestion */}
+                <FlowLayer links={flowCorridorLinks} />
                 <FocusCorridor corridor={{ ...selectedCorridor, fromParams }} route={selectedRoute} />
                 {selectedRoute.length > 1 && (
                   <>
@@ -461,8 +464,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
                       </div>
                     </div>
                     <span
-                      className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white shadow-sm"
-                      style={{ backgroundColor: item.color }}
+                      className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider shadow-sm"
+                      style={{ backgroundColor: item.color, color: badgeText(item.color) }}
                     >
                       {item.status}
                     </span>

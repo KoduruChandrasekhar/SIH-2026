@@ -64,6 +64,25 @@ class ANPRConfig:
     ocr_det_model: Optional[str] = None     # PaddleOCR text detection model (None = PaddleOCR default)
     ocr_rec_model: Optional[str] = None     # PaddleOCR text recognition model
     ocr_fallback_threshold: float = 0.85    # below this, retry with CLAHE + bilateral
+    # read path: "hybrid" = recognition-only first, full det+rec only when that read is not a valid plate or
+    # is below ocr_hybrid_min_conf · "rec" = recognition-only for one-row plates · "full" = always det+rec
+    ocr_mode: str = "hybrid"
+    # recognition-only model for the first read. PP-OCRv5 mobile + oneDNN: ~50-70 ms/crop on CPU and, with the
+    # det+rec second opinion, kept every valid real read of the old path; "PP-OCRv6_medium_rec" = accurate profile
+    ocr_fast_rec_model: Optional[str] = "PP-OCRv5_mobile_rec"
+    ocr_hybrid_min_conf: float = 0.80
+    ocr_hybrid_min_chars: int = 4           # quick reads shorter than this are junk: no det+rec second opinion
+    ocr_hybrid_escalate_min_conf: float = 0.30
+    ocr_single_line_min_aspect: float = 2.2  # crops narrower than this (two-row plates) always use det+rec
+    # acceleration: auto = GPU + TensorRT → GPU → CPU (each warmed up before it is accepted)
+    ocr_device: str = "auto"                # auto | gpu | gpu:N | cpu
+    ocr_use_tensorrt: bool = True
+    ocr_precision: str = "fp16"             # TensorRT precision: fp16 | fp32
+    ocr_trt_max_width: int = 1280           # TensorRT dynamic shape: recognition input width up to this
+    ocr_trt_cache_dir: Optional[str] = "backend/models/trt_cache"
+    ocr_cpu_threads: int = 8
+    ocr_cpu_mkldnn: bool = False            # oneDNN for the full pipeline (breaks PP-OCRv6 det on paddle 3.3)
+    ocr_fast_rec_mkldnn: bool = True        # oneDNN for the recognition-only model (big win for *_mobile_rec)
     min_read_confidence: float = 0.40       # reads below this count as OCR failures
     ocr_min_height_px: int = 128            # crops are upscaled to at least this height
     ocr_border_fraction: float = 0.15       # replicated margin so text does not touch the image edge

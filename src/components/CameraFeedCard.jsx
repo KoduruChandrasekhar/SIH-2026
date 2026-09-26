@@ -35,6 +35,8 @@ export default function CameraFeedCard({
   const [videoFailed, setVideoFailed] = useState(false);
   const [buffering, setBuffering] = useState(alwaysPlay);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Annotated clips are generated locally (git-ignored); deployments without them show the raw feed
+  const [annotatedFailed, setAnnotatedFailed] = useState(false);
 
   const videoRef = useRef(null);
 
@@ -173,7 +175,7 @@ export default function CameraFeedCard({
                 className="text-red-400/80"
               />
 
-              <span className="font-mono text-[11px] font-black tracking-wider text-slate-300">
+              <span className="cam-feed-cam-id font-mono text-[11px] font-black tracking-wider">
                 NO SIGNAL
               </span>
 
@@ -235,7 +237,7 @@ export default function CameraFeedCard({
               </div>
 
               {!alwaysPlay && (
-                <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] text-slate-300 opacity-80 transition-opacity group-hover:opacity-0">
+                <span className="cam-hover-hint absolute bottom-2 right-2 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] opacity-80 transition-opacity group-hover:opacity-0">
                   Hover to play
                 </span>
               )}
@@ -523,7 +525,7 @@ export default function CameraFeedCard({
                   </span>
 
                   <span className="ml-2 hidden rounded border border-blue-500/30 bg-blue-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-blue-400 sm:inline">
-                    AI Annotated Stream
+                    {annotatedFailed ? "Recorded Feed" : "AI Annotated Stream"}
                   </span>
                 </div>
 
@@ -539,18 +541,13 @@ export default function CameraFeedCard({
               {/* Real annotated video */}
               <div className="relative flex aspect-video min-h-[300px] w-full items-center justify-center bg-black">
                 <video
-                  src={modalVideoSrc}
+                  src={annotatedFailed ? videoSrc : modalVideoSrc}
                   controls
                   autoPlay
                   loop
                   playsInline
                   className="h-full w-full max-h-[80vh] object-contain"
-                  onError={() => {
-                    console.error(
-                      "Annotated video failed to load:",
-                      modalVideoSrc
-                    );
-                  }}
+                  onError={() => setAnnotatedFailed(true)}
                 />
               </div>
             </div>
