@@ -11,7 +11,6 @@ import {
   Zap,
   AlertTriangle,
   ArrowRight,
-  Filter,
   Download,
   Check,
 } from "lucide-react";
@@ -30,16 +29,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import Navbar from "../components/Navbar";
-import HeatLayer from "../components/HeatLayer";
-import FlowLayer, { flowLinks } from "../components/FlowLayer";
+import Navbar from "../components/layout/Navbar";
+import HeatLayer from "../components/map/HeatLayer";
+import { LIVE_TRAFFIC_AVAILABLE, LiveTrafficLayer, LiveTrafficLegend, LiveTrafficToggle } from "../components/map/LiveTraffic";
+import LiveRoadTraffic from "../components/map/LiveRoadTraffic";
+import { LIVE_ANALYTICS, corridorLive, networkSummary, useLiveTraffic } from "../lib/liveTraffic";
+import { LiveIncidents, LiveJunctionSpeeds, LiveStatusChip, LiveTrend } from "../components/traffic/LivePanels";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
-import { BCI_COLOR, bciStatus, fetchMacroAnalytics, fetchTrafficCorridors, fetchTrafficOD } from "../api";
-import { SNAPSHOT_TIME, cameraById, corridorsFeed, hourlyTraffic, trafficSummary } from "../data";
+import { BCI_COLOR, bciStatus, fetchMacroAnalytics, fetchTrafficCorridors, fetchTrafficOD } from "../lib/api";
+import { SNAPSHOT_TIME, cameraById, corridorsFeed, hourlyTraffic, trafficSummary } from "../data/data";
 import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
 import { pctChange, useLiveSim } from "../sim/liveSim";
 
-// Corridor + OD data come from the shared dataset (src/data.js) so the map, lists, charts,
+// Corridor + OD data come from the shared dataset (src/data/data.js) so the map, lists, charts,
 // Dashboard and Alerts all describe the same evening-peak situation.
 const localCorridors = corridorsFeed;
 const localOdRoutes = trafficSummary.odRoutes;
@@ -178,16 +180,40 @@ export default function TrafficPage({ navigate, openModal, params }) {
   }, []);
   const real = Boolean(macro);
 
-  // Live corridor readings come from the shared simulation (same drift as the Dashboard junctions)
+  // Live traffic (TomTom): real speed vs free-flow on each camera junction's road + incidents in the cluster.
+  // When available it drives every corridor reading, KPI and chart below; otherwise the page keeps the
+  // backend analytics / demo simulation.
+  const live = useLiveTraffic();
+  const liveMode = LIVE_ANALYTICS && live.probes.length > 0;
+  const probesByCamera = useMemo(() => Object.fromEntries(live.probes.map((p) => [p.camera, p])), [live.probes]);
+  const liveNet = useMemo(() => (liveMode ? networkSummary(live.probes) : null), [liveMode, live.probes]);
+
+  // Corridor readings: live TomTom speeds when available, else the shared simulation / backend analytics
   const corridors = useMemo(
     () =>
       baseCorridors.map((c) => {
-        const live = c.real ? null : sim.corridors[c.id];
-        if (!live) return c;
-        const status = statusFor(live.density);
-        return { ...c, ...live, status, color: STATUS_COLOR[status] };
+        let out = c;
+        const simulated = c.real ? null : sim.corridors[c.id];
+        if (simulated) {
+          const status = statusFor(simulated.density);
+          out = { ...c, ...simulated, status, color: STATUS_COLOR[status] };
+        }
+        const l = liveMode ? corridorLive(c, probesByCamera) : null;
+        if (!l) return out;
+        return {
+          ...out,
+          live: true,
+          speed: l.speed,
+          freeFlow: l.freeFlow,
+          density: l.congestion,
+          delay: l.delay,
+          closed: l.closed,
+          status: l.status,
+          color: STATUS_COLOR[l.status],
+          trend: l.closed ? "road closed" : l.delay > 0 ? `+${l.delay >= 60 ? `${Math.round(l.delay / 60)} min` : `${l.delay} s`} delay` : "free flow",
+        };
       }),
-    [baseCorridors, sim.corridors]
+    [baseCorridors, sim.corridors, liveMode, probesByCamera]
   );
   // Heat layer: one weighted point per ANPR junction from the Polars analytics (BCI, or 24 h volume)
   const heatPoints = useMemo(() => {
@@ -197,7 +223,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
       .map((c) => [c.lat, c.lng, heatMetric === "volume" ? (c.volume24h ?? 0) / maxVolume : Math.max(0.05, c.bci ?? 0)]);
   }, [corridors, heatMetric]);
   const selectedCorridor = corridors.find((c) => c.id === selectedId) ?? corridors[0];
-  const flowCorridorLinks = useMemo(() => flowLinks(corridors), [corridors]);
+  // real-time road traffic (TomTom) — on by default whenever an API key is configured
+  const [liveTraffic, setLiveTraffic] = useState(LIVE_TRAFFIC_AVAILABLE);
   const selectedRoute = (selectedCorridor.cameras ?? []).map((id) => cameraById[id]).filter(Boolean).map((c) => [c.lat, c.lng]);
 
   const exportReport = () => {
@@ -223,9 +250,14 @@ export default function TrafficPage({ navigate, openModal, params }) {
   const routeDensity = useMemo(
     () =>
       [...corridors]
-        .map((c) => ({ name: c.name, id: c.id, volume: real ? (c.volume24h ?? 0) : (c.volume ?? Math.round(c.density * 28)), status: c.status }))
+        .map((c) => ({
+          name: c.name,
+          id: c.id,
+          volume: liveMode ? c.density : real ? (c.volume24h ?? 0) : (c.volume ?? Math.round(c.density * 28)),
+          status: c.status,
+        }))
         .sort((a, b) => b.volume - a.volume),
-    [corridors]
+    [corridors, liveMode]
   );
 
   // Search: corridor name/ID, status, sector (camera zones) and camera codes
@@ -247,13 +279,21 @@ export default function TrafficPage({ navigate, openModal, params }) {
 
       {/* Header Banner */}
       <div className="fade-up delay-100 rounded-[24px] border border-white/60 bg-white/80 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-3 w-3 rounded-full bg-orange-500 trace-live-dot" />
             <span className="text-xs font-extrabold uppercase tracking-widest text-orange-600">
               Module 03: Macro Traffic Flow & Movement Analytics
             </span>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          {LIVE_ANALYTICS && (live.probes.length > 0 ? (
+            <LiveStatusChip live={live} />
+          ) : (
+            <span className="rounded-full border border-gray-200 px-2.5 py-1 text-[10px] font-bold text-gray-500">
+              {live.status === "error" ? `Live traffic unavailable · ${live.error}` : "Loading live traffic…"}
+            </span>
+          ))}
           <button
             onClick={exportReport}
             disabled={exportState === "exporting"}
@@ -268,18 +308,52 @@ export default function TrafficPage({ navigate, openModal, params }) {
               <><Download size={14} /> Export CSV Report</>
             )}
           </button>
+          </div>
         </div>
         <h1 className="text-2xl font-black tracking-tight text-gray-900 mt-1">
           City-Wide Traffic Intelligence
         </h1>
         <p className="text-xs text-gray-500 mt-1 max-w-[800px]">
-          Aggregated ANPR camera data visualizing city-wide traffic dynamics, density heatmaps, origin-destination patterns, and congestion bottlenecks.
+          {liveMode
+            ? "Live road speeds and incidents from TomTom at every camera junction, combined with ANPR camera analytics for origin–destination movement."
+            : "Aggregated ANPR camera data visualizing city-wide traffic dynamics, density heatmaps, origin-destination patterns, and congestion bottlenecks."}
         </p>
       </div>
 
       {/* Metrics Row — derived from the hourly profile and corridor data */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {real ? (
+        {liveMode && liveNet ? (
+          <>
+            <MetricCard
+              title="Network Average Speed"
+              value={<AnimatedNumber value={liveNet.speed} format={(v) => `${v.toFixed(1)} km/h`} />}
+              trend={`free flow ${Math.round(liveNet.freeFlow)} km/h`}
+              icon={Gauge}
+              color="text-blue-600"
+            />
+            <MetricCard
+              title="Network Congestion"
+              value={<AnimatedNumber value={liveNet.congestion} format={(v) => `${Math.round(v)}%`} />}
+              trend={`below free flow · ${bottlenecks.length} corridor${bottlenecks.length === 1 ? "" : "s"} High+`}
+              icon={TrafficCone}
+              color="text-orange-500"
+            />
+            <MetricCard
+              title="Live Incidents"
+              value={<AnimatedNumber value={live.incidents.length} />}
+              trend={`${live.incidents.filter((i) => i.group === "jam").length} jams · ${live.incidents.filter((i) => i.group === "closure").length} closures`}
+              icon={AlertTriangle}
+              color="text-red-500"
+            />
+            <MetricCard
+              title="Travel-time Delay"
+              value={liveNet.delay >= 60 ? `${Math.round(liveNet.delay / 60)} min` : `${Math.round(liveNet.delay)} s`}
+              trend={`across ${live.probes.length} junction roads`}
+              icon={Activity}
+              color="text-emerald-600"
+            />
+          </>
+        ) : real ? (
           <>
             <MetricCard
               title="Network Average Speed"
@@ -328,14 +402,15 @@ export default function TrafficPage({ navigate, openModal, params }) {
         {/* LEFT COLUMN: GIS Traffic Heatmap */}
         <div className="fade-up delay-300 flex flex-col gap-5">
           <div className="flex h-[500px] flex-col rounded-[28px] border border-white/80 bg-white/70 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-3 px-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2">
               <div className="flex items-center gap-2">
                 <Map size={16} className="text-orange-500" />
                 <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">
                   Live Density Heatmap
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+              <LiveTrafficToggle enabled={liveTraffic} onChange={setLiveTraffic} />
               {real && (
                 <div role="group" aria-label="Heatmap metric" className="flex rounded-full bg-gray-100 p-0.5 text-[9px] font-bold">
                   {[["congestion", "Congestion"], ["volume", "Volume"]].map(([key, label]) => (
@@ -371,9 +446,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                <LiveTrafficLayer enabled={liveTraffic} />
                 {real && <HeatLayer points={heatPoints} />}
-                {/* live traffic: particles pace and colour follow each corridor's speed and congestion */}
-                <FlowLayer links={flowCorridorLinks} />
                 <FocusCorridor corridor={{ ...selectedCorridor, fromParams }} route={selectedRoute} />
                 {selectedRoute.length > 1 && (
                   <>
@@ -415,6 +489,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
                 ))}
               </MapContainer>
               </MapBoundary>
+              {liveTraffic && LIVE_TRAFFIC_AVAILABLE && <LiveTrafficLegend />}
             </div>
           </div>
         </div>
@@ -477,7 +552,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
                       <span className="text-lg font-black text-gray-900">{item.speed != null ? <AnimatedNumber value={item.speed} /> : "—"} <span className="text-[10px] text-gray-500">km/h</span></span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-extrabold text-gray-400 uppercase">{item.real ? "Congestion (BCI)" : "Density Index"}</span>
+                      <span className="text-[10px] font-extrabold text-gray-400 uppercase">{item.live ? "Congestion (live)" : item.real ? "Congestion (BCI)" : "Density Index"}</span>
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-lg font-black text-gray-900"><AnimatedNumber value={item.density} format={(v) => `${Math.round(v)}%`} /></span>
                         <span className={`text-[10px] font-bold ${item.trend.includes('+') ? 'text-red-500' : 'text-emerald-500'}`}>
@@ -494,8 +569,20 @@ export default function TrafficPage({ navigate, openModal, params }) {
 
       </div>
 
-      {/* Speed vs density + route density */}
+      {/* Real-time road traffic across the city (Google / TomTom live map) */}
+      <LiveRoadTraffic />
+
+      {/* Speed vs density + route density (live: junction speeds + congestion by corridor) */}
       <div className="grid w-full gap-5 lg:grid-cols-[1.4fr_1fr]">
+        {liveMode ? (
+          <LiveJunctionSpeeds
+            probes={live.probes}
+            onSelect={(camId) => {
+              const hit = corridors.find((c) => (c.cameras ?? []).includes(camId));
+              if (hit) setSelectedId(hit.id);
+            }}
+          />
+        ) : (
         <section className="premium-panel flex h-[320px] flex-col p-5">
           <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
             <div>
@@ -522,20 +609,39 @@ export default function TrafficPage({ navigate, openModal, params }) {
             </ResponsiveContainer>
           </div>
         </section>
+        )}
 
         <section className="premium-panel flex h-[320px] flex-col p-5">
           <div className="mb-2">
-            <h3 className="flex items-center gap-2 text-sm font-black text-gray-900"><TrafficCone size={16} className="text-orange-500" /> Route density by corridor</h3>
-            <p className="text-[10px] font-bold text-gray-500">{real ? "Vehicles observed per junction · last 24 h · colour = BCI status" : `Vehicles per hour at ${SNAPSHOT_TIME} · colour = congestion status`}</p>
+            <h3 className="flex items-center gap-2 text-sm font-black text-gray-900"><TrafficCone size={16} className="text-orange-500" /> {liveMode ? "Live congestion by corridor" : "Route density by corridor"}</h3>
+            <p className="text-[10px] font-bold text-gray-500">{liveMode ? "% below free-flow speed · TomTom live · colour = status" : real ? "Vehicles observed per junction · last 24 h · colour = BCI status" : `Vehicles per hour at ${SNAPSHOT_TIME} · colour = congestion status`}</p>
           </div>
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={routeDensity} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 0 }}>
                 <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" domain={real ? [0, "auto"] : [0, 3000]} ticks={real ? undefined : [0, 1000, 2000, 3000]} tick={chart.tick} axisLine={false} tickLine={false} tickFormatter={(v) => (real ? `${v}` : v ? `${v / 1000}k veh/h` : "0")} />
-                <YAxis type="category" dataKey="id" tick={chart.tick} axisLine={false} tickLine={false} width={52} />
-                <Tooltip cursor={{ fill: chart.cursor }} content={<ChartTooltip units={{ volume: real ? "veh / 24 h" : "veh/h" }} />} labelFormatter={(id) => routeDensity.find((r) => r.id === id)?.name} />
-                <Bar dataKey="volume" name="Volume" radius={[0, 4, 4, 0]} maxBarSize={20} animationDuration={500} onClick={(d) => d?.id && setSelectedId(d.id)} cursor="pointer">
+                <XAxis
+                  type="number"
+                  domain={liveMode ? [0, 100] : real ? [0, "auto"] : [0, 3000]}
+                  ticks={liveMode ? [0, 25, 50, 75, 100] : real ? undefined : [0, 1000, 2000, 3000]}
+                  tick={chart.tick}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => (liveMode ? `${v}%` : real ? `${v}` : v ? `${v / 1000}k veh/h` : "0")}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="id"
+                  tick={chart.tick}
+                  axisLine={false}
+                  tickLine={false}
+                  width={liveMode ? 104 : 52}
+                  tickMargin={6}
+                  // live: print the value so an uncongested (0 %) corridor still reads clearly
+                  tickFormatter={(id) => (liveMode ? `${id} · ${routeDensity.find((r) => r.id === id)?.volume ?? 0}%` : id)}
+                />
+                <Tooltip cursor={{ fill: chart.cursor }} content={<ChartTooltip units={{ volume: liveMode ? "%" : real ? "veh / 24 h" : "veh/h" }} />} labelFormatter={(id) => routeDensity.find((r) => r.id === id)?.name} />
+                <Bar dataKey="volume" name={liveMode ? "Congestion" : "Volume"} minPointSize={liveMode ? 3 : 0} radius={[0, 4, 4, 0]} maxBarSize={20} animationDuration={500} onClick={(d) => d?.id && setSelectedId(d.id)} cursor="pointer">
                   {routeDensity.map((r) => (
                     <Cell key={r.id} fill={STATUS_COLOR[r.status] ?? "#3b82f6"} fillOpacity={r.id === selectedCorridor.id ? 1 : 0.45} />
                   ))}
@@ -545,6 +651,13 @@ export default function TrafficPage({ navigate, openModal, params }) {
           </div>
         </section>
       </div>
+
+      {liveMode && (
+        <div className="grid w-full gap-5 lg:grid-cols-2">
+          <LiveIncidents incidents={live.incidents} />
+          <LiveTrend history={live.history} />
+        </div>
+      )}
 
       {/* NEW SECTION: Origin-Destination & Corridor Analysis Breakdown */}
       <div className="grid w-full gap-5 lg:grid-cols-2">
@@ -556,7 +669,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
               <TrendingUp size={18} className="text-purple-600" />
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">Origin–Destination (O-D) Flows</h3>
             </div>
-            <span className="text-[10px] font-bold text-gray-400">Sector-to-Sector Movement</span>
+            <span className="text-[10px] font-bold text-gray-400">Sector-to-Sector Movement{liveMode ? " · from ANPR cameras" : ""}</span>
           </div>
           <div className="flex flex-col gap-3">
             {odRoutes.map((route, idx) => (

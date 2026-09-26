@@ -1,5 +1,5 @@
-import { Zap, Camera, Clock, Activity, MapPin, Gauge } from "lucide-react";
-import { formatConfidence } from "../demoData";
+import { Zap, Camera, Activity } from "lucide-react";
+import { formatConfidence } from "../../data/demoData";
 
 export default function VehicleIdentityCard({ vehicle, currentObservation, isTracking }) {
   if (!vehicle) return null;

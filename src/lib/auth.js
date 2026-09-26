@@ -3,7 +3,7 @@
  *
  * The app signs in automatically as the demo `officer` (law_enforcement) so it never stops at a
  * login wall; the Login page can switch identity (officer / admin). The token lives in memory +
- * sessionStorage and is injected into every API call by src/api.js. A 401 triggers one re-login.
+ * sessionStorage and is injected into every API call by src/lib/api.js. A 401 triggers one re-login.
  */
 
 import { API_BASE, BACKEND_ENABLED, DEMO_AUTO_LOGIN } from "./config";

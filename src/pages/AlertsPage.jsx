@@ -17,11 +17,11 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Circle, useMap } from "react-leaflet";
-import Navbar from "../components/Navbar";
-import { addToWatchlist, fetchAlerts } from "../api";
-import { useAlerts } from "../alerts/AlertsContext";
-import { WATCHLIST_CAMERAS, cameraDisplayId } from "../demoData";
-import { alertsFeed as localAlerts, cameraById } from "../data";
+import Navbar from "../components/layout/Navbar";
+import { addToWatchlist, fetchAlerts } from "../lib/api";
+import { useAlerts } from "../context/AlertsContext";
+import { WATCHLIST_CAMERAS, cameraDisplayId } from "../data/demoData";
+import { alertsFeed as localAlerts, cameraById } from "../data/data";
 import { AnimatedNumber, MapBoundary } from "../components/motion/Motion";
 import { formatClock, simNowSec } from "../sim/liveSim";
 
@@ -622,7 +622,7 @@ export default function AlertsPage({ navigate, openModal }) {
                       selectedAlert?.id === item.id
                         ? `${sev(item).border} bg-white shadow-lg ring-2 ${sev(item).ring}`
                         : "border-white/80 bg-white/70 hover:bg-white hover:shadow-md"
-                    } ${item.status === "Resolved" ? "opacity-70" : ""}`}
+                    } ${item.status === "Resolved" ? "opacity-70" : ""} ${item.severity === "CRITICAL" && item.status !== "Resolved" ? "tn-alert-critical" : ""}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">

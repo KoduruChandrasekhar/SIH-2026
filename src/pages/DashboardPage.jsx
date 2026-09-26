@@ -27,13 +27,12 @@ import {
   ReferenceLine,
 } from "recharts";
 import { MapContainer, TileLayer, Tooltip as MapTooltip, CircleMarker, Circle, Polyline, useMap } from "react-leaflet";
-import FlowLayer, { flowLinks } from "../components/FlowLayer";
-import Navbar from "../components/Navbar";
+import Navbar from "../components/layout/Navbar";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
 import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
-import { fetchDashboard, fetchMacroAnalytics } from "../api";
-import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, corridorsFeed, hourlyTraffic, junctionReadings } from "../data";
-import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../demoData";
+import { fetchDashboard, fetchMacroAnalytics } from "../lib/api";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, hourlyTraffic, junctionReadings } from "../data/data";
+import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../data/demoData";
 import { formatClock, pctChange, simNowSec, useLiveSim } from "../sim/liveSim";
 
 // --- LOCAL DATA (fallback) ---
@@ -93,9 +92,6 @@ function macroToNodes(macro) {
     };
   });
 }
-// live-flow links for the map (static network; congestion from the shared corridor data)
-const DASHBOARD_FLOW = flowLinks(corridorsFeed);
-
 const NOW_HOUR = Number(SNAPSHOT_TIME.slice(0, 2));
 
 // Flow lines between connected cameras (demo network edges)
@@ -391,8 +387,6 @@ export default function DashboardPage({ navigate, openModal }) {
               <MapContainer center={[17.475, 78.405]} zoom={13} scrollWheelZoom={false} style={{ width: "100%", height: "100%" }}>
                 <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <FocusCamera cam={selected} />
-                {/* live traffic particles along the camera links, paced/coloured by corridor congestion */}
-                <FlowLayer links={DASHBOARD_FLOW} />
 
                 {/* Flow lines between connected cameras */}
                 {odLines

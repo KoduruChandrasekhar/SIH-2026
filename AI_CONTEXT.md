@@ -16,7 +16,7 @@ The project currently consists of a frontend and a backend component.
 - **Tech Stack**: React.js, Vite, Tailwind CSS, Lucide React, Leaflet (for GIS mapping).
 - **Location**: `src/`, `public/`, `index.html`
 - **Key Features**:
-  - `api.js`: Handles API calls to the FastAPI backend. It gracefully falls back to local mock data (from `src/data.js` and `src/demoData.js`) if the backend is down.
+  - `src/lib/api.js`: Handles API calls to the FastAPI backend. It gracefully falls back to local mock data (from `src/data/data.js` and `src/data/demoData.js`) if the backend is down.
   - Dashboards for vehicle tracking, traffic flow analytics, GIS mapping, and active alerts.
   - Supports Dark/Light mode and responsive layouts.
 - **Run Command**: `npm run dev`

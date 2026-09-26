@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   Car,
+  Cpu,
   Cctv,
   CornerDownLeft,
   Home,
@@ -14,10 +15,10 @@ import {
   Sun,
   TrafficCone,
 } from "lucide-react";
-import { cameraRegistry, corridorsFeed } from "../../data";
-import { DEMO_PLATE } from "../../demoData";
-import { useTheme } from "../../ThemeContext";
-import { useSession } from "../../useSession";
+import { cameraRegistry, corridorsFeed } from "../../data/data";
+import { DEMO_PLATE } from "../../data/demoData";
+import { useTheme } from "../../context/ThemeContext";
+import { useSession } from "../../hooks/useSession";
 
 // Plates the Tracking page can reconstruct offline (keys of localVehicles in pages/TrackingPage.jsx)
 const DEMO_PLATES = [DEMO_PLATE, "TS09EA4512", "AP28BK8821", "TS08EJ4892", "TS09EE9911", "MH04EF7710", "AP28BY5521"];
@@ -94,6 +95,7 @@ export default function CommandPalette({ navigate, page }) {
       { id: "p-tracking", label: "Tracking", hint: "Reconstruct a vehicle trajectory", icon: Navigation, run: () => navigate("tracking") },
       { id: "p-traffic", label: "Traffic", hint: "Corridor density & OD analytics", icon: TrafficCone, run: () => navigate("traffic") },
       { id: "p-alerts", label: "Alerts", hint: "Blacklist, congestion, anomalies", icon: Bell, run: () => navigate("alerts") },
+      { id: "p-pipeline", label: "AI Pipeline", hint: "OCR lab, ANPR funnel, model benchmarks", icon: Cpu, keywords: "ocr anpr model detector yolo paddle benchmark engine", run: () => navigate("pipeline") },
       ...(session?.role === "camera_admin"
         ? [{ id: "p-admin", label: "Admin", hint: "Users & camera administration", icon: ShieldCheck, run: () => navigate("admin") }]
         : []),

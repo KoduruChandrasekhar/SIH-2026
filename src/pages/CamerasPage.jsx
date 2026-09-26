@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Cctv, ScanLine, Search, Signal, VideoOff, Wifi, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import Navbar from "../components/Navbar";
-import CameraFeedCard from "../components/CameraFeedCard";
+import Navbar from "../components/layout/Navbar";
+import CameraFeedCard from "../components/camera/CameraFeedCard";
 import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
-import { anprToOcrEvidence, fetchCameraAnpr, fetchCameras, fetchIngestionCameras, vehicleClassLabel } from "../api";
-import OCRPanel from "../components/OCRPanel";
-import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraById, cameraRegistry, hourlyTraffic } from "../data";
+import { anprToOcrEvidence, fetchCameraAnpr, fetchCameras, fetchIngestionCameras, vehicleClassLabel } from "../lib/api";
+import OCRPanel from "../components/anpr/OCRPanel";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraById, cameraRegistry, hourlyTraffic } from "../data/data";
 import { AnimatedNumber } from "../components/motion/Motion";
 import { formatClock, useLiveSim } from "../sim/liveSim";
 

@@ -2243,13 +2243,13 @@ html:not([data-theme="dark"]) .tn-cam-banner .bg-slate-900\/60 {
     position: relative;
   }
 }
+/* the bubble only exists while shown: a hidden (opacity 0) one would still widen the page on phones */
 [data-tip]::after {
-  content: attr(data-tip);
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
   z-index: 80;
-  transform: translate(-50%, 4px);
+  transform: translate(-50%, 0);
   width: max-content;
   max-width: 220px;
   padding: 5px 8px;
@@ -2264,14 +2264,17 @@ html:not([data-theme="dark"]) .tn-cam-banner .bg-slate-900\/60 {
   text-transform: none;
   white-space: normal;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--tn-fast) ease, transform var(--tn-fast) var(--tn-ease);
 }
 [data-tip]:hover::after,
 [data-tip]:focus-visible::after {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  transition-delay: 250ms;
+  content: attr(data-tip);
+  animation: tn-tip-in var(--tn-fast) var(--tn-ease) 250ms backwards;
+}
+@keyframes tn-tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
 }
 [data-tip-pos="bottom"]::after {
   top: calc(100% + 8px);
@@ -2881,6 +2884,7 @@ html:not([data-theme="dark"]) .tn-surface-btn {
 .tn-ambient[data-page="cameras"] { --amb-1: rgba(6, 182, 212, 0.18); --amb-2: rgba(59, 130, 246, 0.16); --amb-3: rgba(16, 185, 129, 0.1); }
 .tn-ambient[data-page="tracking"] { --amb-1: rgba(59, 130, 246, 0.22); --amb-2: rgba(99, 102, 241, 0.16); --amb-3: rgba(14, 165, 233, 0.12); }
 .tn-ambient[data-page="traffic"] { --amb-1: rgba(245, 158, 11, 0.16); --amb-2: rgba(249, 115, 22, 0.12); --amb-3: rgba(14, 165, 233, 0.12); }
+.tn-ambient[data-page="pipeline"] { --amb-1: rgba(16, 185, 129, 0.16); --amb-2: rgba(6, 182, 212, 0.14); --amb-3: rgba(99, 102, 241, 0.12); }
 .tn-ambient[data-page="alerts"] { --amb-1: rgba(239, 68, 68, 0.18); --amb-2: rgba(249, 115, 22, 0.12); --amb-3: rgba(139, 92, 246, 0.1); }
 
 .tn-ambient-aurora {
@@ -4047,5 +4051,841 @@ html:not([data-theme="dark"]) .tn-surface-btn {
 @media (prefers-reduced-motion: reduce) {
   .tn-story-marker[data-state="active"] .tn-story-marker-ring {
     animation: none;
+  }
+}
+
+/* ---------- Cameras: idle tiles show a still from the feed (a CCTV wall, not empty boxes) ---------- */
+.cam-feed-still-wrap {
+  overflow: hidden;
+  background: #0b1220;
+}
+.cam-feed-still {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: 60% 45%;
+  filter: saturate(0.9) brightness(0.92);
+  transition: filter 0.4s ease;
+  will-change: transform;
+  animation: cam-still-drift 16s ease-in-out infinite alternate;
+}
+.cam-feed-card:hover .cam-feed-still {
+  filter: saturate(1.05) brightness(1.02);
+}
+.cam-feed-still-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.45) 0%, rgba(2, 6, 23, 0) 30%, rgba(2, 6, 23, 0) 65%, rgba(2, 6, 23, 0.5) 100%);
+}
+@keyframes cam-still-drift {
+  from { transform: scale(1.02) translate3d(0, 0, 0); }
+  to { transform: scale(1.1) translate3d(-1.5%, -1%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cam-feed-still {
+    animation: none;
+  }
+}
+
+/* ---------- Alerts: active critical alerts carry a rotating alarm ring (same language as the hero CTA) ---------- */
+@property --tn-alarm {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.tn-alert-critical {
+  box-shadow: 0 0 28px -8px rgba(239, 68, 68, 0.5);
+}
+.tn-alert-critical::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 2px; /* ring width, laid over the card border */
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--tn-alarm), #ef4444, #f97316 18%, rgba(239, 68, 68, 0) 34%, rgba(239, 68, 68, 0) 56%, #f43f5e 72%, #ef4444);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: tn-alarm-spin 3.2s linear infinite;
+}
+@keyframes tn-alarm-spin {
+  to {
+    --tn-alarm: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tn-alert-critical::before {
+    animation: none;
+  }
+}
+
+/* =========================================================
+   PIPELINE PAGE — backend stages · OCR lab · ANPR funnel · benchmarks
+   ========================================================= */
+
+/* ---------- Stage flow ---------- */
+.tn-flow-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 1.5rem;
+}
+.tn-flow-line {
+  position: absolute;
+  top: 26px;
+  left: 5.5%;
+  right: 5.5%;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.3));
+}
+.tn-flow-packet {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent calc(100% - 70px), rgba(96, 165, 250, 0.9) calc(100% - 10px), #fff);
+  transform: translateX(-100%);
+  animation: tn-flow-packet 6.4s linear infinite;
+}
+@keyframes tn-flow-packet {
+  to { transform: translateX(100%); }
+}
+.tn-flow-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.15rem 0.25rem;
+  border-radius: 14px;
+  text-align: center;
+}
+.tn-flow-node {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card-solid);
+  color: #3b82f6;
+  box-shadow: 0 6px 16px -8px rgba(15, 23, 42, 0.35);
+  transition: transform var(--tn-fast) var(--tn-ease), background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  animation: tn-flow-node 6.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.64s);
+}
+@keyframes tn-flow-node {
+  0%, 12%, 100% { box-shadow: 0 6px 16px -8px rgba(15, 23, 42, 0.35); }
+  5% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18), 0 0 18px rgba(59, 130, 246, 0.45); }
+}
+.tn-flow-stage:hover .tn-flow-node {
+  transform: translateY(-2px);
+}
+.tn-flow-stage.is-active .tn-flow-node {
+  background: linear-gradient(135deg, #2563eb, #0891b2);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18), 0 10px 24px -8px rgba(37, 99, 235, 0.6);
+  animation: none;
+}
+.tn-flow-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.tn-flow-metric {
+  font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #0891b2;
+}
+[data-theme="dark"] .tn-flow-metric {
+  color: #22d3ee;
+}
+@media (max-width: 1023px) {
+  .tn-flow-track {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 1rem;
+  }
+  .tn-flow-line {
+    display: none;
+  }
+}
+.tn-flow-detail {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-subtle);
+  animation: tn-flow-detail 0.35s var(--tn-ease) both;
+}
+@keyframes tn-flow-detail {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.tn-flow-detail-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+/* ---------- OCR lab ---------- */
+.tn-ocr-stage {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  background: #050a14;
+}
+.tn-ocr-frame {
+  position: absolute;
+  inset: 0;
+  transition: transform 1.3s var(--tn-ease), filter 0.6s ease;
+  will-change: transform;
+}
+.tn-ocr-frame img,
+.tn-ocr-frame svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.tn-ocr-stage[data-step="2"] .tn-ocr-frame,
+.tn-ocr-stage[data-step="3"] .tn-ocr-frame,
+.tn-ocr-stage[data-step="4"] .tn-ocr-frame {
+  filter: brightness(0.28) saturate(0.6);
+}
+.tn-ocr-vbox,
+.tn-ocr-pbox {
+  fill: none;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  transition: opacity 0.4s ease;
+}
+.tn-ocr-vbox {
+  stroke: #22d3ee;
+  stroke-width: 8;
+}
+.tn-ocr-pbox {
+  stroke: #34d399;
+  stroke-width: 1.6;
+}
+.tn-ocr-stage[data-step="0"] .tn-ocr-vbox {
+  animation: tn-ocr-draw 1s var(--tn-ease) 0.25s both;
+}
+.tn-ocr-stage[data-step="1"] .tn-ocr-vbox {
+  stroke-dashoffset: 0;
+  opacity: 0.35;
+}
+.tn-ocr-stage[data-step="1"] .tn-ocr-pbox {
+  animation: tn-ocr-draw 0.8s var(--tn-ease) 0.9s both;
+}
+@keyframes tn-ocr-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.tn-ocr-vlabel {
+  position: absolute;
+  transform: translateY(calc(-100% - 4px));
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #22d3ee;
+  color: #042f2e;
+  font: 800 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.tn-ocr-stage[data-step="0"] .tn-ocr-vlabel {
+  opacity: 1;
+  transition-delay: 0.9s;
+}
+.tn-ocr-layer {
+  position: absolute;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.45s ease, transform 0.45s var(--tn-ease);
+  pointer-events: none;
+  color: #e2e8f0;
+}
+.tn-ocr-stage[data-step="1"] .tn-ocr-layer--quality,
+.tn-ocr-stage[data-step="2"] .tn-ocr-layer--enhance,
+.tn-ocr-stage[data-step="3"] .tn-ocr-layer--reads,
+.tn-ocr-stage[data-step="4"] .tn-ocr-layer--final {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.35s;
+}
+.tn-ocr-layer-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+}
+.tn-ocr-layer--quality {
+  right: 3%;
+  bottom: 5%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: min(250px, 48%);
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.8);
+}
+.tn-ocr-meter-track,
+.tn-ocr-conf {
+  height: 4px;
+  margin-top: 3px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.2);
+}
+.tn-ocr-meter-track span,
+.tn-ocr-conf span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #22d3ee, #34d399);
+  transform-origin: left;
+  transition: transform 0.8s var(--tn-ease);
+}
+.tn-ocr-layer--enhance {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  padding: 0 5%;
+}
+.tn-ocr-layer--enhance figure {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 40%;
+}
+.tn-ocr-layer--enhance img {
+  width: 100%;
+  aspect-ratio: 84 / 43;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.8);
+}
+.tn-ocr-pixel {
+  image-rendering: pixelated;
+}
+.tn-ocr-layer--enhance figcaption {
+  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #94a3b8;
+}
+.tn-ocr-arrow {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #34d399;
+}
+.tn-ocr-layer--reads {
+  inset: 7% 7%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+}
+.tn-ocr-read {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.72);
+}
+.tn-ocr-read-crop {
+  flex: none;
+  width: 84px;
+  height: 43px;
+  border-radius: 6px;
+  image-rendering: pixelated;
+  object-fit: cover;
+}
+.tn-ocr-layer--final {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0 6%;
+}
+.tn-ocr-plate {
+  display: flex;
+  align-items: stretch;
+  height: clamp(44px, 9vw, 64px);
+  overflow: hidden;
+  border-radius: 8px;
+  border: 3px solid #0b0f19;
+  background: linear-gradient(180deg, #fde047, #facc15);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 40px rgba(250, 204, 21, 0.35);
+}
+.tn-ocr-plate-ind {
+  display: grid;
+  place-items: center;
+  width: clamp(22px, 4vw, 30px);
+  background: #1e40af;
+  color: #fff;
+  font: 800 9px/1 ui-sans-serif, system-ui, sans-serif;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.tn-ocr-plate-text {
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(10px, 2vw, 18px);
+  font: 900 clamp(20px, 4vw, 34px)/1 ui-monospace, "Cascadia Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  color: #0b0f19;
+}
+.tn-ocr-segments {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 0.5rem;
+}
+.tn-ocr-segments div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.7);
+}
+.tn-ocr-segments b {
+  font: 800 14px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #fde68a;
+}
+.tn-ocr-segments span {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.tn-ocr-checks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1rem;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+.tn-ocr-checks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+@media (max-width: 639px) {
+  .tn-ocr-layer--quality {
+    width: 62%;
+    gap: 0.25rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .tn-ocr-read {
+    padding: 0.3rem 0.5rem;
+  }
+  .tn-ocr-read-crop {
+    width: 56px;
+    height: 29px;
+  }
+  .tn-ocr-segments span {
+    display: none;
+  }
+}
+
+/* steps */
+.tn-ocr-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  overflow: hidden;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+.tn-ocr-step:hover {
+  background: var(--bg-subtle);
+}
+.tn-ocr-step.is-active {
+  border-color: var(--border-primary);
+  background: rgba(59, 130, 246, 0.07);
+}
+.tn-ocr-step-num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  border: 1px solid var(--border-primary);
+  font: 800 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-tertiary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.tn-ocr-step.is-active .tn-ocr-step-num {
+  border-color: transparent;
+  background: #2563eb;
+  color: #fff;
+}
+.tn-ocr-step.is-done .tn-ocr-step-num {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+.tn-ocr-step:not(.is-active) .tn-ocr-step-body {
+  display: none;
+}
+.tn-ocr-step-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, #2563eb, #22d3ee);
+  transform-origin: left;
+  animation: tn-ocr-progress linear both;
+}
+@keyframes tn-ocr-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* ---------- ANPR funnel ---------- */
+.tn-funnel-track {
+  height: 8px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  box-shadow: inset 0 0 0 1px var(--border-primary);
+}
+.tn-funnel-bar {
+  display: block;
+  height: 100%;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #2563eb, #22d3ee);
+  transform-origin: left;
+  transition: transform 0.7s var(--tn-ease);
+}
+.tn-outcome-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.tn-outcome-bar span {
+  min-width: 4px;
+  transition: flex-grow 0.6s var(--tn-ease);
+}
+
+/* ---------- Benchmarks ---------- */
+.tn-bench-key {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.tn-bench-key--before,
+.tn-bench-bar--before {
+  background: rgba(148, 163, 184, 0.5);
+}
+.tn-bench-key--after,
+.tn-bench-bar--after {
+  background: linear-gradient(90deg, #10b981, #22d3ee);
+}
+.tn-bench-pair {
+  display: grid;
+  gap: 3px;
+  margin-top: 5px;
+}
+.tn-bench-bar,
+.tn-speed-bar {
+  display: block;
+  height: 6px;
+  border-radius: 6px;
+  transform-origin: left;
+  transform: scaleX(var(--w));
+  animation: tn-bar-grow 0.9s var(--tn-ease) var(--d, 0ms) both;
+}
+@keyframes tn-bar-grow {
+  from { transform: scaleX(0); }
+}
+.tn-speed-track {
+  margin-top: 5px;
+}
+.tn-speed-bar {
+  height: 10px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.45), rgba(148, 163, 184, 0.7));
+}
+.tn-speed-bar.is-current {
+  background: linear-gradient(90deg, #10b981, #22d3ee);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+}
+.tn-class-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-subtle);
+}
+.tn-class-target {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.tn-class-chip {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+[data-theme="dark"] .tn-class-chip {
+  color: #93c5fd;
+}
+.tn-class-group--skip .tn-class-chip {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--text-tertiary);
+}
+.tn-runtime {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.tn-runtime li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-subtle);
+}
+.tn-runtime li.is-active {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.08);
+}
+.tn-runtime-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.tn-runtime-detail {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+.tn-runtime-badge {
+  margin-top: 3px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #10b981;
+}
+@media (max-width: 639px) {
+  .tn-runtime {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tn-flow-packet,
+  .tn-flow-node,
+  .tn-bench-bar,
+  .tn-speed-bar,
+  .tn-ocr-stage .tn-ocr-vbox,
+  .tn-ocr-stage .tn-ocr-pbox {
+    animation: none;
+  }
+  .tn-ocr-vbox,
+  .tn-ocr-pbox {
+    stroke-dashoffset: 0;
+  }
+  .tn-ocr-frame {
+    transition: none;
+  }
+}
+
+/* Navbar: the full link row (xl) needs the room below 2xl — the search button keeps just its icon */
+@media (min-width: 1280px) and (max-width: 1535px) {
+  .tn-cmdk-trigger kbd {
+    display: none;
+  }
+  .tn-cmdk-trigger {
+    padding: 0 0.7rem;
+  }
+}
+
+/* ---------- Live traffic (TomTom flow tiles) toggle + legend ---------- */
+.tn-live-traffic-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 800;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.tn-live-traffic-toggle.is-on {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+[data-theme="dark"] .tn-live-traffic-toggle.is-on {
+  color: #34d399;
+}
+.tn-live-traffic-toggle.is-unavailable {
+  opacity: 0.55;
+  cursor: help;
+}
+.tn-live-traffic-switch {
+  position: relative;
+  width: 22px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+  transition: background-color 0.2s ease;
+}
+.tn-live-traffic-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s var(--tn-ease);
+}
+.tn-live-traffic-toggle.is-on .tn-live-traffic-switch {
+  background: #10b981;
+}
+.tn-live-traffic-toggle.is-on .tn-live-traffic-switch::after {
+  transform: translateX(10px);
+}
+.tn-live-traffic-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 22px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 132px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card-solid);
+  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.45);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.tn-live-traffic-ramp {
+  height: 5px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #22c55e, #eab308 40%, #f97316 65%, #dc2626 85%, #7f1d1d);
+}
+
+/* ---------- Traffic: live road traffic (Google Maps / TomTom traffic layer) ---------- */
+.tn-live-road {
+  position: relative;
+  height: 480px;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-subtle);
+}
+.tn-live-road--setup {
+  height: auto;
+  min-height: 260px;
+}
+.tn-live-road-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  height: 100%;
+  min-height: 260px;
+  padding: 1.5rem;
+  text-align: center;
+}
+.tn-live-road-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card-solid);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.tn-live-road-option code {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  font: 700 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+/* Google / TomTom traffic colours: free flow → slow → congested → standstill */
+.tn-live-road-ramp {
+  width: 96px;
+  height: 6px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #16a34a, #eab308 40%, #f97316 62%, #dc2626 82%, #7f1d1d);
+}
+@media (max-width: 639px) {
+  .tn-live-road {
+    height: 380px;
   }
 }

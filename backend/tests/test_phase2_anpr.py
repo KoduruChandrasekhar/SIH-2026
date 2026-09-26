@@ -302,7 +302,7 @@ def _validator(s):
 def test_consensus_example_from_spec():
     reads = [Candidate("TS09AB4521", 0.94, True), Candidate("TS09AB4521", 0.91, True),
              Candidate("TS09A84521", 0.72, False)]
-    c = build_consensus(reads, 0.8, _validator)
+    c = build_consensus(reads, 1, _validator)
     assert c.text == "TS09AB4521" and c.valid
     assert c.frames_used == 3 and c.consensus_count == 2 and c.agreeing_count == 3
     assert 0.8 < c.confidence <= 0.94
@@ -311,15 +311,15 @@ def test_consensus_example_from_spec():
 def test_consensus_character_vote_tolerates_one_error_per_frame():
     reads = [Candidate("TS09AB4521", 0.90, True), Candidate("TS09AB4527", 0.88, True),
              Candidate("TS08AB4521", 0.86, True)]
-    c = build_consensus(reads, 0.8, _validator)
+    c = build_consensus(reads, 1, _validator)
     assert c.text == "TS09AB4521"
 
 
 def test_consensus_disagreement_lowers_confidence_and_empty_is_none():
-    agree = build_consensus([Candidate("TS09AB4521", 0.9, True)] * 2, 0.8, _validator)
-    split = build_consensus([Candidate("TS09AB4521", 0.9, True), Candidate("KA01MN0001", 0.9, True)], 0.8, _validator)
+    agree = build_consensus([Candidate("TS09AB4521", 0.9, True)] * 2, 1, _validator)
+    split = build_consensus([Candidate("TS09AB4521", 0.9, True), Candidate("KA01MN0001", 0.9, True)], 1, _validator)
     assert split.confidence < agree.confidence
-    assert build_consensus([Candidate("", 0.0, False)], 0.8, _validator) is None
+    assert build_consensus([Candidate("", 0.0, False)], 1, _validator) is None
 
 
 def test_pipeline_consensus_and_observation_schema(tmp_path):

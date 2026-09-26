@@ -6,11 +6,12 @@ import CamerasPage from "./pages/CamerasPage";
 import TrackingPage from "./pages/TrackingPage";
 import TrafficPage from "./pages/TrafficPage";
 import AlertsPage from "./pages/AlertsPage";
+import PipelinePage from "./pages/PipelinePage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import { X } from "lucide-react";
-import { AlertsProvider } from "./alerts/AlertsContext";
-import { ensureSession } from "./auth";
+import { AlertsProvider } from "./context/AlertsContext";
+import { ensureSession } from "./lib/auth";
 import AmbientBackdrop from "./components/fx/AmbientBackdrop";
 import CommandPalette from "./components/fx/CommandPalette";
 import useInteractionFX from "./components/fx/useInteractionFX";
@@ -73,6 +74,8 @@ export default function App() {
         return <TrackingPage navigate={navigate} openModal={openModal} params={params} />;
       case "traffic":
         return <TrafficPage navigate={navigate} openModal={openModal} params={params} />;
+      case "pipeline":
+        return <PipelinePage navigate={navigate} openModal={openModal} params={params} />;
       case "alerts":
         return <AlertsPage navigate={navigate} openModal={openModal} params={params} />;
       case "admin":

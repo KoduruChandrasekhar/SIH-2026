@@ -1,14 +1,14 @@
 import { Activity, Route, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Navbar from "../components/Navbar";
+import Navbar from "../components/layout/Navbar";
 import HeroSection from "../components/home/HeroSection";
 import FeatureModules from "../components/home/FeatureModules";
 import CommandMap from "../components/home/CommandMap";
 import NetworkPulse from "../components/home/NetworkPulse";
 import TrajectoryStory from "../components/home/TrajectoryStory";
 import usePrefersReducedMotion from "../hooks/usePrefersReducedMotion";
-import { alertsFeed, systemMetrics, trafficSummary } from "../data";
-import { fetchAlerts, fetchDashboard, fetchTraffic } from "../api";
+import { alertsFeed, systemMetrics, trafficSummary } from "../data/data";
+import { fetchAlerts, fetchDashboard, fetchTraffic } from "../lib/api";
 
 // Real values from the TraceNet API when it is reachable, otherwise the local demo dataset.
 function useHomeTelemetry() {

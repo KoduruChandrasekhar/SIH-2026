@@ -1,4 +1,4 @@
-import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../demoData";
+import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../../data/demoData";
 
 export default function CameraGraph({ activeRoute, currentCamera, isAnimating }) {
   // Simple layout scaling for the fixed node lat/lng

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Search, Fingerprint, ShieldCheck } from "lucide-react";
-import { formatConfidence } from "../demoData";
+import { Fingerprint, ShieldCheck } from "lucide-react";
+import { formatConfidence } from "../../data/demoData";
 
 export default function ReIDPanel({ matchData, fromCamera, toCamera, globalId, isActive }) {
   const [progress, setProgress] = useState({

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Check, Clock, Gauge, Route, ScanLine } from "lucide-react";
-import { cameraById, cameraRegistry } from "../../data";
-import { DEMO_GLOBAL_ID, DEMO_OBSERVATIONS, DEMO_VEHICLE } from "../../demoData";
+import { cameraById, cameraRegistry } from "../../data/data";
+import { DEMO_GLOBAL_ID, DEMO_OBSERVATIONS, DEMO_VEHICLE } from "../../data/demoData";
 
 // ─── Street-level map (SVG user units) ───────────────────────────────────────
 // A stylised GIS view — city blocks, arterials, an expressway, a lake and a park — deliberately different

@@ -1,4 +1,4 @@
-import { Network, Search, CheckCircle2, ArrowRight } from "lucide-react";
+import { Network, Search, CheckCircle2 } from "lucide-react";
 
 export default function CameraHandoff({ fromCamera, candidates, confirmedCamera, isActive, stage }) {
   if (!isActive) return null;

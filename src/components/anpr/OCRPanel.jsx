@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Scan, CheckCircle2, AlertTriangle } from "lucide-react";
-import { formatConfidence } from "../demoData";
+import { formatConfidence } from "../../data/demoData";
 
 export default function OCRPanel({ ocrData, isActive }) {
   const [showSelected, setShowSelected] = useState(false);

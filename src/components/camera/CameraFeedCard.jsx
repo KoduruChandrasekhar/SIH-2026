@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Camera, VideoOff, X } from "lucide-react";
-import { OCR_ACCURACY_TARGET } from "../data";
-import { formatAge } from "../sim/liveSim";
-import { AnimatedNumber } from "./motion/Motion";
-import { attachHls, useLiveStream } from "../streams";
+import { OCR_ACCURACY_TARGET } from "../../data/data";
+import { formatAge } from "../../sim/liveSim";
+import { AnimatedNumber } from "../motion/Motion";
+import { attachHls, useLiveStream } from "../../lib/streams";
 
 const TRACK_DATA = [
   { tracks: ["TRACK-017", "TRACK-024"] },
@@ -37,6 +37,8 @@ export default function CameraFeedCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   // Annotated clips are generated locally (git-ignored); deployments without them show the raw feed
   const [annotatedFailed, setAnnotatedFailed] = useState(false);
+  // idle tiles show a still frame from the camera's footage (falls back to the plain placeholder)
+  const [stillFailed, setStillFailed] = useState(false);
 
   const videoRef = useRef(null);
 
@@ -188,8 +190,24 @@ export default function CameraFeedCard({
             </div>
           ) : (
             <>
-              {/* Camera placeholder */}
-              {!showVideo && (
+              {/* Idle tile: a still frame from this camera's footage, slowly drifting */}
+              {!showVideo && !stillFailed && (
+                <div className="cam-feed-still-wrap absolute inset-0" aria-hidden="true">
+                  <img
+                    src={posterFor(videoSrc)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="cam-feed-still"
+                    style={{ animationDelay: `${-(parseInt(camId.replace(/\D/g, ""), 10) % 7) * 2}s` }}
+                    onError={() => setStillFailed(true)}
+                  />
+                  <span className="cam-feed-still-shade" />
+                </div>
+              )}
+
+              {/* Camera placeholder (no still available) */}
+              {!showVideo && stillFailed && (
                 <div className="cam-feed-placeholder absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-500">
                   <Camera
                     size={26}

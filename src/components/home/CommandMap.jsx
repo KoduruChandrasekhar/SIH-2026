@@ -9,10 +9,10 @@ import {
   Tooltip,
   useMap,
 } from "react-leaflet";
-import { areas, cameraRegistry } from "../../data";
-import { CAMERA_NETWORK_EDGES, CAMERA_NETWORK_NODES, DEMO_PLATE, DEMO_ROUTE_PATH } from "../../demoData";
+import { areas, cameraRegistry } from "../../data/data";
+import { CAMERA_NETWORK_EDGES, CAMERA_NETWORK_NODES, DEMO_PLATE, DEMO_ROUTE_PATH } from "../../data/demoData";
 
-export const MAP_MODES = [
+const MAP_MODES = [
   { id: "overview", label: "Overview", title: "Network overview", hint: "City zones & synchronized camera nodes" },
   { id: "trajectory", label: "Trajectory", title: "GIS tracking", hint: `Reconstructed trajectory · ${DEMO_PLATE}` },
   { id: "flow", label: "Traffic", title: "Macro traffic flow", hint: "Origin–destination corridors & zone density" },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Navigation, Pause, Play } from "lucide-react";
-import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraRegistry, hourlyTraffic, systemMetrics } from "../../data";
+import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraRegistry, hourlyTraffic, systemMetrics } from "../../data/data";
 import { useDecodeText, useMagnetic } from "../fx/textFx";
 
 // ── Hero media sequence ─────────────────────────────────────────────

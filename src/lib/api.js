@@ -53,7 +53,7 @@ async function apiFetch(endpoint) {
 }
 
 /** Mutating call; returns { ok, status, data }. */
-export async function apiSend(endpoint, method, body) {
+async function apiSend(endpoint, method, body) {
   try {
     const res = await request(endpoint, { method, body });
     return { ok: res.ok, status: res.status, data: await res.json().catch(() => null) };
@@ -113,7 +113,14 @@ export async function fetchCameraAnpr(cameraId) {
   return apiFetch(`/api/cameras/${encodeURIComponent(cameraId)}/anpr`);
 }
 
-export const anprEvidenceUrl = (path) => (path ? withToken(`${API_BASE}${path}`) : null);
+/** Every camera's latest Phase 2 run summary: { cameras: { "CAM-401": { stats, run, camera } } } or null. */
+export async function fetchAnprRuns() {
+  const data = await apiFetch("/api/anpr?limit=0");
+  return data?.cameras ?? null;
+}
+
+/** Absolute, token-signed URL for a backend-served file (ANPR crops, evidence frames). */
+const apiUrl = (path) => (path ? withToken(`${API_BASE}${path}`) : null);
 
 /** Map one ANPR observation onto the OCRPanel's `ocrData` shape (real reads only). */
 export function anprToOcrEvidence(obs) {
@@ -127,7 +134,7 @@ export function anprToOcrEvidence(obs) {
       selected: r.usable && r.corrected_text === obs.consensus_text,
       ocrOutput: r.corrected_text || "—",
       ocrConfidence: r.final_confidence * 100,
-      cropUrl: anprEvidenceUrl(r.crop_url),
+      cropUrl: apiUrl(r.crop_url),
     })),
     consensusPlate: obs.plate ?? obs.consensus_text ?? "—",
     consensusConfidence: obs.ocr_confidence != null ? obs.ocr_confidence * 100 : "—",
@@ -137,8 +144,6 @@ export function anprToOcrEvidence(obs) {
 }
 
 /* ─── Phase 4: PostGIS-backed trajectories ─────────────────────────────────── */
-
-export const apiUrl = (path) => (path ? withToken(`${API_BASE}${path}`) : null);
 
 /** { database: "ok" | "unavailable", … } or null when the backend is offline. */
 export async function fetchDbHealth() {
@@ -253,19 +258,19 @@ export function trajectoryToVehicle(data) {
 
 /* ─── Phase 5: Polars macro analytics (summary tables, refreshed in the background) ─── */
 
-export async function fetchHeatmap(window = "24h") {
+async function fetchHeatmap(window = "24h") {
   return apiFetch(`/api/v1/geo/heatmap?window=${window}`);
 }
 
-export async function fetchOdMatrix() {
+async function fetchOdMatrix() {
   return apiFetch("/api/v1/analytics/od-matrix");
 }
 
-export async function fetchAnalyticsSummary() {
+async function fetchAnalyticsSummary() {
   return apiFetch("/api/v1/analytics/summary");
 }
 
-export async function fetchHourlySeries(camera) {
+async function fetchHourlySeries(camera) {
   return apiFetch(`/api/v1/analytics/hourly${camera ? `?camera=${encodeURIComponent(camera)}` : ""}`);
 }
 

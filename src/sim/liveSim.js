@@ -14,9 +14,9 @@
  *    reduced rate; the offline one is frozen (its "last seen" age keeps growing)
  */
 import { useSyncExternalStore } from "react";
-import { SNAPSHOT_TIME, cameraRegistry, corridorsFeed, hourlyTraffic, junctionReadings } from "../data";
+import { SNAPSHOT_TIME, cameraRegistry, corridorsFeed, hourlyTraffic, junctionReadings } from "../data/data";
 
-export const TICK_MS = 5000;
+const TICK_MS = 5000;
 
 const toSec = (hms) => hms.split(":").reduce((acc, v) => acc * 60 + Number(v), 0);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));

@@ -57,6 +57,7 @@ class PlateValidation:
     plate_format: Optional[str]        # STANDARD | BH | None
     format_valid: bool
     corrections: list[str] = field(default_factory=list)   # e.g. ["0->O@0", "B->8@9"]
+    reject_reason: Optional[str] = None  # when invalid: format | unknown_state_code | watermark_text | no_text
 
     @property
     def validation(self) -> str:

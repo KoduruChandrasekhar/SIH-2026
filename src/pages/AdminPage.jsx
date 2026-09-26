@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Cctv, Database, KeyRound, Play, RefreshCw, Search, ShieldCheck, Square, UserPlus, Users, Workflow } from "lucide-react";
-import Navbar from "../components/Navbar";
+import Navbar from "../components/layout/Navbar";
 import {
   controlCamera,
   createAdminUser,
@@ -14,8 +14,8 @@ import {
   fetchStreams,
   refreshAnalytics,
   updateAdminUser,
-} from "../api";
-import { useSession } from "../useSession";
+} from "../lib/api";
+import { useSession } from "../hooks/useSession";
 
 /**
  * Admin console (camera_admin) — completion plan 3.3.

@@ -25,6 +25,8 @@
   "max_detect_skew_deg": 30.0,
   "min_char_transitions": 6,
   "crop_padding": 0.08,
+  "plate_owner_min_overlap": 0.80,
+  "plate_duplicate_iou": 0.30,
 
   "q_weight_area": 0.35,
   "q_weight_sharpness": 0.45,
@@ -69,7 +71,7 @@
   "bilateral_sigma_color": 75.0,
   "bilateral_sigma_space": 75.0,
 
-  "consensus_similarity": 0.80,
+  "consensus_max_edit_distance": 1,
   "resolve_confidence": 0.85,
   "min_plate_confidence": 0.75,
 

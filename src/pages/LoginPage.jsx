@@ -8,7 +8,7 @@ import {
   ArrowLeft 
 } from "lucide-react";
 import tracenetLogo from "../assets/tracenet-logo.jpg";
-import { login } from "../auth";
+import { login } from "../lib/auth";
 
 export default function LoginPage({ navigate }) {
   // Toggle between 'police' and 'admin'

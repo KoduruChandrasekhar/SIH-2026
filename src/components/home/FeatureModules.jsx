@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { ArrowRight, Bell, LayoutDashboard, Navigation, TrafficCone } from "lucide-react";
-import { areas } from "../../data";
-import { DEMO_ROUTE_PATH, cameraDisplayId } from "../../demoData";
+import { areas } from "../../data/data";
+import { DEMO_ROUTE_PATH, cameraDisplayId } from "../../data/demoData";
 
 const SEVERITY_DOT = { CRITICAL: "bg-red-500", HIGH: "bg-orange-500", MEDIUM: "bg-amber-400" };
 

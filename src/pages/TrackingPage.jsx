@@ -20,10 +20,10 @@ import {
 } from "lucide-react";
 import { GeoJSON, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
-import Navbar from "../components/Navbar";
-import { fetchDbHealth, fetchStoredTrajectories, fetchTrajectory, fetchVehicles, searchPlates, trajectoryToVehicle } from "../api";
+import Navbar from "../components/layout/Navbar";
+import { fetchDbHealth, fetchStoredTrajectories, fetchTrajectory, fetchVehicles, searchPlates, trajectoryToVehicle } from "../lib/api";
 import { MapBoundary } from "../components/motion/Motion";
-import { cameraById, cameraRegistry } from "../data";
+import { cameraById, cameraRegistry } from "../data/data";
 
 import {
   DEMO_PLATE,
@@ -34,15 +34,15 @@ import {
   DEMO_HANDOFF_CANDIDATES,
   DEMO_OCR_EVIDENCE,
   formatConfidence,
-} from "../demoData";
+} from "../data/demoData";
 
-import VehicleIdentityCard from "../components/VehicleIdentityCard";
-import JourneyTimeline from "../components/JourneyTimeline";
-import ReIDPanel from "../components/ReIDPanel";
-import OCRPanel from "../components/OCRPanel";
-import CameraHandoff from "../components/CameraHandoff";
-import ParallelProcessing from "../components/ParallelProcessing";
-import CameraGraph from "../components/CameraGraph";
+import VehicleIdentityCard from "../components/tracking/VehicleIdentityCard";
+import JourneyTimeline from "../components/tracking/JourneyTimeline";
+import ReIDPanel from "../components/tracking/ReIDPanel";
+import OCRPanel from "../components/anpr/OCRPanel";
+import CameraHandoff from "../components/tracking/CameraHandoff";
+import ParallelProcessing from "../components/tracking/ParallelProcessing";
+import CameraGraph from "../components/tracking/CameraGraph";
 
 // Trajectory records. Every hop uses a registry camera with its real coordinates; hop distances
 // are road distances (≥ the straight line between the cameras) and times match the speeds.

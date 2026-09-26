@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, Cctv, Radio, ScanLine } from "lucide-react";
-import { cameraRegistry, systemMetrics } from "../../data";
-import { DEMO_PLATE } from "../../demoData";
-import { EDGES, NODES, curveControl, projectNodes } from "../../cityGraph";
+import { cameraRegistry, systemMetrics } from "../../data/data";
+import { DEMO_PLATE } from "../../data/demoData";
+import { EDGES, NODES, curveControl, projectNodes } from "../../data/cityGraph";
 import { AnimatedNumber } from "../motion/Motion";
 
 const READS_TODAY = cameraRegistry.reduce((s, c) => s + c.today, 0);

@@ -63,6 +63,10 @@ CLASS_NAME_MAP = {
 # vehicles that carry a registration plate (bicycles are detected by UVH models but not tracked for ANPR)
 TRACKED_CLASSES = ("car", "motorcycle", "auto_rickshaw", "bus", "truck")
 
+# ByteTrack settings (track_buffer 60) and the smallest box, in source pixels, handed to the tracker
+TRACKER_CONFIG = str(Path(__file__).resolve().parents[1] / "config" / "bytetrack.yaml")
+MIN_BOX_PX = 35
+
 
 # Annotation colours (BGR)
 CLASS_COLORS = {
@@ -88,19 +92,23 @@ class VehicleTracker:
         iou: float = 0.7,
         imgsz: Optional[int] = None,
         tracked_classes: tuple[str, ...] = TRACKED_CLASSES,
-        tracker_config: str = "bytetrack.yaml",
+        tracker_config: str = TRACKER_CONFIG,
+        min_box_px: int = MIN_BOX_PX,
     ):
         """
         confidence  detection confidence threshold (also ByteTrack's high-score band starts from this)
         iou         NMS IoU threshold: raise it (0.75-0.8) in dense two-wheeler traffic so adjacent vehicles
                     are not suppressed as duplicates; lower it (0.5-0.6) if one vehicle yields twin boxes
         imgsz       inference size (None = the model's training size); 960-1280 helps far/small vehicles
+        min_box_px  boxes narrower or shorter than this never reach ByteTrack (or ANPR): tiny far-away vehicles
+                    flicker in and out of detection and would otherwise be dropped and re-found under new IDs
         """
         self.model_path = model_path
         self.confidence = confidence
         self.iou = iou
         self.imgsz = imgsz
         self.tracker_config = tracker_config
+        self.min_box_px = min_box_px
         self.output_dir = Path(output_dir)
         self.public_dir = Path(public_dir)
 
@@ -133,6 +141,21 @@ class VehicleTracker:
                 "extend CLASS_NAME_MAP in backend/ai/vehicle_tracker.py"
             )
         self.class_ids = sorted(self.class_map)
+
+        # Registered before the first model.track() call, so it runs ahead of Ultralytics' own tracker callback
+        # (callbacks run in registration order): ByteTrack only ever sees boxes of at least min_box_px.
+        if self.min_box_px > 0:
+            self.model.add_callback("on_predict_postprocess_end", self._drop_small_boxes)
+
+    def _drop_small_boxes(self, predictor) -> None:
+        for i, result in enumerate(predictor.results):
+            boxes = result.boxes
+            if boxes is None or len(boxes) == 0:
+                continue
+            wh = boxes.xywh[:, 2:4]
+            keep = ((wh[:, 0] >= self.min_box_px) & (wh[:, 1] >= self.min_box_px)).nonzero().flatten().tolist()
+            if len(keep) < len(boxes):
+                predictor.results[i] = result[keep]
 
     def track_frame(self, frame) -> list[dict]:
         """Run YOLO + ByteTrack on one frame (tracker state persists across calls)."""

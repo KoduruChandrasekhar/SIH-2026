@@ -40,6 +40,8 @@ class ANPRConfig:
     max_detect_skew_deg: float = 30.0
     min_char_transitions: int = 6           # dark/light transitions across the plate's middle rows
     crop_padding: float = 0.08              # fraction of plate size added on each side
+    plate_owner_min_overlap: float = 0.80   # share of a plate inside a vehicle box for that vehicle to own it
+    plate_duplicate_iou: float = 0.30       # a plate box this close to one already assigned on the frame is a duplicate
 
     # ── Q-score (runs BEFORE any OCR) ───────────────────────────────────
     q_weight_area: float = 0.35
@@ -93,7 +95,7 @@ class ANPRConfig:
     bilateral_sigma_space: float = 75.0
 
     # ── Consensus ───────────────────────────────────────────────────────
-    consensus_similarity: float = 0.80      # 1 - normalised edit distance to count as agreeing
+    consensus_max_edit_distance: int = 1    # reads within this edit distance are the same plate (majority vote)
     resolve_confidence: float = 0.85        # early-OCR consensus at/above this closes the transit
     min_plate_confidence: float = 0.75      # valid-format consensus below this is OCR_FAILED, not DETECTED
 

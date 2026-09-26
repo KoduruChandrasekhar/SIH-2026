@@ -6,7 +6,7 @@ import { CAMERA_NETWORK_EDGES } from "./demoData";
  * road links, plus each camera's two nearest neighbours — so every visual draws the same city.
  */
 export const NODES = cameraRegistry.map((c) => ({ id: c.id, code: c.code, lat: c.lat, lng: c.lng, online: c.status !== "offline" }));
-export const nodeIndex = Object.fromEntries(NODES.map((n, i) => [n.id, i]));
+const nodeIndex = Object.fromEntries(NODES.map((n, i) => [n.id, i]));
 
 const COS_LAT = Math.cos((17.47 * Math.PI) / 180);
 

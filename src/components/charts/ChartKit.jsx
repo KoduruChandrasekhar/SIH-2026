@@ -1,4 +1,4 @@
-import { useTheme } from "../../ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
 
 // Shared Recharts styling so every TraceNet chart reads the same in light and dark mode.
 export function useChartTheme() {

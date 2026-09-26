@@ -17,3 +17,9 @@ export const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 /** Sign in automatically as the demo officer. Set VITE_DEMO_AUTO_LOGIN=false to require the Login page. */
 export const DEMO_AUTO_LOGIN = import.meta.env.VITE_DEMO_AUTO_LOGIN !== "false";
+
+/** TomTom API key for the real-time traffic flow overlay (free tier). Empty = the Live traffic toggle is disabled. */
+export const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY ?? "").trim();
+
+/** Google Maps JavaScript API key for the live traffic map (Google's own traffic layer). Takes priority over TomTom. */
+export const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "").trim();

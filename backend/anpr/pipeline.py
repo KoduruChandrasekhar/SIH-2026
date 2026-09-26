@@ -48,6 +48,33 @@ log = logging.getLogger("tracenet.anpr")
 DEFAULT_REPLAY_START = "2026-09-19T18:45:00+05:30"   # same clock origin as Phase 1 replay
 
 
+def _area(box: Sequence[float]) -> float:
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+
+
+def _intersection(a: Sequence[float], b: Sequence[float]) -> float:
+    return max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+
+
+def _iou(a: Sequence[float], b: Sequence[float]) -> float:
+    inter = _intersection(a, b)
+    union = _area(a) + _area(b) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def plate_owner(plate_bbox: Sequence[float], vehicle_boxes: Sequence[Sequence[float]],
+                min_overlap: float = 0.8) -> Optional[int]:
+    """
+    Index of the vehicle a plate belongs to: of the boxes containing at least `min_overlap` of the plate's area,
+    the one with the smallest total area (the nearer vehicle when a larger box overlaps it). None if none does.
+    """
+    plate_area = _area(plate_bbox)
+    if plate_area <= 0:
+        return None
+    containing = [i for i, box in enumerate(vehicle_boxes) if _intersection(plate_bbox, box) / plate_area >= min_overlap]
+    return min(containing, key=lambda i: (_area(vehicle_boxes[i]), i)) if containing else None
+
+
 @dataclass
 class _Buffered:
     q: float
@@ -147,6 +174,8 @@ class ANPRPipeline:
             "short_tracks_discarded": 0,
             "plate_searches": 0,
             "plate_candidates": 0,
+            "plate_bleed_rejected": 0,        # plate inside a smaller, overlapping vehicle box → not this track's
+            "plate_duplicate_rejected": 0,    # same plate box already assigned to another track on this frame
             "candidates_rejected": Counter(),
             "candidates_accepted": 0,
             "crops_sent_to_ocr": 0,
@@ -175,7 +204,8 @@ class ANPRPipeline:
             self._last_sample_offset = offset
             st["frames_sampled_for_plates"] += 1
 
-        for det in detections:
+        searching: list[tuple[_Track, dict, int]] = []
+        for i, det in enumerate(detections):
             st["vehicle_detections"] += 1
             tid = det.get("track_id")
             if tid is None:
@@ -187,8 +217,10 @@ class ANPRPipeline:
                 st["unique_tracks"] += 1
             self._update_track(track, det, frame_index, offset, frame)
             if sampled and not track.ocr_done:
-                self._search_plate(track, frame, det, frame_index, offset)
+                searching.append((track, det, i))
 
+        if searching:
+            self._search_plates(frame, detections, searching, frame_index, offset)
         self._expire(frame_index)
 
     def process_packet(self, packet, detections: Sequence[dict]) -> None:
@@ -258,11 +290,39 @@ class ANPRPipeline:
 
     # ── plate search + quality gate (no OCR here) ────────────────────────
 
-    def _search_plate(self, track: _Track, frame: np.ndarray, det: dict, frame_index: int, offset: float) -> None:
+    def _search_plates(self, frame: np.ndarray, detections: Sequence[dict],
+                       searching: list[tuple[_Track, dict, int]], frame_index: int, offset: float) -> None:
+        """
+        Find plate candidates for every searching vehicle on this frame, then give each plate to exactly one vehicle.
+
+        In dense traffic a large box (a truck, a bus) often covers the car in front of it, so the car's plate is
+        found inside both boxes. A plate belongs to the SMALLEST vehicle box that contains it, and one plate box is
+        never assigned to two tracks on the same frame.
+        """
+        cfg, st = self.cfg, self.stats
+        found = [(track, det, i, self._detect_candidates(track, frame, det)) for track, det, i in searching]
+        boxes = [d["bbox"] for d in detections]
+        claimed: list[tuple[list[int], int]] = []      # (plate box, track id) already assigned on this frame
+        # smallest vehicles claim first, so a plate seen through an overlapping truck box stays with its car
+        for track, det, i, candidates in sorted(found, key=lambda f: _area(f[1]["bbox"])):
+            kept = []
+            for cand in candidates:
+                owner = plate_owner(cand.bbox, boxes, cfg.plate_owner_min_overlap)
+                if owner is not None and owner != i:
+                    st["plate_bleed_rejected"] += 1
+                    continue
+                if any(_iou(cand.bbox, box) >= cfg.plate_duplicate_iou for box, tid in claimed if tid != track.track_id):
+                    st["plate_duplicate_rejected"] += 1
+                    continue
+                claimed.append((list(cand.bbox), track.track_id))
+                kept.append(cand)
+            self._accept_candidates(track, frame, det, kept, frame_index, offset)
+
+    def _detect_candidates(self, track: _Track, frame: np.ndarray, det: dict) -> list[PlateCandidate]:
         cfg, st = self.cfg, self.stats
         x1, y1, x2, y2 = det["bbox"]
         if x2 - x1 < cfg.min_vehicle_width_px or y2 - y1 < cfg.min_vehicle_height_px:
-            return
+            return []
 
         track.searched += 1
         st["plate_searches"] += 1
@@ -273,7 +333,11 @@ class ANPRPipeline:
             log.warning("plate detection failed on track %s: %s", track.track_id, exc)
             candidates = []
         st["plate_detection_seconds"] += time.perf_counter() - t0
+        return candidates
 
+    def _accept_candidates(self, track: _Track, frame: np.ndarray, det: dict, candidates: Sequence[PlateCandidate],
+                           frame_index: int, offset: float) -> None:
+        cfg, st = self.cfg, self.stats
         H, W = frame.shape[:2]
         for cand in candidates:
             track.candidates_found += 1
@@ -356,7 +420,7 @@ class ANPRPipeline:
         track.consensus = build_consensus(
             [Candidate(r.validation.corrected_text if r.usable else "", r.final_confidence,
                        r.usable and r.validation.format_valid) for r in track.reads],
-            cfg.consensus_similarity,
+            cfg.consensus_max_edit_distance,
             validator=lambda s: ((v := validate_plate(s)).corrected_text, v.format_valid),
         )
         if early and track.consensus and track.consensus.valid and track.consensus.confidence >= cfg.resolve_confidence:

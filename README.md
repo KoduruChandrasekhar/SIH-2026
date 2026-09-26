@@ -438,16 +438,16 @@ The frontend is designed to integrate with an AI backend containing components s
 TraceNet/
 ├── index.html, vite.config.js, package.json   React + Vite frontend (deployed to Vercel)
 ├── vercel.json, .vercelignore, .env.example   frontend deployment config
-├── public/                   hero clips, camera feeds + posters (served as static files)
 ├── src/
 │   ├── main.jsx, App.jsx     entry, page switching + view transitions
-│   ├── config.js             backend URL / demo-mode switches (VITE_* env vars)
-│   ├── api.js, auth.js       REST client + JWT session (offline fallbacks)
-│   ├── data.js, demoData.js  bundled demo dataset
-│   ├── pages/                Home, Dashboard, Cameras, Tracking, Traffic, Alerts, Admin, Login
-│   ├── components/           feature panels, charts/, home/, motion/, fx/ (palette, backdrop, effects)
-│   ├── alerts/, sim/, hooks/ live alert stream, demo live simulation, shared hooks
-│   └── index.css             Tailwind v4 + theme tokens + component styles
+│   ├── styles/index.css      Tailwind v4 + theme tokens + component styles
+│   ├── lib/                  api.js · auth.js · streams.js · config.js (VITE_* env vars)
+│   ├── data/                 bundled demo dataset, camera graph, pipeline measurements
+│   ├── context/, hooks/      theme + live-alert contexts, shared hooks
+│   ├── sim/                  demo live simulation
+│   ├── pages/                Home, Dashboard, Cameras, Tracking, Traffic, Pipeline, Alerts, Admin, Login
+│   └── components/           layout/ camera/ anpr/ tracking/ map/ charts/ home/ fx/ motion/
+├── public/                   hero clips, camera feeds + posters, pipeline/ (real OCR evidence images)
 ├── backend/                  FastAPI API, ANPR / fusion / analytics pipeline, tests
 ├── db/                       PostGIS schema
 ├── docker/, docker-compose.yml  PostGIS, Redis, RabbitMQ, MediaMTX
@@ -547,6 +547,8 @@ The repo root is the Vite app, so Vercel needs no root-directory change: import 
 |---|---|---|
 | `VITE_API_BASE_URL` | *(empty)* | Backend origin, e.g. `https://api.example.org` (https). Empty = self-contained demo on the bundled dataset, no API calls. |
 | `VITE_DEMO_AUTO_LOGIN` | `true` | Sign in automatically as the demo officer; `false` requires the Login page. |
+| `VITE_GOOGLE_MAPS_API_KEY` | *(empty)* | *Live road traffic* map on the Traffic page: Google Maps with Google's traffic layer and TraceNet's cameras. Needs "Maps JavaScript API" enabled and a billing account (free monthly credit); restrict the key to your domain. |
+| `VITE_TOMTOM_API_KEY` | *(empty)* | Alternative traffic source (TomTom Traffic Flow tiles, free key, no card): used by the live map when no Google key is set, and by the heatmap's *Live traffic* toggle. |
 
 Set them under **Project → Settings → Environment Variables** and redeploy (Vite bakes them in at build
 time). To connect a deployed backend, also allow the site's origin there:

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ShieldAlert, Zap, X } from "lucide-react";
-import { BACKEND_ENABLED, WS_BASE } from "../config";
-import { ensureSession, getToken, onSessionChange, refreshSession } from "../auth";
+import { BACKEND_ENABLED, WS_BASE } from "../lib/config";
+import { ensureSession, getToken, onSessionChange, refreshSession } from "../lib/auth";
 
 /**
  * Phase 6 — live alert stream for the whole app.

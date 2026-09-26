@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Bell,
   Cctv,
+  Cpu,
   Home,
   LayoutDashboard,
   LogIn,
@@ -15,11 +16,11 @@ import {
   X,
 } from "lucide-react";
 
-import tracenetLogo from "../assets/tracenet-logo.jpg"; 
-import { useTheme } from "../ThemeContext";
-import { useAlerts } from "../alerts/AlertsContext";
-import { useSession } from "../useSession";
-import { isMac, openCommandPalette } from "./fx/CommandPalette";
+import tracenetLogo from "../../assets/tracenet-logo.jpg"; 
+import { useTheme } from "../../context/ThemeContext";
+import { useAlerts } from "../../context/AlertsContext";
+import { useSession } from "../../hooks/useSession";
+import { isMac, openCommandPalette } from "../fx/CommandPalette";
 
 export default function Navbar({ page, navigate, openModal }) {
   const { unread, connected } = useAlerts();
@@ -50,7 +51,7 @@ export default function Navbar({ page, navigate, openModal }) {
           items-center
           gap-2
           rounded-xl
-          px-3.5
+          px-2.5 2xl:px-3.5
           py-2
           text-xs
           sm:text-sm
@@ -158,7 +159,7 @@ export default function Navbar({ page, navigate, openModal }) {
                 tracking-[2px]
                 text-blue-500
                 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]
-                md:block
+                md:block xl:hidden 2xl:block
               "
             >
               AI Traffic Intelligence
@@ -197,6 +198,7 @@ export default function Navbar({ page, navigate, openModal }) {
         {item("Cameras", Cctv, "cameras")}
         {item("Tracking", Navigation, "tracking")}
         {item("Traffic", TrafficCone, "traffic")}
+        {item("Pipeline", Cpu, "pipeline")}
         {session?.role === "camera_admin" && item("Admin", ShieldCheck, "admin")}
 
         {/* Alerts Route Button with Red FX */}
@@ -210,7 +212,7 @@ export default function Navbar({ page, navigate, openModal }) {
             items-center
             gap-1.5
             rounded-xl
-            px-3.5
+            px-2.5 2xl:px-3.5
             py-2
             text-xs
             font-bold
