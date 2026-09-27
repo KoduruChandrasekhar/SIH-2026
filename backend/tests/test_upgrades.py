@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-for p in (PROJECT_ROOT, PROJECT_ROOT / "backend" / "training" / "yolo"):
+for p in (PROJECT_ROOT, PROJECT_ROOT / "backend" / "scripts", PROJECT_ROOT / "backend" / "training" / "yolo"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 

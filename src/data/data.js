@@ -55,10 +55,6 @@ export const cameraById = Object.fromEntries(cameraRegistry.map((c) => [c.id, c]
 
 export const systemMetrics = {
   totalNodesActive: 254, // city-wide ANPR nodes (the registry above is 24 of them)
-  networkUptime: "99.6%",
-  averageInferenceLatency: "46ms",
-  platesIndexedToday: "1,428,910",
-  activeAlertsCount: 3,
 };
 
 // ─── Hourly network profile for the cluster (00:00–23:00) ─────────────────

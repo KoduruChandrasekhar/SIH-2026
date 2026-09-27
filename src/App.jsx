@@ -12,9 +12,9 @@ import AdminPage from "./pages/AdminPage";
 import { X } from "lucide-react";
 import { AlertsProvider } from "./context/AlertsContext";
 import { ensureSession } from "./lib/auth";
-import AmbientBackdrop from "./components/fx/AmbientBackdrop";
-import CommandPalette from "./components/fx/CommandPalette";
-import useInteractionFX from "./components/fx/useInteractionFX";
+import AmbientBackdrop from "./components/layout/AmbientBackdrop";
+import CommandPalette from "./components/layout/CommandPalette";
+import useInteractionFX from "./hooks/useInteractionFX";
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -70,24 +70,24 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case "dashboard":
-        return <DashboardPage navigate={navigate} openModal={openModal} params={params} />;
+        return <DashboardPage navigate={navigate} params={params} />;
       case "cameras":
-        return <CamerasPage navigate={navigate} openModal={openModal} params={params} />;
+        return <CamerasPage navigate={navigate} params={params} />;
       case "tracking":
         return <TrackingPage navigate={navigate} openModal={openModal} params={params} />;
       case "traffic":
-        return <TrafficPage navigate={navigate} openModal={openModal} params={params} />;
+        return <TrafficPage navigate={navigate} params={params} />;
       case "pipeline":
-        return <PipelinePage navigate={navigate} openModal={openModal} params={params} />;
+        return <PipelinePage navigate={navigate} params={params} />;
       case "alerts":
-        return <AlertsPage navigate={navigate} openModal={openModal} params={params} />;
+        return <AlertsPage navigate={navigate} params={params} />;
       case "admin":
-        return <AdminPage navigate={navigate} openModal={openModal} params={params} />;
+        return <AdminPage navigate={navigate} params={params} />;
       case "login":
-        return <LoginPage navigate={navigate} openModal={openModal} params={params} />;
+        return <LoginPage navigate={navigate} params={params} />;
       case "home":
       default:
-        return <HomePage navigate={navigate} openModal={openModal} params={params} />;
+        return <HomePage navigate={navigate} params={params} />;
     }
   };
 

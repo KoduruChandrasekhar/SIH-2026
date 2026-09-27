@@ -1169,23 +1169,46 @@ select {
 }
 
 /* Dynamic copy — swaps with each stage */
-.tn-hero-copy {
+.tn-hero-copy-stack {
+  display: grid;
   margin-top: clamp(1.5rem, 4svh, 2.75rem);
   max-width: 46rem;
-  animation: tn-copy-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
-@keyframes tn-copy-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-    filter: blur(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    filter: blur(0);
-  }
+/* stacked in one cell; only the active stage is visible. Opacity + transform only (cheap to animate). */
+.tn-hero-copy {
+  grid-area: 1 / 1;
+  align-self: center;
+  opacity: 0;
+  transform: translateY(-8px);
+  visibility: hidden;
+  transition:
+    opacity 0.45s ease,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0.6s;
+}
+.tn-hero-copy.is-active {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity 0.7s ease 0.25s,
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s,
+    visibility 0s;
+}
+/* the incoming copy rises from just below while the outgoing one lifts away */
+.tn-hero-copy:not(.is-active) {
+  pointer-events: none;
+}
+.tn-hero-copy.is-active .tn-hero-heading,
+.tn-hero-copy.is-active .tn-hero-body {
+  animation: tn-copy-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+.tn-hero-copy.is-active .tn-hero-body {
+  animation-delay: 0.35s;
+}
+@keyframes tn-copy-rise {
+  from { transform: translateY(10px); }
+  to { transform: none; }
 }
 
 .tn-hero-label {
@@ -1896,13 +1919,18 @@ select {
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
+  .tn-hero-copy,
+  .tn-hero-copy.is-active {
+    transform: none;
+  }
   .tn-hero-clip,
   .tn-hero-clip.is-active {
     transform: none;
     filter: brightness(1.15);
     transition: opacity 0.6s linear;
   }
-  .tn-hero-copy,
+  .tn-hero-copy .tn-hero-heading,
+  .tn-hero-copy .tn-hero-body,
   .tn-scroll-cue-arrow,
   .tn-home .tn-live-dot,
   .tn-home .trace-live-dot {

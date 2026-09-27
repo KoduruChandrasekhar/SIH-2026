@@ -36,11 +36,11 @@ import { LIVE_TRAFFIC_AVAILABLE, LiveTrafficLayer, LiveTrafficLegend, LiveTraffi
 import LiveRoadTraffic from "../components/map/LiveRoadTraffic";
 import { LIVE_ANALYTICS, corridorLive, networkSummary, useLiveTraffic } from "../lib/liveTraffic";
 import { LiveIncidents, LiveJunctionSpeeds, LiveStatusChip, LiveTrend } from "../components/traffic/LivePanels";
-import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
+import { ChartTooltip, hourTicks, useChartTheme } from "../components/ui/ChartKit";
 import { BCI_COLOR, bciStatus, fetchMacroAnalytics, fetchTrafficCorridors, fetchTrafficOD } from "../lib/api";
 import { SNAPSHOT_TIME, cameraById, corridorsFeed, hourlyTraffic, trafficSummary } from "../data/data";
-import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
-import { pctChange, useLiveSim } from "../sim/liveSim";
+import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/ui/Motion";
+import { pctChange, useLiveSim } from "../lib/liveSim";
 
 // Corridor + OD data come from the shared dataset (src/data/data.js) so the map, lists, charts,
 // Dashboard and Alerts all describe the same evening-peak situation.
@@ -138,7 +138,7 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-export default function TrafficPage({ navigate, openModal, params }) {
+export default function TrafficPage({ navigate, params }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [baseCorridors, setCorridors] = useState(localCorridors);
   const [odRoutes, setOdRoutes] = useState(localOdRoutes);
@@ -261,7 +261,6 @@ export default function TrafficPage({ navigate, openModal, params }) {
     }, 450);
   };
 
-  const nowHour = hourlyTraffic[Number(SNAPSHOT_TIME.slice(0, 2))];
   const hourlySeries = real ? macro.hourly : hourlyTraffic;
   const nowTick = real ? macro.hourly.at(-1)?.hour : `${SNAPSHOT_TIME.slice(0, 2)}:00`;
   const net = sim.network;
@@ -278,7 +277,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
           status: c.status,
         }))
         .sort((a, b) => b.volume - a.volume),
-    [corridors, liveMode]
+    [corridors, liveMode, real]
   );
 
   // Search: corridor name/ID, status, sector (camera zones) and camera codes
@@ -295,7 +294,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
       
       {/* Navbar */}
       <div className="w-full">
-        <Navbar page="traffic" navigate={navigate} openModal={openModal} />
+        <Navbar page="traffic" navigate={navigate} />
       </div>
 
       {/* Header Banner */}

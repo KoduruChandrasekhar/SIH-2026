@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { Cpu } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
-import PipelineFlow from "../components/anpr/PipelineFlow";
-import OcrLab from "../components/anpr/OcrLab";
-import FieldTests from "../components/anpr/FieldTests";
-import OcrUpgrade from "../components/anpr/OcrUpgrade";
+import PipelineFlow from "../components/pipeline/PipelineFlow";
+import OcrLab from "../components/pipeline/OcrLab";
+import FieldTests from "../components/pipeline/FieldTests";
+import OcrUpgrade from "../components/pipeline/OcrUpgrade";
 import { fetchDbHealth } from "../lib/api";
 
 /**
  * Module 06 — the AI pipeline behind every read: the backend's stages, one real OCR read step by step,
  * the pipeline on recorded Indian traffic, and the OCR engine upgrade.
  */
-export default function PipelinePage({ navigate, openModal }) {
+export default function PipelinePage({ navigate }) {
   const [live, setLive] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function PipelinePage({ navigate, openModal }) {
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10">
       <div className="w-full">
-        <Navbar page="pipeline" navigate={navigate} openModal={openModal} />
+        <Navbar page="pipeline" navigate={navigate} />
       </div>
 
       <header className="premium-panel fade-up p-6">

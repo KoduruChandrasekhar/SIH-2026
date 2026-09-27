@@ -2,8 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Camera, VideoOff, X } from "lucide-react";
 import { OCR_ACCURACY_TARGET } from "../../data/data";
-import { formatAge } from "../../sim/liveSim";
-import { AnimatedNumber } from "../motion/Motion";
+import { formatAge } from "../../lib/liveSim";
+import { AnimatedNumber } from "../ui/Motion";
 import { attachHls, useLiveStream } from "../../lib/streams";
 
 const TRACK_DATA = [

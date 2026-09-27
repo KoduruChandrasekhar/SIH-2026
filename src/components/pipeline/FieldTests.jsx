@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Car, CheckCircle2, Clapperboard, Pause, Play, ScanLine, ShieldCheck, Vote } from "lucide-react";
 import { FIELD_TESTS } from "../../data/fieldTests";
-import { AnimatedNumber } from "../motion/Motion";
+import { AnimatedNumber } from "../ui/Motion";
 
 // The pipeline's stages, each tied to the funnel rows it produces (labels match FIELD_TESTS[].funnel)
 const STAGES = [

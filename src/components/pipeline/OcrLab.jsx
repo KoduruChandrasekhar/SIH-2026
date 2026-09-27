@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Pause, Play, ScanLine } from "lucide-react";
 import { OCR_READ as R } from "../../data/pipeline";
-import { useDecodeText } from "../fx/textFx";
+import { useDecodeText } from "../../hooks/useTextFx";
 
 const STEPS = [
   {

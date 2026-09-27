@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Navigation, Pause, Play } from "lucide-react";
 import { OCR_ACCURACY_TARGET } from "../../data/data";
-import { useDecodeText, useMagnetic } from "../fx/textFx";
+import { useDecodeText, useMagnetic } from "../../hooks/useTextFx";
 
 // ── Hero media sequence ─────────────────────────────────────────────
 // Three story stages, four clips: the street stage shows the cameras, then what they see.
@@ -187,9 +187,8 @@ export default function HeroSection({ navigate, onEnter, reducedMotion }) {
   }, [playing, active, stage]);
 
   const copy = STAGES[stage];
-  // each stage's headline and data ticker "lock on" like a plate read
-  const headingRef = useDecodeText(copy.heading, { duration: 800, delay: 150 });
-  const tickerRef = useDecodeText(copy.ticker, { duration: 1100, delay: 350 });
+  // the data ticker "locks on" like a plate read (monospace, so the line never jitters while it resolves)
+  const tickerRef = useDecodeText(copy.ticker, { duration: 1100, delay: 450 });
   const primaryRef = useMagnetic();
   const secondaryRef = useMagnetic();
 
@@ -233,18 +232,25 @@ export default function HeroSection({ navigate, onEnter, reducedMotion }) {
             <span aria-hidden="true">Trace</span> <span aria-hidden="true">Net</span>
           </h1>
 
-          <div key={stage} className="tn-hero-copy">
-            <p className="tn-hero-label">
-              <span className="tn-hero-label-dot" aria-hidden="true" />
-              {copy.label}
-            </p>
-            <h2 className="tn-hero-heading" aria-label={copy.heading}>
-              <span ref={headingRef} aria-hidden="true">{copy.heading}</span>
-            </h2>
-            <p className="tn-hero-body">{copy.body}</p>
-            <p className="tn-hero-ticker" aria-label={copy.ticker}>
-              <span ref={tickerRef} aria-hidden="true">{copy.ticker}</span>
-            </p>
+          {/* All three stages share one grid cell: the block is always as tall as the longest copy, so nothing
+              below moves, and the outgoing copy fades out while the incoming one fades in */}
+          <div className="tn-hero-copy-stack">
+            {STAGES.map((s, i) => {
+              const on = i === stage;
+              return (
+                <div key={s.short} className={`tn-hero-copy ${on ? "is-active" : ""}`} aria-hidden={!on}>
+                  <p className="tn-hero-label">
+                    <span className="tn-hero-label-dot" aria-hidden="true" />
+                    {s.label}
+                  </p>
+                  <h2 className="tn-hero-heading">{s.heading}</h2>
+                  <p className="tn-hero-body">{s.body}</p>
+                  <p className="tn-hero-ticker" aria-label={s.ticker}>
+                    <span ref={on ? tickerRef : undefined} aria-hidden="true">{s.ticker}</span>
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
           <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">

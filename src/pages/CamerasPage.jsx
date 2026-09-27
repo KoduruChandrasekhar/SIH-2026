@@ -3,12 +3,12 @@ import { Activity, Cctv, ScanLine, Search, Signal, VideoOff, Wifi, X } from "luc
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Navbar from "../components/layout/Navbar";
 import CameraFeedCard from "../components/camera/CameraFeedCard";
-import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
+import { ChartTooltip, hourTicks, useChartTheme } from "../components/ui/ChartKit";
 import { anprToOcrEvidence, fetchCameraAnpr, fetchCameras, fetchIngestionCameras, vehicleClassLabel } from "../lib/api";
 import OCRPanel from "../components/anpr/OCRPanel";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraById, cameraRegistry, hourlyTraffic } from "../data/data";
-import { AnimatedNumber } from "../components/motion/Motion";
-import { formatClock, useLiveSim } from "../sim/liveSim";
+import { AnimatedNumber } from "../components/ui/Motion";
+import { formatClock, useLiveSim } from "../lib/liveSim";
 
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
@@ -64,7 +64,7 @@ function hourlyReads(camera) {
   }));
 }
 
-export default function CamerasPage({ navigate, openModal, params }) {
+export default function CamerasPage({ navigate, params }) {
   const chart = useChartTheme();
   const [cameraList, setCameraList] = useState(cameraRegistry);
   const [query, setQuery] = useState("");
@@ -148,7 +148,7 @@ export default function CamerasPage({ navigate, openModal, params }) {
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10">
       <div className="w-full">
-        <Navbar page="cameras" navigate={navigate} openModal={openModal} />
+        <Navbar page="cameras" navigate={navigate} />
       </div>
 
       {/* Header with the CCTV clip as an ambient backdrop */}

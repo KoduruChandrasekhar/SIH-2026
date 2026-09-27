@@ -28,17 +28,17 @@ import {
 } from "recharts";
 import { MapContainer, TileLayer, Tooltip as MapTooltip, CircleMarker, Circle, Polyline, useMap } from "react-leaflet";
 import Navbar from "../components/layout/Navbar";
-import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/ChartKit";
-import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
+import { ChartTooltip, hourTicks, useChartTheme } from "../components/ui/ChartKit";
+import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/ui/Motion";
 import { fetchDashboard, fetchMacroAnalytics } from "../lib/api";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, hourlyTraffic, junctionReadings } from "../data/data";
 import { EDGES as NETWORK_EDGES, NODES as NETWORK_NODES } from "../data/cityGraph";
-import { formatClock, pctChange, simNowSec, useLiveSim } from "../sim/liveSim";
+import { formatClock, pctChange, simNowSec, useLiveSim } from "../lib/liveSim";
 import { LIVE_ANALYTICS, corridorLive, networkSummary, useLiveTraffic } from "../lib/liveTraffic";
 
 // --- LOCAL DATA (fallback) ---
 // Key junction cameras from the shared registry; live readings come from the shared simulation
-// (src/sim/liveSim.js), so these nodes always match the Traffic corridors and the Cameras wall.
+// (src/lib/liveSim.js), so these nodes always match the Traffic corridors and the Cameras wall.
 const localCamerasData = Object.entries(junctionReadings).map(([camId, r]) => {
   const c = cameraById[camId];
   return {
@@ -132,7 +132,7 @@ function FocusCamera({ cam }) {
   return null;
 }
 
-export default function DashboardPage({ navigate, openModal }) {
+export default function DashboardPage({ navigate }) {
   const [camerasData, setCamerasData] = useState(localCamerasData);
   const [apiTrends, setApiTrends] = useState(null);
   const [macro, setMacro] = useState(null); // Phase 5 Polars analytics (null → local demo data)
@@ -274,7 +274,7 @@ export default function DashboardPage({ navigate, openModal }) {
 
       {/* Navbar */}
       <div className="w-full">
-        <Navbar page="dashboard" navigate={navigate} openModal={openModal} />
+        <Navbar page="dashboard" navigate={navigate} />
       </div>
 
       {/* Header Banner with Module 01 Badge */}

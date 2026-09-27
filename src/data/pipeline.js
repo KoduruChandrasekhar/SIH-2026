@@ -3,7 +3,7 @@
  *
  * Sources (all from this repository):
  *   OCR_READ       backend/output/anpr/CAM-401_anpr.json (Phase 2 run; evidence images copied to public/pipeline/)
- *   OCR_PROFILES   docs/UPGRADES_OCR_DETECTOR_BENCHMARK.md (measured on the development machine, CPU)
+ *   OCR_PROFILES   measured on the development machine (CPU)
  *   OCR_RUNTIME    backend/config/anpr.json (ocr_device "auto", ocr_use_tensorrt, fp16, hybrid mode)
  */
 

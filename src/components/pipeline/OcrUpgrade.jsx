@@ -6,7 +6,7 @@ const fastest = Math.min(...OCR_PROFILES.map((p) => p.medianMs));
 // log scale so 60 ms and 1.85 s are both readable
 const msWidth = (ms) => Math.max(0.04, Math.log10(ms) / Math.log10(maxMs));
 
-// Measured in docs/UPGRADES_OCR_DETECTOR_BENCHMARK.md
+// Measured on the development machine (CPU)
 
 /** OCR engine upgrade: latency per profile and the runtime fallback plan. */
 export default function OcrUpgrade() {

@@ -2,10 +2,10 @@
 """
 Standalone, disposable ANPR + tracking benchmark on IISc UVH-26 (Bengaluru Safe-City pole cameras).
 
-    python run_standalone_uvh26_test.py                                  # 2 val folders x 30 frames
-    python run_standalone_uvh26_test.py --sequences 000 --frames-per-seq 100
-    python run_standalone_uvh26_test.py --local-frames D:/cctv/seq01     # any folder of sequential frames
-    python run_standalone_uvh26_test.py --cleanup                        # delete downloads afterwards
+    python backend/scripts/run_standalone_uvh26_test.py                                  # 2 val folders x 30 frames
+    python backend/scripts/run_standalone_uvh26_test.py --sequences 000 --frames-per-seq 100
+    python backend/scripts/run_standalone_uvh26_test.py --local-frames D:/cctv/seq01     # any folder of sequential frames
+    python backend/scripts/run_standalone_uvh26_test.py --cleanup                        # delete downloads afterwards
 
 Isolation
     * Nothing in the repository is created or modified. TraceNet modules are imported read-only (backend.ai,
@@ -50,7 +50,7 @@ from typing import Any, Optional
 import cv2
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

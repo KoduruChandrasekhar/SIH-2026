@@ -22,8 +22,8 @@ import { addToWatchlist, fetchAlerts } from "../lib/api";
 import { useAlerts } from "../context/AlertsContext";
 import { WATCHLIST_CAMERAS, cameraDisplayId } from "../data/demoData";
 import { alertsFeed as localAlerts, cameraById } from "../data/data";
-import { AnimatedNumber, MapBoundary } from "../components/motion/Motion";
-import { formatClock, simNowSec } from "../sim/liveSim";
+import { AnimatedNumber, MapBoundary } from "../components/ui/Motion";
+import { formatClock, simNowSec } from "../lib/liveSim";
 
 // One controlled demo event per session: the blacklisted SUV from ALT-9041 is re-sighted
 // at the next camera on its path (CAM-401 → CAM-402 is 1.4 km). Not a random alert generator.
@@ -69,7 +69,7 @@ function FocusAlert({ alert }) {
   return null;
 }
 
-export default function AlertsPage({ navigate, openModal }) {
+export default function AlertsPage({ navigate }) {
   const [alerts, setAlerts] = useState(() => (sessionResighting ? [{ ...sessionResighting, isNew: false }, ...localAlerts] : localAlerts));
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -283,7 +283,7 @@ export default function AlertsPage({ navigate, openModal }) {
 
       {/* Navbar */}
       <div className="w-full">
-        <Navbar page="alerts" navigate={navigate} openModal={openModal} />
+        <Navbar page="alerts" navigate={navigate} />
       </div>
 
       {/* Header Banner */}

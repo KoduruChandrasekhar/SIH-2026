@@ -22,7 +22,7 @@ import { GeoJSON, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } fro
 import L from "leaflet";
 import Navbar from "../components/layout/Navbar";
 import { fetchDbHealth, fetchStoredTrajectories, fetchTrajectory, fetchVehicles, searchPlates, trajectoryToVehicle } from "../lib/api";
-import { MapBoundary } from "../components/motion/Motion";
+import { MapBoundary } from "../components/ui/Motion";
 import { cameraById, cameraRegistry } from "../data/data";
 
 import {
@@ -724,7 +724,7 @@ export default function TrackingPage({ navigate, openModal, params }) {
   return (
     <div className="tracking-page flex w-full flex-col gap-5 pb-10">
       <div>
-        <Navbar page="tracking" navigate={navigate} openModal={openModal} />
+        <Navbar page="tracking" navigate={navigate} />
       </div>
 
       {/* 1. Vehicle / Plate Search Header */}

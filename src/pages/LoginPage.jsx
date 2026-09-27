@@ -169,14 +169,16 @@ export default function LoginPage({ navigate }) {
             {/* Submit Button */}
             <button
               type="submit"
-              className={`group relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
+              disabled={busy}
+              aria-busy={busy}
+              className={`group relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:pointer-events-none disabled:opacity-70 ${
                 role === "police" 
                   ? "bg-blue-600 shadow-blue-600/30 hover:bg-blue-700" 
                   : "bg-indigo-600 shadow-indigo-600/30 hover:bg-indigo-700"
               }`}
             >
               <span className="relative z-10 flex items-center gap-2">
-                Authenticate & Login
+                {busy ? "Signing in…" : "Authenticate & Login"}
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
               </span>
             </button>

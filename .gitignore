@@ -55,6 +55,7 @@ pnpm-debug.log*
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # Virtual environments
 .venv/
@@ -120,3 +121,16 @@ backend-source.zip
 
 *.tmp
 *.temp
+
+# =========================================================
+# Internal documentation — kept out of the public repository
+# (design notes, phase plans, architecture, run books)
+# =========================================================
+
+docs/
+
+# =========================================================
+# Local tooling state
+# =========================================================
+
+.claude/*.lock

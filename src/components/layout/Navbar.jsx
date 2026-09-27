@@ -20,9 +20,9 @@ import tracenetLogo from "../../assets/tracenet-logo.jpg";
 import { useTheme } from "../../context/ThemeContext";
 import { useAlerts } from "../../context/AlertsContext";
 import { useSession } from "../../hooks/useSession";
-import { isMac, openCommandPalette } from "../fx/CommandPalette";
+import { isMac, openCommandPalette } from "./CommandPalette";
 
-export default function Navbar({ page, navigate, openModal }) {
+export default function Navbar({ page, navigate }) {
   const { unread, connected } = useAlerts();
   const session = useSession();
   const { theme, toggleTheme } = useTheme();

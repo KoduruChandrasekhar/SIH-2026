@@ -1,6 +1,6 @@
 import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../../data/demoData";
 
-export default function CameraGraph({ activeRoute, currentCamera, isAnimating }) {
+export default function CameraGraph({ activeRoute, currentCamera }) {
   // Simple layout scaling for the fixed node lat/lng
   const minLat = Math.min(...CAMERA_NETWORK_NODES.map(n => n.lat));
   const maxLat = Math.max(...CAMERA_NETWORK_NODES.map(n => n.lat));

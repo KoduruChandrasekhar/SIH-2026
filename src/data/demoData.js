@@ -1,5 +1,5 @@
 /**
- * TraceNet SIH-2026 — Centralized Demo Data
+ * TraceNet — Centralized Demo Data
  * ============================================
  * Single source of truth for the demo vehicle and camera network.
  * All pages/components import from here to ensure data consistency.

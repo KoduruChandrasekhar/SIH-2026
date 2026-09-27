@@ -1,6 +1,6 @@
 import { AlertTriangle, Ban, Car, Construction, Gauge, RefreshCw, Siren, TrendingUp } from "lucide-react";
 import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ChartTooltip, useChartTheme } from "../charts/ChartKit";
+import { ChartTooltip, useChartTheme } from "../ui/ChartKit";
 
 const clock = (t) => new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
 const minutes = (sec) => (sec >= 60 ? `${Math.round(sec / 60)} min` : `${sec} s`);

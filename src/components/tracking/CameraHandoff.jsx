@@ -19,7 +19,7 @@ export default function CameraHandoff({ fromCamera, candidates, confirmedCamera,
       </div>
 
       <div className="space-y-2">
-        {candidates.map((cand, i) => {
+        {candidates.map((cand) => {
           const isTarget = cand.camera === confirmedCamera;
           const showHighlight = (stage === 'found' || stage === 'confirmed') && isTarget;
           const progress = stage === 'leaving' ? 0 : cand.match;

@@ -3,11 +3,11 @@
 Automated full-pipeline ANPR benchmark: acquire a 10 s traffic clip → 15 FPS frames → track → plate → OCR → KPIs.
 
     # 1. YouTube (you choose the video - use one you have the right to download and process):
-    python run_automated_anpr_benchmark.py --url "https://www.youtube.com/watch?v=<id>" --start 30
+    python backend/scripts/run_automated_anpr_benchmark.py --url "https://www.youtube.com/watch?v=<id>" --start 30
     # 2. a local video file (any container ffmpeg reads):
-    python run_automated_anpr_benchmark.py --video public/camera-feeds/CAM-402.mp4
+    python backend/scripts/run_automated_anpr_benchmark.py --video public/camera-feeds/CAM-402.mp4
     # 3. frames you already have:
-    python run_automated_anpr_benchmark.py --frames-dir ./test_eval_tmp/local_frames
+    python backend/scripts/run_automated_anpr_benchmark.py --frames-dir ./test_eval_tmp/local_frames
 
     options: --duration 10 --fps 15 --ocr-profile default|accurate|full --ocr-device auto|gpu|cpu
              --model backend/models/uvh26_yolo11s.pt --max-ocr-per-frame 6 --cleanup
@@ -51,7 +51,7 @@ from typing import Any, Optional
 import cv2
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

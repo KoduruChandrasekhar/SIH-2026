@@ -48,7 +48,7 @@ function Tile({ icon: Icon, label, value, sub, tone = "text-gray-900" }) {
   );
 }
 
-export default function AdminPage({ navigate, openModal }) {
+export default function AdminPage({ navigate }) {
   const session = useSession();
   const isAdmin = session?.role === "camera_admin";
 
@@ -115,7 +115,7 @@ export default function AdminPage({ navigate, openModal }) {
   if (!isAdmin) {
     return (
       <div className="relative flex w-full flex-col gap-5 pb-10">
-        <Navbar page="admin" navigate={navigate} openModal={openModal} />
+        <Navbar page="admin" navigate={navigate} />
         <section className={`${card} mx-auto mt-10 flex max-w-lg flex-col items-center gap-3 text-center`}>
           <ShieldCheck size={30} className="text-violet-500" />
           <h1 className="text-lg font-black text-gray-900">Admin access required</h1>
@@ -136,7 +136,7 @@ export default function AdminPage({ navigate, openModal }) {
 
   return (
     <div className="relative flex w-full flex-col gap-5 pb-10">
-      <Navbar page="admin" navigate={navigate} openModal={openModal} />
+      <Navbar page="admin" navigate={navigate} />
 
       <header className="fade-up delay-100 flex flex-col gap-2 rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl sm:flex-row sm:items-end sm:justify-between">
         <div>

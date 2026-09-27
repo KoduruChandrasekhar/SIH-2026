@@ -40,7 +40,7 @@ function useHomeTelemetry() {
   return telemetry;
 }
 
-export default function HomePage({ navigate, openModal }) {
+export default function HomePage({ navigate }) {
   const reducedMotion = usePrefersReducedMotion();
   const telemetry = useHomeTelemetry();
   const [mapMode, setMapMode] = useState("overview");
@@ -105,7 +105,7 @@ export default function HomePage({ navigate, openModal }) {
     <div ref={homeRef} data-theme="dark" className="tn-home">
       <div className="tn-home-nav">
         <div className="mx-auto max-w-[1400px] px-3 pt-3 sm:px-6 lg:px-8">
-          <Navbar page="home" navigate={navigate} openModal={openModal} />
+          <Navbar page="home" navigate={navigate} />
         </div>
       </div>
 
