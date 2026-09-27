@@ -113,12 +113,6 @@ export async function fetchCameraAnpr(cameraId) {
   return apiFetch(`/api/cameras/${encodeURIComponent(cameraId)}/anpr`);
 }
 
-/** Every camera's latest Phase 2 run summary: { cameras: { "CAM-401": { stats, run, camera } } } or null. */
-export async function fetchAnprRuns() {
-  const data = await apiFetch("/api/anpr?limit=0");
-  return data?.cameras ?? null;
-}
-
 /** Absolute, token-signed URL for a backend-served file (ANPR crops, evidence frames). */
 const apiUrl = (path) => (path ? withToken(`${API_BASE}${path}`) : null);
 

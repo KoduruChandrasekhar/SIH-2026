@@ -32,8 +32,9 @@ import { ChartTooltip, hourTicks, useChartTheme } from "../components/charts/Cha
 import { AnimatedNumber, Delta, MapBoundary, useFlash } from "../components/motion/Motion";
 import { fetchDashboard, fetchMacroAnalytics } from "../lib/api";
 import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, alertsFeed, cameraById, cameraRegistry, hourlyTraffic, junctionReadings } from "../data/data";
-import { CAMERA_NETWORK_NODES, CAMERA_NETWORK_EDGES } from "../data/demoData";
+import { EDGES as NETWORK_EDGES, NODES as NETWORK_NODES } from "../data/cityGraph";
 import { formatClock, pctChange, simNowSec, useLiveSim } from "../sim/liveSim";
+import { LIVE_ANALYTICS, corridorLive, networkSummary, useLiveTraffic } from "../lib/liveTraffic";
 
 // --- LOCAL DATA (fallback) ---
 // Key junction cameras from the shared registry; live readings come from the shared simulation
@@ -62,6 +63,10 @@ const normaliseTrend = (rows, key, target) => rows?.map((r) => ({ hour: r.time ?
 const densityColor = (d) => (d > 80 ? "#ef4444" : d > 50 ? "#f97316" : "#10b981");
 const densityStatus = (d) => (d > 80 ? "High" : d > 50 ? "Med" : "Low");
 // Phase 5 (real data): BCI % — red ≥ 70 (severe), orange ≥ 40, green below
+// live status (current speed vs free flow, TomTom) → node colour
+const LIVE_COLOR = { Severe: "#ef4444", High: "#f97316", Moderate: "#eab308", Low: "#10b981" };
+const fmtDelay = (sec) => (sec >= 60 ? `${Math.round(sec / 60)} min` : `${Math.round(sec)} s`);
+const clockOf = (t) => new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
 const bciColor = (b) => (b == null ? "#94a3b8" : b >= 70 ? "#ef4444" : b >= 40 ? "#f97316" : "#10b981");
 const bciLabel = (b) => (b == null ? "No speed data" : b >= 70 ? "Severe" : b >= 40 ? "Moderate" : "Free flow");
 const hhmm = (iso) => (iso ? iso.slice(11, 16) : "—");
@@ -94,26 +99,36 @@ function macroToNodes(macro) {
 }
 const NOW_HOUR = Number(SNAPSHOT_TIME.slice(0, 2));
 
-// Flow lines between connected cameras (demo network edges)
-const flowLineEdges = CAMERA_NETWORK_EDGES.map(([fromId, toId]) => {
-  const from = CAMERA_NETWORK_NODES.find((n) => n.id === fromId);
-  const to = CAMERA_NETWORK_NODES.find((n) => n.id === toId);
-  return from && to ? [[from.lat, from.lng], [to.lat, to.lng]] : null;
-}).filter(Boolean);
+// Road links between cameras — the same connected network graph as the homepage visuals
+const flowLineEdges = NETWORK_EDGES.map(([a, b]) => [
+  [NETWORK_NODES[a].lat, NETWORK_NODES[a].lng],
+  [NETWORK_NODES[b].lat, NETWORK_NODES[b].lng],
+]);
 
 // Pans the (persistent) map to the selected camera
+// Every camera in the registry: the map opens framed on the whole city network
+const NETWORK_POINTS = cameraRegistry.map((c) => [c.lat, c.lng]);
+
+function FitNetwork() {
+  const map = useMap();
+  useEffect(() => {
+    map.fitBounds(NETWORK_POINTS, { padding: [24, 24], animate: false });
+  }, [map]);
+  return null;
+}
+
 function FocusCamera({ cam }) {
   const map = useMap();
-  const first = useRef(true);
+  // fly only when a different node is picked: the node object itself is rebuilt on every live update,
+  // and the first selection keeps the city-wide view
+  const shown = useRef(cam?.id);
   useEffect(() => {
-    if (!cam) return;
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (!cam || cam.id === shown.current) return;
+    shown.current = cam.id;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     map.flyTo([cam.lat, cam.lng], Math.max(map.getZoom(), 14), { duration: reduce ? 0 : 0.8 });
-  }, [map, cam]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, cam?.id]);
   return null;
 }
 
@@ -125,6 +140,11 @@ export default function DashboardPage({ navigate, openModal }) {
   const [selectedId, setSelectedId] = useState(localCamerasData[0].id);
   const chart = useChartTheme();
   const sim = useLiveSim();
+  // Live traffic (TomTom): real speed vs free flow at each junction camera — drives the KPIs and map nodes when available
+  const live = useLiveTraffic();
+  const liveMode = LIVE_ANALYTICS && live.probes.length > 0;
+  const probesByCamera = useMemo(() => Object.fromEntries(live.probes.map((p) => [p.camera, p])), [live.probes]);
+  const liveNet = useMemo(() => (liveMode ? networkSummary(live.probes) : null), [liveMode, live.probes]);
   const apiLoaded = useRef(false);
 
   // Fetch from API with fallback
@@ -186,12 +206,17 @@ export default function DashboardPage({ navigate, openModal }) {
           const speed = parseInt(c.speed, 10);
           return { ...c, liveDensity: c.densityValue ?? 0, liveSpeed: Number.isNaN(speed) ? null : speed, color: bciColor(c.densityValue), status: bciLabel(c.densityValue) };
         }
-        const live = c.camId ? sim.junctions[c.camId] : null;
-        const density = live?.density ?? c.densityValue;
-        const speed = live?.speed ?? parseInt(c.speed, 10);
+        const l = liveMode && c.camId ? corridorLive({ cameras: [c.camId] }, probesByCamera) : null;
+        if (l) {
+          const trend = l.closed ? "Road closed" : l.delay > 0 ? `+${fmtDelay(l.delay)} delay` : "Free flow";
+          return { ...c, live: true, liveDensity: l.congestion, liveSpeed: l.speed, color: LIVE_COLOR[l.status], status: l.status, trend };
+        }
+        const simulated = c.camId ? sim.junctions[c.camId] : null;
+        const density = simulated?.density ?? c.densityValue;
+        const speed = simulated?.speed ?? parseInt(c.speed, 10);
         return { ...c, liveDensity: density, liveSpeed: speed, color: densityColor(density), status: densityStatus(density) };
       }),
-    [camerasData, sim.junctions]
+    [camerasData, sim.junctions, liveMode, probesByCamera]
   );
   const selected = liveCameras.find((c) => c.id === selectedId) ?? liveCameras[0];
   const camId = selected.code ?? selected.id.split(" ")[0];
@@ -274,7 +299,7 @@ export default function DashboardPage({ navigate, openModal }) {
             <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-emerald-600">Live City Flow</span>
             <span className="ml-0.5 font-mono text-[10px] font-bold text-emerald-500">{formatClock(clock)} IST</span>
             <span className="hidden font-mono text-[9px] font-bold text-emerald-600/70 sm:inline">
-              {real ? `· Polars ${hhmm(macro.summary.computed_at)}` : `· updated ${updatedAgo}s ago`}
+              {liveMode && live.updatedAt ? `· TomTom ${clockOf(live.updatedAt)}` : real ? `· Polars ${hhmm(macro.summary.computed_at)}` : `· updated ${updatedAgo}s ago`}
             </span>
           </div>
         </div>
@@ -282,7 +307,35 @@ export default function DashboardPage({ navigate, openModal }) {
 
       {/* Network KPIs (live) */}
       <section aria-label="Network indicators" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        {real ? (
+        {liveMode && liveNet ? (
+          <>
+            <Kpi
+              icon={Gauge}
+              label="Network avg speed"
+              value={<AnimatedNumber value={liveNet.speed} format={(v) => `${v.toFixed(1)} km/h`} />}
+              sub={`free flow ${Math.round(liveNet.freeFlow)} km/h · TomTom live`}
+              delay="delay-100"
+            />
+            <Kpi
+              icon={MapIcon}
+              label="Network congestion"
+              value={<AnimatedNumber value={liveNet.congestion} format={(v) => `${Math.round(v)}%`} />}
+              sub="below free-flow speed"
+              tone={liveNet.congestion >= 50 ? "text-red-500" : "text-gray-900"}
+              delay="delay-100"
+            />
+            <Kpi icon={Activity} label="Travel-time delay" value={fmtDelay(liveNet.avgDelay)} sub={`average per junction road · ${live.probes.length} roads`} delay="delay-200" />
+            <Kpi
+              icon={AlertTriangle}
+              label="Live incidents"
+              value={<AnimatedNumber value={live.incidents.length} />}
+              sub={`${live.incidents.filter((i) => i.group === "jam").length} jams · ${live.incidents.filter((i) => i.group === "closure").length} closures`}
+              tone="text-amber-500"
+              delay="delay-200"
+            />
+            <Kpi icon={ScanLine} label="Active alerts" value={kpi.activeAlerts} sub="blacklist · congestion · anomaly" tone="text-red-500" delay="delay-300" />
+          </>
+        ) : real ? (
           <>
             <Kpi icon={Gauge} label="Network avg speed" value={macro.summary.average_city_speed != null ? `${macro.summary.average_city_speed.toFixed(1)} km/h` : "—"} sub={`24 h · ${macro.summary.speed_samples} leg speeds`} delay="delay-100" />
             <Kpi
@@ -368,6 +421,16 @@ export default function DashboardPage({ navigate, openModal }) {
             </div>
 
             {/* Map Legend */}
+            {liveMode ? (
+              <div className="tn-legend" role="note" aria-label="Live speed legend">
+                <span className="tn-legend-title">Live:</span>
+                {["Severe", "High", "Moderate", "Low"].map((s) => (
+                  <span key={s} className="tn-legend-item">
+                    <span className="h-2 w-2 rounded-full" style={{ background: LIVE_COLOR[s] }} /> {s}
+                  </span>
+                ))}
+              </div>
+            ) : (
             <div className="tn-legend" role="note" aria-label="Density legend">
               <span className="tn-legend-title">{real ? "BCI:" : "Density:"}</span>
               <span className="tn-legend-item">
@@ -380,12 +443,14 @@ export default function DashboardPage({ navigate, openModal }) {
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> {real ? "<0.4" : "Low"}
               </span>
             </div>
+            )}
           </div>
 
           <div className="relative z-10 w-full flex-1 overflow-hidden rounded-[16px] border border-gray-100" role="region" aria-label="Live GIS map of camera nodes">
             <MapBoundary>
-              <MapContainer center={[17.475, 78.405]} zoom={13} scrollWheelZoom={false} style={{ width: "100%", height: "100%" }}>
+              <MapContainer center={[17.43, 78.445]} zoom={12} scrollWheelZoom={false} style={{ width: "100%", height: "100%" }}>
                 <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <FitNetwork />
                 <FocusCamera cam={selected} />
 
                 {/* Flow lines between connected cameras */}
@@ -440,7 +505,11 @@ export default function DashboardPage({ navigate, openModal }) {
                       <MapTooltip direction="top" offset={[0, -8]}>
                         <strong>{cam.code ?? cam.id.split(" ")[0]}</strong> · {cam.name ?? ""}
                         <br />
-                        {cam.real ? `${cam.liveSpeed ?? "—"} km/h · BCI ${cam.densityValue != null ? (cam.densityValue / 100).toFixed(2) : "—"}` : `${cam.liveSpeed} km/h · ${cam.liveDensity}% capacity`}
+                        {cam.real
+                          ? `${cam.liveSpeed ?? "—"} km/h · BCI ${cam.densityValue != null ? (cam.densityValue / 100).toFixed(2) : "—"}`
+                          : cam.live
+                          ? `${cam.liveSpeed} km/h · ${cam.liveDensity}% below free flow`
+                          : `${cam.liveSpeed} km/h · ${cam.liveDensity}% capacity`}
                       </MapTooltip>
                     </CircleMarker>
                   );
@@ -498,7 +567,7 @@ export default function DashboardPage({ navigate, openModal }) {
 
               <div className="metric-tile tn-kpi flex flex-col rounded-[20px] border border-gray-100 bg-white/80 p-5 shadow-sm">
                 <span className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                  <Activity size={14} style={{ color: selected.color }} /> {selected.real ? "Congestion (BCI)" : "Density"}
+                  <Activity size={14} style={{ color: selected.color }} /> {selected.real ? "Congestion (BCI)" : selected.live ? "Congestion (live)" : "Density"}
                 </span>
                 <span className="congestion-transition text-3xl font-black tracking-tight" style={{ color: selected.color }}>
                   <AnimatedNumber value={selected.liveDensity} format={(v) => `${Math.round(v)}%`} />
@@ -546,7 +615,7 @@ export default function DashboardPage({ navigate, openModal }) {
                 </>
               ) : (
                 <>
-                  {kpi.online} of {cameraRegistry.length} cluster cameras reporting · {kpi.offline} offline ·{" "}
+                  {kpi.online} of {cameraRegistry.length} network cameras reporting · {kpi.offline} offline ·{" "}
                   <AnimatedNumber value={readsLastHour} /> plate reads in the last hour
                 </>
               )}
@@ -564,7 +633,7 @@ export default function DashboardPage({ navigate, openModal }) {
 
       {/* BOTTOM SECTION: today's network trends — the current hour updates live */}
       <div className="grid w-full gap-5 lg:grid-cols-3">
-        <TrendCard icon={Activity} iconClass="text-blue-500" title="Traffic Flow Trends" subtitle={real ? "Vehicles per hour across the cluster · last 24 h (Polars)" : "Vehicles per hour across the cluster · today so far"}>
+        <TrendCard icon={Activity} iconClass="text-blue-500" title="Traffic Flow Trends" subtitle={real ? "Vehicles per hour across the network · last 24 h (Polars)" : "Vehicles per hour across the network · today so far"}>
           <AreaChart data={flowTrendsData} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">

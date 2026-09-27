@@ -1,9 +1,10 @@
 /**
  * TraceNet — local demo dataset (used whenever the FastAPI backend is offline).
  *
- * Everything here describes ONE consistent snapshot of the west-Hyderabad ANPR cluster
- * (Kukatpally · JNTU · Miyapur · Nizampet · Balanagar · Madhapur / Hitech City · Gachibowli)
- * at the evening peak (SNAPSHOT_TIME). Cameras, corridors, zones, alerts and the hourly
+ * Everything here describes ONE consistent snapshot of the Hyderabad ANPR network — the west cluster
+ * (Kukatpally · JNTU · Miyapur · Nizampet · Balanagar · Madhapur / Hitech City · Gachibowli) and the
+ * city centre and east (Ameerpet · Begumpet · Secunderabad · Khairatabad · Abids · Koti · Old City ·
+ * Mehdipatnam · Tarnaka · Dilsukhnagar) — at the evening peak (SNAPSHOT_TIME). Cameras, corridors, zones, alerts and the hourly
  * trend series all reference the same camera IDs, coordinates and traffic levels.
  * Values are demo data, not measured production results.
  */
@@ -16,7 +17,8 @@ export const SNAPSHOT_TIME = "18:45";
 export const OCR_ACCURACY_TARGET = 90;
 
 // ─── Camera registry (single source of truth for camera IDs) ──────────────
-// CAM #401–#406 are the demo trajectory network (demoData); #407–#412 extend the cluster.
+// CAM #401–#406 are the demo trajectory network (demoData); #407–#412 extend the west cluster;
+// #413–#424 cover central and east Hyderabad.
 const node = (id) => CAMERA_NETWORK_NODES.find((n) => n.id === id);
 
 const REGISTRY = [
@@ -32,6 +34,19 @@ const REGISTRY = [
   { id: "CAM #410", name: "Gachibowli Flyover", lat: 17.4401, lng: 78.3489, zone: "Gachibowli", status: "online", fps: 30, resolution: "4K", lastHour: 1930, today: 26780, ocrRate: 96.0, latencyMs: 39, uptime: 99.9, lastPlate: "KA05MN8123", lastSeen: "18:44:59", videoFeed: "/camera-feeds/CAM-402.mp4" },
   { id: "CAM #411", name: "KPHB Colony Phase 1", lat: 17.4849, lng: 78.391, zone: "Kukatpally", status: "online", fps: 25, resolution: "1080p", lastHour: 1370, today: 20550, ocrRate: 92.7, latencyMs: 46, uptime: 99.5, lastPlate: "TS08HK2210", lastSeen: "18:44:57", videoFeed: "/camera-feeds/CAM-403.mp4" },
   { id: "CAM #412", name: "Bharat Nagar Flyover", lat: 17.4671, lng: 78.4296, zone: "Balanagar", status: "online", fps: 25, resolution: "1080p", lastHour: 1490, today: 22160, ocrRate: 94.4, latencyMs: 43, uptime: 99.6, lastPlate: "AP28BK8821", lastSeen: "18:44:55", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  // Central and east Hyderabad: Ameerpet · Secunderabad · Tank Bund · Old City · Dilsukhnagar
+  { id: "CAM #413", name: "Ameerpet X Roads", lat: 17.4374, lng: 78.4482, zone: "Ameerpet", status: "online", fps: 25, resolution: "4K", lastHour: 2260, today: 31120, ocrRate: 95.2, latencyMs: 41, uptime: 99.8, lastPlate: "TS09EU3316", lastSeen: "18:44:58", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  { id: "CAM #414", name: "Panjagutta Circle", lat: 17.426, lng: 78.4513, zone: "Panjagutta", status: "online", fps: 25, resolution: "1080p", lastHour: 2080, today: 28740, ocrRate: 94.6, latencyMs: 43, uptime: 99.7, lastPlate: "TS09FK7742", lastSeen: "18:44:57", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { id: "CAM #415", name: "Begumpet Flyover", lat: 17.4441, lng: 78.4644, zone: "Begumpet", status: "online", fps: 30, resolution: "4K", lastHour: 1720, today: 24310, ocrRate: 95.7, latencyMs: 38, uptime: 99.9, lastPlate: "TS10EC2291", lastSeen: "18:44:59", videoFeed: "/camera-feeds/CAM-403.mp4" },
+  { id: "CAM #416", name: "Paradise Circle", lat: 17.4434, lng: 78.4874, zone: "Secunderabad", status: "online", fps: 25, resolution: "1080p", lastHour: 1960, today: 27450, ocrRate: 94.1, latencyMs: 45, uptime: 99.6, lastPlate: "TS10UF6634", lastSeen: "18:44:56", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  { id: "CAM #417", name: "Khairatabad Junction", lat: 17.4108, lng: 78.463, zone: "Khairatabad", status: "online", fps: 25, resolution: "4K", lastHour: 2150, today: 29880, ocrRate: 95.0, latencyMs: 40, uptime: 99.8, lastPlate: "TS09GA1187", lastSeen: "18:44:58", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { id: "CAM #418", name: "Tank Bund – Liberty", lat: 17.4057, lng: 78.4787, zone: "Tank Bund", status: "degraded", fps: 11, resolution: "1080p", lastHour: 740, today: 15260, ocrRate: 88.4, latencyMs: 198, uptime: 97.6, lastPlate: "TS07HB5503", lastSeen: "18:44:29", videoFeed: "/camera-feeds/CAM-403.mp4", note: "Lens fogging after evening drizzle — reads intermittent" },
+  { id: "CAM #419", name: "Abids GPO Circle", lat: 17.3928, lng: 78.4757, zone: "Abids", status: "online", fps: 25, resolution: "1080p", lastHour: 1840, today: 25930, ocrRate: 93.8, latencyMs: 47, uptime: 99.5, lastPlate: "TS11EQ8820", lastSeen: "18:44:55", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  { id: "CAM #420", name: "Koti Junction", lat: 17.3855, lng: 78.4864, zone: "Koti", status: "online", fps: 25, resolution: "1080p", lastHour: 1790, today: 24980, ocrRate: 93.5, latencyMs: 49, uptime: 99.4, lastPlate: "TS11UD4471", lastSeen: "18:44:57", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { id: "CAM #421", name: "Charminar", lat: 17.3616, lng: 78.4747, zone: "Old City", status: "online", fps: 25, resolution: "4K", lastHour: 1530, today: 21640, ocrRate: 92.9, latencyMs: 52, uptime: 99.3, lastPlate: "TS13EK0925", lastSeen: "18:44:54", videoFeed: "/camera-feeds/CAM-403.mp4" },
+  { id: "CAM #422", name: "Mehdipatnam Rythu Bazar", lat: 17.3917, lng: 78.4397, zone: "Mehdipatnam", status: "online", fps: 25, resolution: "1080p", lastHour: 1880, today: 26170, ocrRate: 94.3, latencyMs: 44, uptime: 99.6, lastPlate: "TS13UC3368", lastSeen: "18:44:58", videoFeed: "/camera-feeds/CAM-401.mp4" },
+  { id: "CAM #423", name: "Tarnaka", lat: 17.4287, lng: 78.5383, zone: "Tarnaka", status: "online", fps: 25, resolution: "1080p", lastHour: 1410, today: 20060, ocrRate: 94.8, latencyMs: 42, uptime: 99.7, lastPlate: "TS08UE7715", lastSeen: "18:44:56", videoFeed: "/camera-feeds/CAM-402.mp4" },
+  { id: "CAM #424", name: "Dilsukhnagar", lat: 17.3688, lng: 78.5247, zone: "Dilsukhnagar", status: "online", fps: 30, resolution: "4K", lastHour: 2010, today: 28320, ocrRate: 95.4, latencyMs: 39, uptime: 99.8, lastPlate: "TS07FT2248", lastSeen: "18:44:59", videoFeed: "/camera-feeds/CAM-403.mp4" },
 ];
 
 export const cameraRegistry = REGISTRY.map((c) => ({ ...c, code: c.id.replace(" #", "-") }));
@@ -39,7 +54,7 @@ export const cameraRegistry = REGISTRY.map((c) => ({ ...c, code: c.id.replace(" 
 export const cameraById = Object.fromEntries(cameraRegistry.map((c) => [c.id, c]));
 
 export const systemMetrics = {
-  totalNodesActive: 254, // city-wide ANPR nodes (the cluster above is 12 of them)
+  totalNodesActive: 254, // city-wide ANPR nodes (the registry above is 24 of them)
   networkUptime: "99.6%",
   averageInferenceLatency: "46ms",
   platesIndexedToday: "1,428,910",
@@ -74,6 +89,12 @@ export const junctionReadings = {
   "CAM #411": { speed: 29, density: 62, trend: "Moderate flow", change: "+4%" },
   "CAM #407": { speed: 33, density: 55, trend: "Steady flow", change: "+3%" },
   "CAM #405": { speed: 39, density: 42, trend: "Free flow", change: "-2%" },
+  "CAM #419": { speed: 13, density: 88, trend: "Heavy congestion", change: "+16%" },
+  "CAM #413": { speed: 18, density: 82, trend: "Metro interchange surge", change: "+12%" },
+  "CAM #417": { speed: 20, density: 79, trend: "Heavy congestion", change: "+9%" },
+  "CAM #422": { speed: 24, density: 71, trend: "Moderate flow", change: "+4%" },
+  "CAM #415": { speed: 26, density: 64, trend: "Moderate flow", change: "+5%" },
+  "CAM #423": { speed: 31, density: 58, trend: "Steady flow", change: "+2%" },
 };
 
 // ─── Corridors (Traffic page) — tied to registry cameras ──────────────────
@@ -83,6 +104,12 @@ export const corridorsFeed = [
   { id: "COR-03", name: "Balanagar – Bharat Nagar", cameras: ["CAM #403", "CAM #412"], status: "Moderate", density: 68, speed: 27, volume: 1720, trend: "+6%", lat: 17.4682, lng: 78.4357, color: "#eab308", bottleneck: "Heavy-vehicle merge at flyover ramp", length: "0.9 km", duration: "6 mins" },
   { id: "COR-04", name: "Miyapur X Roads – Nizampet", cameras: ["CAM #407", "CAM #408"], status: "Moderate", density: 55, speed: 33, volume: 1310, trend: "+3%", lat: 17.4966, lng: 78.3574, color: "#eab308", bottleneck: "Metro feeder buses at Miyapur", length: "0.6 km", duration: "4 mins" },
   { id: "COR-05", name: "Jubilee Hills Checkpost", cameras: ["CAM #405"], status: "Low", density: 42, speed: 39, volume: 1150, trend: "-2%", lat: 17.4325, lng: 78.4072, color: "#22c55e", bottleneck: "None", length: "0 km", duration: "0 mins" },
+  { id: "COR-06", name: "Ameerpet – Panjagutta", cameras: ["CAM #413", "CAM #414"], status: "High", density: 82, speed: 18, volume: 2460, trend: "+12%", lat: 17.4317, lng: 78.4497, color: "#f97316", bottleneck: "Metro interchange crowds at Ameerpet", length: "1.3 km", duration: "9 mins" },
+  { id: "COR-07", name: "Begumpet – Paradise Circle", cameras: ["CAM #415", "CAM #416"], status: "Moderate", density: 64, speed: 26, volume: 1880, trend: "+5%", lat: 17.4437, lng: 78.4759, color: "#eab308", bottleneck: "Airport-road merge at Begumpet flyover", length: "2.4 km", duration: "8 mins" },
+  { id: "COR-08", name: "Khairatabad – Tank Bund", cameras: ["CAM #417", "CAM #418"], status: "High", density: 79, speed: 20, volume: 2210, trend: "+9%", lat: 17.4083, lng: 78.4708, color: "#f97316", bottleneck: "Signal cycle at Khairatabad flyover", length: "1.8 km", duration: "9 mins" },
+  { id: "COR-09", name: "Abids – Koti", cameras: ["CAM #419", "CAM #420"], status: "Severe", density: 88, speed: 13, volume: 2050, trend: "+16%", lat: 17.3891, lng: 78.4810, color: "#ef4444", bottleneck: "Market-area parking spill-over", length: "1.2 km", duration: "10 mins" },
+  { id: "COR-10", name: "Mehdipatnam – Charminar", cameras: ["CAM #422", "CAM #421"], status: "Moderate", density: 71, speed: 24, volume: 1640, trend: "+4%", lat: 17.3767, lng: 78.4572, color: "#eab308", bottleneck: "Two-wheeler weave near Charminar", length: "4.3 km", duration: "14 mins" },
+  { id: "COR-11", name: "Tarnaka – Dilsukhnagar", cameras: ["CAM #423", "CAM #424"], status: "Moderate", density: 58, speed: 31, volume: 1420, trend: "+2%", lat: 17.3988, lng: 78.5315, color: "#eab308", bottleneck: "Inner Ring Road merge at Uppal", length: "6.4 km", duration: "13 mins" },
 ];
 
 // ─── City zones (homepage map / dashboard) — counts sum to the 254-node network ──
@@ -185,5 +212,8 @@ export const trafficSummary = {
     { origin: "Balanagar", destination: "Madhapur", count: "1,426 vehicles" },
     { origin: "Kukatpally", destination: "Cyberabad", count: "2,103 vehicles" },
     { origin: "Miyapur", destination: "Madhapur", count: "1,268 vehicles" },
+    { origin: "Ameerpet", destination: "Secunderabad", count: "1,634 vehicles" },
+    { origin: "Mehdipatnam", destination: "Koti", count: "1,187 vehicles" },
+    { origin: "Dilsukhnagar", destination: "Tarnaka", count: "962 vehicles" },
   ],
 };

@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { Activity, Cctv, Radio, ScanLine } from "lucide-react";
-import { cameraRegistry, systemMetrics } from "../../data/data";
+import { useEffect, useRef } from "react";
+import { BellRing, Cctv, Route, ScanLine } from "lucide-react";
 import { DEMO_PLATE } from "../../data/demoData";
 import { EDGES, NODES, curveControl, projectNodes } from "../../data/cityGraph";
-import { AnimatedNumber } from "../motion/Motion";
 
-const READS_TODAY = cameraRegistry.reduce((s, c) => s + c.today, 0);
-const READS_HOUR = cameraRegistry.reduce((s, c) => s + c.lastHour, 0);
-const OCR_AVG = (() => {
-  const r = cameraRegistry.filter((c) => c.ocrRate != null);
-  return r.reduce((s, c) => s + c.ocrRate, 0) / r.length;
-})();
+// What the network does — capabilities, not live figures
+const FEATURES = [
+  { icon: ScanLine, title: "A plate read at every junction", body: "Each ANPR camera reads number plates as vehicles pass, day and night." },
+  { icon: Route, title: "Linked across cameras", body: "Reads from different junctions are fused into one vehicle trajectory." },
+  { icon: BellRing, title: "Instant watchlist alerts", body: "A flagged plate raises an alert the moment any camera sees it." },
+  { icon: Cctv, title: "One city-wide network", body: "Every camera feeds the same live map, dashboards and traffic analytics." },
+];
 
 const COLORS = ["#38bdf8", "#60a5fa", "#818cf8", "#22d3ee"];
 const TRACKED = "#fbbf24";
@@ -313,8 +312,6 @@ export default function NetworkPulse({ sectionRef }) {
   const trailRef = useRef(null);
   const topRef = useRef(null);
   const ownRef = useRef(null);
-  const statsRef = useRef(null);
-  const [seen, setSeen] = useState(false);
 
   useEffect(() => {
     const section = ownRef.current;
@@ -329,21 +326,9 @@ export default function NetworkPulse({ sectionRef }) {
       { threshold: 0.08 }
     );
     io.observe(section);
-    // counters start when the stats themselves come into view
-    const statsIo = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setSeen(true);
-          statsIo.disconnect();
-        }
-      },
-      { threshold: 0.35 }
-    );
-    statsIo.observe(statsRef.current);
     document.addEventListener("visibilitychange", sync);
     return () => {
       io.disconnect();
-      statsIo.disconnect();
       document.removeEventListener("visibilitychange", sync);
       engine.dispose();
     };
@@ -353,13 +338,6 @@ export default function NetworkPulse({ sectionRef }) {
     ownRef.current = el;
     if (sectionRef) sectionRef.current = el;
   };
-
-  const stats = [
-    { icon: ScanLine, value: READS_TODAY, label: "Plate reads today", format: (v) => Math.round(v).toLocaleString("en-IN") },
-    { icon: Activity, value: READS_HOUR, label: "Reads in the last hour", format: (v) => Math.round(v).toLocaleString("en-IN") },
-    { icon: Radio, value: OCR_AVG, label: "Average OCR confidence", format: (v) => `${v.toFixed(1)}%` },
-    { icon: Cctv, value: systemMetrics.totalNodesActive, label: "ANPR nodes city-wide", format: (v) => Math.round(v).toLocaleString("en-IN") },
-  ];
 
   return (
     <section ref={setRefs} id="network-pulse" className="tn-netpulse" aria-labelledby="tn-netpulse-title">
@@ -381,22 +359,20 @@ export default function NetworkPulse({ sectionRef }) {
             <span>in one living network.</span>
           </h2>
           <p className="tn-section-body">
-          Each light-trail is a vehicle moving between ANPR cameras across West Hyderabad. Every junction it passes is a
+          Each light-trail is a vehicle moving between ANPR cameras across Hyderabad. Every junction it passes is a
           plate read, fused into one trajectory — the amber trail is a vehicle being tracked in real time.
           </p>
         </header>
 
-        <dl ref={statsRef} className="tn-netpulse-stats" data-reveal>
-          {stats.map(({ icon: Icon, value, label, format }) => (
-            <div key={label} className="tn-netpulse-stat" data-spot="">
-              <dt>
-                <Icon size={14} aria-hidden="true" />
-                {label}
-              </dt>
-              <dd>{seen ? <AnimatedNumber value={value} format={format} duration={1400} /> : format(0)}</dd>
-            </div>
+        <ul className="tn-netpulse-stats" data-reveal>
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <li key={title} className="tn-netpulse-stat" data-spot="">
+              <Icon size={18} className="tn-netpulse-feature-icon" aria-hidden="true" />
+              <h3 className="tn-netpulse-feature-title">{title}</h3>
+              <p className="tn-netpulse-feature-body">{body}</p>
+            </li>
           ))}
-        </dl>
+        </ul>
 
         <ul className="tn-netpulse-legend" aria-label="Legend" data-reveal>
           <li><span className="tn-dot tn-dot--trail" />Vehicle trail</li>

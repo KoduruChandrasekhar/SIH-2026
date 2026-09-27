@@ -7,11 +7,11 @@ import { cameraRegistry } from "../../data/data";
 import { useTheme } from "../../context/ThemeContext";
 import { LiveTrafficLayer } from "./LiveTraffic";
 
-// Areas to jump between (the camera cluster first)
+// Areas to jump between (the whole camera network first)
 const AREAS = [
-  { id: "cluster", label: "Camera cluster", lat: 17.477, lng: 78.405, zoom: 13 },
+  { id: "network", label: "Camera network", lat: 17.43, lng: 78.445, zoom: 12 },
+  { id: "centre", label: "City centre", lat: 17.405, lng: 78.47, zoom: 14 },
   { id: "hitech", label: "Hitech City", lat: 17.4474, lng: 78.3762, zoom: 14 },
-  { id: "city", label: "Hyderabad centre", lat: 17.405, lng: 78.46, zoom: 12 },
 ];
 
 const PROVIDER = GOOGLE_MAPS_API_KEY ? "google" : TOMTOM_API_KEY ? "tomtom" : null;
@@ -35,7 +35,7 @@ const LIGHT_STYLE = [
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];
 
-/** Google Maps + its live TrafficLayer, with the cluster's cameras marked. */
+/** Google Maps + its live TrafficLayer, with the network's cameras marked. */
 function GoogleTrafficMap({ area }) {
   const { theme } = useTheme();
   const elRef = useRef(null);
@@ -175,7 +175,7 @@ function SetupPanel() {
 }
 
 /**
- * Real-time road traffic for Hyderabad: Google Maps' traffic layer (or TomTom's) with the cluster's
+ * Real-time road traffic for Hyderabad: Google Maps' traffic layer (or TomTom's) with the network's
  * cameras on top — roads coloured green → red by their current speed.
  */
 export default function LiveRoadTraffic() {

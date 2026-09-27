@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Navigation, Pause, Play } from "lucide-react";
-import { OCR_ACCURACY_TARGET, SNAPSHOT_TIME, cameraRegistry, hourlyTraffic, systemMetrics } from "../../data/data";
+import { OCR_ACCURACY_TARGET } from "../../data/data";
 import { useDecodeText, useMagnetic } from "../fx/textFx";
 
 // ── Hero media sequence ─────────────────────────────────────────────
@@ -12,30 +12,27 @@ const CLIPS = [
   { id: "aerial", stage: 2, src: "/hero/aerial-city-night.mp4", poster: "/hero/aerial-city-night-poster.jpg", plays: 1, fallback: 14.4 },
 ];
 
-const now = hourlyTraffic[Number(SNAPSHOT_TIME.slice(0, 2))];
-const readsPerHour = cameraRegistry.reduce((s, c) => s + c.lastHour, 0);
-
 const STAGES = [
   {
     short: "Global",
     label: "Global view · India",
     heading: "City-wide AI engine",
     body: "One connected intelligence layer over every ANPR camera in the city — built for Indian urban traffic.",
-    ticker: `${systemMetrics.totalNodesActive} ANPR nodes · 5 zones · Hyderabad`,
+    ticker: "Every ANPR camera · one network · city-wide",
   },
   {
     short: "Street",
     label: "Street view · Multi-camera",
     heading: "Multi-camera vehicle intelligence",
     body: `ANPR reads linked across cameras to reconstruct each vehicle's path, engineered for a >${OCR_ACCURACY_TARGET}% OCR accuracy target through glare, rain, motion blur and angled or damaged plates.`,
-    ticker: `${readsPerHour.toLocaleString("en-IN")} plate reads / hour · OCR target >${OCR_ACCURACY_TARGET}%`,
+    ticker: "Cross-camera tracking · Indian plate formats",
   },
   {
     short: "City",
     label: "Urban flow · Aerial view",
     heading: "Macro traffic analytics",
     body: "Density, route volumes, congestion and origin–destination movement across the whole city, on one GIS map.",
-    ticker: `${(now.flow / 1000).toFixed(1)}k veh/h · ${now.density}% capacity · ${now.speed} km/h at ${now.hour}`,
+    ticker: "Density · congestion · origin–destination flows",
   },
 ];
 

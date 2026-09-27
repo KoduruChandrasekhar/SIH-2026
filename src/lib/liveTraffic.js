@@ -5,8 +5,8 @@ import { cameraRegistry } from "../data/data";
 /**
  * Live traffic analytics from TomTom (needs VITE_TOMTOM_API_KEY):
  *   Traffic Flow — current vs free-flow speed, travel times and closures on the road at each camera junction
- *   Traffic Incidents — jams, closures, accidents and roadworks inside the camera cluster
- * One refresh = one flow request per junction + one incident request; refreshed every 5 min while the tab is
+ *   Traffic Incidents — jams, closures, accidents and roadworks across the camera network
+ * One refresh = one flow request per junction + one incident request; refreshed every 10 min while the tab is
  * visible and cached in localStorage so page switches and reloads do not re-query. Each refresh also adds a
  * network sample to a rolling 24 h trend kept in this browser.
  */
@@ -14,13 +14,13 @@ export const LIVE_ANALYTICS = Boolean(TOMTOM_API_KEY);
 
 const FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/12/json";
 const INCIDENT_URL = "https://api.tomtom.com/traffic/services/5/incidentDetails";
-const REFRESH_MS = 5 * 60 * 1000;
+const REFRESH_MS = 10 * 60 * 1000; // 24 junctions: ~25 requests per refresh, inside TomTom's free daily quota
 const MIN_MANUAL_MS = 60 * 1000; // a manual refresh never re-queries more than once a minute
-const CACHE_KEY = "tn.liveTraffic.v1";
-const HISTORY_KEY = "tn.liveTraffic.history.v1";
+const CACHE_KEY = "tn.liveTraffic.v2"; // v2: 24 junctions (city-wide network)
+const HISTORY_KEY = "tn.liveTraffic.history.v2";
 const HISTORY_MS = 24 * 3600 * 1000;
 
-// bounding box around the cluster (lon/lat) with a small margin
+// bounding box around the camera network (lon/lat) with a small margin
 const BBOX = (() => {
   const lats = cameraRegistry.map((c) => c.lat);
   const lngs = cameraRegistry.map((c) => c.lng);
@@ -121,7 +121,8 @@ export function networkSummary(probes) {
     speed,
     freeFlow,
     congestion: Math.max(0, Math.round((1 - speed / freeFlow) * 100)),
-    delay,
+    delay, // total extra seconds across the junction roads
+    avgDelay: delay / open.length, // extra seconds on a typical junction road
     closed: probes.filter((p) => p.closed).length,
     confidence: open.reduce((s, p) => s + (p.confidence ?? 0), 0) / open.length,
   };

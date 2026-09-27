@@ -160,9 +160,9 @@ export default function CamerasPage({ navigate, openModal, params }) {
               <Cctv size={16} className="text-blue-400" />
               <span className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-blue-300">Cameras · Live camera network</span>
             </div>
-            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">West Hyderabad ANPR cluster</h1>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Hyderabad ANPR network</h1>
             <p className="mt-2 text-sm font-medium text-slate-300">
-              Monitor connected ANPR/CCTV feeds across the city network — {counts.total} of 254 network nodes, Kukatpally to Gachibowli.
+              Monitor connected ANPR/CCTV feeds across the city network — {counts.total} of 254 network nodes, from Miyapur to Dilsukhnagar.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

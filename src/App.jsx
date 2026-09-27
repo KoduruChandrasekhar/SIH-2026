@@ -38,7 +38,10 @@ export default function App() {
       flushSync(commit);
       window.scrollTo(0, 0);
     });
-    vt.finished.finally(() => root.classList.remove("tn-vt"));
+    // a skipped transition (hidden tab, rapid clicks) rejects these; the page has already changed either way
+    const done = () => root.classList.remove("tn-vt");
+    vt.ready.catch(() => {});
+    vt.finished.then(done, done);
   }, []);
   const [modal, setModal] = useState({ isOpen: false, title: "", content: "" });
 

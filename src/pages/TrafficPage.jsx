@@ -31,6 +31,7 @@ import {
 } from "recharts";
 import Navbar from "../components/layout/Navbar";
 import HeatLayer from "../components/map/HeatLayer";
+import JunctionGlow from "../components/map/JunctionGlow";
 import { LIVE_TRAFFIC_AVAILABLE, LiveTrafficLayer, LiveTrafficLegend, LiveTrafficToggle } from "../components/map/LiveTraffic";
 import LiveRoadTraffic from "../components/map/LiveRoadTraffic";
 import { LIVE_ANALYTICS, corridorLive, networkSummary, useLiveTraffic } from "../lib/liveTraffic";
@@ -100,16 +101,24 @@ function macroToCorridors(macro) {
 }
 
 // Flies the (persistent) map to the selected corridor
+// Every corridor camera: the map opens framed on the whole city network
+const NETWORK_POINTS = corridorsFeed.flatMap((c) => c.cameras.map((id) => cameraById[id]).filter(Boolean).map((cam) => [cam.lat, cam.lng]));
+
+function FitNetwork() {
+  const map = useMap();
+  useEffect(() => {
+    map.fitBounds(NETWORK_POINTS, { padding: [28, 28], animate: false });
+  }, [map]);
+  return null;
+}
+
 function FocusCorridor({ corridor, route }) {
   const map = useMap();
-  const first = useRef(true);
+  // the corridor already in view: the initial selection keeps the city-wide view unless it was passed in
+  const shown = useRef(corridor?.fromParams ? null : corridor?.id);
   useEffect(() => {
-    if (!corridor) return;
-    if (first.current && !corridor.fromParams) {
-      first.current = false;
-      return;
-    }
-    first.current = false;
+    if (!corridor || corridor.id === shown.current) return;
+    shown.current = corridor.id;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const opts = { duration: reduce ? 0 : 0.8, maxZoom: 15, padding: [60, 60] };
     if (route.length > 1) map.flyToBounds(route, opts);
@@ -180,7 +189,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
   }, []);
   const real = Boolean(macro);
 
-  // Live traffic (TomTom): real speed vs free-flow on each camera junction's road + incidents in the cluster.
+  // Live traffic (TomTom): real speed vs free-flow on each camera junction's road + incidents across the network.
   // When available it drives every corridor reading, KPI and chart below; otherwise the page keeps the
   // backend analytics / demo simulation.
   const live = useLiveTraffic();
@@ -215,13 +224,25 @@ export default function TrafficPage({ navigate, openModal, params }) {
       }),
     [baseCorridors, sim.corridors, liveMode, probesByCamera]
   );
-  // Heat layer: one weighted point per ANPR junction from the Polars analytics (BCI, or 24 h volume)
+  // Congestion glow at every corridor camera (TomTom live when available, else the demo reading)
+  const glowPoints = useMemo(
+    () =>
+      real
+        ? []
+        : corridors.flatMap((c) =>
+            (c.cameras ?? []).map((id) => cameraById[id]).filter(Boolean)
+              .map((cam) => ({ id: `${c.id}-${cam.id}`, lat: cam.lat, lng: cam.lng, color: c.color, density: c.density ?? 0, status: c.status }))
+          ),
+    [corridors, real]
+  );
+  // Heat layer (backend connected): one weighted point per ANPR junction from the Polars analytics (BCI, or 24 h volume)
   const heatPoints = useMemo(() => {
+    if (!real) return [];
     const maxVolume = Math.max(1, ...corridors.map((c) => c.volume24h ?? 0));
     return corridors
       .filter((c) => c.real && c.lat != null)
       .map((c) => [c.lat, c.lng, heatMetric === "volume" ? (c.volume24h ?? 0) / maxVolume : Math.max(0.05, c.bci ?? 0)]);
-  }, [corridors, heatMetric]);
+  }, [corridors, heatMetric, real]);
   const selectedCorridor = corridors.find((c) => c.id === selectedId) ?? corridors[0];
   // real-time road traffic (TomTom) — on by default whenever an API key is configured
   const [liveTraffic, setLiveTraffic] = useState(LIVE_TRAFFIC_AVAILABLE);
@@ -347,8 +368,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
             />
             <MetricCard
               title="Travel-time Delay"
-              value={liveNet.delay >= 60 ? `${Math.round(liveNet.delay / 60)} min` : `${Math.round(liveNet.delay)} s`}
-              trend={`across ${live.probes.length} junction roads`}
+              value={liveNet.avgDelay >= 60 ? `${Math.round(liveNet.avgDelay / 60)} min` : `${Math.round(liveNet.avgDelay)} s`}
+              trend={`average per junction road · ${live.probes.length} roads`}
               icon={Activity}
               color="text-emerald-600"
             />
@@ -436,7 +457,7 @@ export default function TrafficPage({ navigate, openModal, params }) {
             <div className="relative flex-1 w-full rounded-[20px] overflow-hidden border border-gray-200/60 shadow-inner z-10">
               <MapBoundary>
               <MapContainer
-                center={[17.475, 78.41]}
+                center={[17.43, 78.445]}
                 zoom={12}
                 scrollWheelZoom={false}
                 style={{ width: "100%", height: "100%" }}
@@ -447,7 +468,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
                 />
 
                 <LiveTrafficLayer enabled={liveTraffic} />
-                {real && <HeatLayer points={heatPoints} />}
+                <FitNetwork />
+                {real ? <HeatLayer points={heatPoints} /> : <JunctionGlow points={glowPoints} />}
                 <FocusCorridor corridor={{ ...selectedCorridor, fromParams }} route={selectedRoute} />
                 {selectedRoute.length > 1 && (
                   <>
@@ -463,8 +485,8 @@ export default function TrafficPage({ navigate, openModal, params }) {
                     pathOptions={{
                       color: corridor.id === selectedCorridor.id ? "#fff" : corridor.color,
                       fillColor: corridor.color,
-                      // real analytics: the heat layer carries the colour; circles stay as clickable outlines
-                      fillOpacity: real ? (corridor.id === selectedCorridor.id ? 0.14 : 0.04) : corridor.id === selectedCorridor.id ? 0.5 : 0.3,
+                      // the heat layer carries the colour; circles stay as clickable outlines
+                      fillOpacity: corridor.id === selectedCorridor.id ? 0.14 : 0.04,
                       weight: corridor.id === selectedCorridor.id ? 2.5 : 1.5,
                     }}
                     eventHandlers={{

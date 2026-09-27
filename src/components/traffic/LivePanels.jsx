@@ -70,7 +70,7 @@ export function LiveJunctionSpeeds({ probes, onSelect }) {
 const GROUP_ICON = { jam: Car, closure: Ban, accident: Siren, works: Construction, hazard: AlertTriangle, other: AlertTriangle };
 const GROUP_COLOR = { jam: "#f97316", closure: "#ef4444", accident: "#dc2626", works: "#eab308", hazard: "#f59e0b", other: "#94a3b8" };
 
-/** Live incidents inside the camera cluster: counts by type and the most disruptive ones. */
+/** Live incidents across the camera network: counts by type and the most disruptive ones. */
 export function LiveIncidents({ incidents }) {
   const counts = incidents.reduce((acc, i) => ({ ...acc, [i.group]: (acc[i.group] ?? 0) + 1 }), {});
   const top = [...incidents].sort((a, b) => b.delay - a.delay || b.magnitudeLevel - a.magnitudeLevel || b.length - a.length).slice(0, 6);
@@ -85,7 +85,7 @@ export function LiveIncidents({ incidents }) {
       <div className="flex items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-black text-gray-900">
-            <Siren size={16} className="text-red-500" /> Live incidents in the cluster
+            <Siren size={16} className="text-red-500" /> Live incidents across the network
           </h3>
           <p className="text-[10px] font-bold text-gray-500">{incidents.length} active right now · TomTom live</p>
         </div>

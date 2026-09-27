@@ -9,8 +9,9 @@ import {
   Tooltip,
   useMap,
 } from "react-leaflet";
-import { areas, cameraRegistry } from "../../data/data";
-import { CAMERA_NETWORK_EDGES, CAMERA_NETWORK_NODES, DEMO_PLATE, DEMO_ROUTE_PATH } from "../../data/demoData";
+import { areas, cameraRegistry, corridorsFeed } from "../../data/data";
+import { CAMERA_NETWORK_NODES, DEMO_PLATE, DEMO_ROUTE_PATH } from "../../data/demoData";
+import { EDGES as NETWORK_EDGES, NODES as NETWORK_NODES } from "../../data/cityGraph";
 
 const MAP_MODES = [
   { id: "overview", label: "Overview", title: "Network overview", hint: "City zones & synchronized camera nodes" },
@@ -20,10 +21,21 @@ const MAP_MODES = [
 ];
 
 const nodeById = Object.fromEntries(CAMERA_NETWORK_NODES.map((n) => [n.id, [n.lat, n.lng]]));
+// Camera zones → mean position (resolves city-centre names the five homepage areas don't cover)
+const ZONE_POS = (() => {
+  const acc = {};
+  cameraRegistry.forEach((c) => {
+    const z = (acc[c.zone.toLowerCase()] ??= { lat: 0, lng: 0, n: 0 });
+    z.lat += c.lat;
+    z.lng += c.lng;
+    z.n += 1;
+  });
+  return Object.fromEntries(Object.entries(acc).map(([k, z]) => [k, [z.lat / z.n, z.lng / z.n]]));
+})();
 const areaPos = (name) => {
   const key = name.toLowerCase();
   // "Madhapur" and "Cyberabad" both resolve to the "Cyberabad / Madhapur" zone
-  return areas.find((a) => a.name.toLowerCase().includes(key))?.position;
+  return areas.find((a) => a.name.toLowerCase().includes(key))?.position ?? ZONE_POS[key];
 };
 
 const SEVERITY_COLOR = { CRITICAL: "#ef4444", HIGH: "#f97316", MEDIUM: "#eab308" };
@@ -33,6 +45,26 @@ const NODE_STYLE = {
   offline: { color: "#fecaca", fill: "#ef4444" },
 };
 const ROUTE_POINTS = DEMO_ROUTE_PATH.map((id) => nodeById[id]).filter(Boolean);
+const ROUTE_SET = new Set(DEMO_ROUTE_PATH);
+
+// The shared camera network, as drawable links
+const pos = (i) => [NETWORK_NODES[i].lat, NETWORK_NODES[i].lng];
+const NETWORK_LINES = NETWORK_EDGES.map(([a, b]) => ({ key: `${a}-${b}`, a, b, ida: NETWORK_NODES[a].id, idb: NETWORK_NODES[b].id, positions: [pos(a), pos(b)] }));
+const nodeIndexById = Object.fromEntries(NETWORK_NODES.map((n, i) => [n.id, i]));
+
+// Traffic layer: every corridor as a road between its cameras, coloured by status
+const STATUS_COLOR = { Severe: "#ef4444", High: "#f97316", Moderate: "#eab308", Low: "#22c55e" };
+const CORRIDOR_LINES = corridorsFeed
+  .map((c) => ({ ...c, positions: c.cameras.map((id) => nodeIndexById[id]).filter((i) => i != null).map(pos) }))
+  .filter((c) => c.positions.length > 1);
+
+// Alerts: the camera an alert came from (its own camera, else the nearest one)
+const alertNode = (a) =>
+  nodeIndexById[a.cameraId] ??
+  NETWORK_NODES.reduce((best, n, i) => {
+    const d = Math.hypot(n.lat - a.lat, n.lng - a.lng);
+    return !best || d < best[1] ? [i, d] : best;
+  }, null)?.[0];
 const CITY_BOUNDS = areas.map((a) => a.position).concat(cameraRegistry.map((c) => [c.lat, c.lng]));
 
 // Moves the (single, persistent) map to fit the active layer; never re-creates it.
@@ -89,18 +121,40 @@ export default function CommandMap({ mode, onModeChange, telemetry, navigate, re
 
   const mappedAlerts = useMemo(() => alerts.filter((a) => a.lat && a.lng), [alerts]);
 
+  // Alerts layer: from each active alert's camera, the links a flagged vehicle can take next (interception)
+  const alertLinks = useMemo(() => {
+    const rank = { CRITICAL: 3, HIGH: 2, MEDIUM: 1 };
+    const colorByNode = {};
+    mappedAlerts
+      .filter((a) => a.status !== "Resolved")
+      .forEach((a) => {
+        const i = alertNode(a);
+        if (i == null) return;
+        const prev = colorByNode[i];
+        if (!prev || (rank[a.severity] ?? 0) > prev.rank) colorByNode[i] = { rank: rank[a.severity] ?? 0, color: SEVERITY_COLOR[a.severity] ?? "#94a3b8" };
+      });
+    const out = {};
+    NETWORK_LINES.forEach((l) => {
+      const hit = colorByNode[l.a] ?? colorByNode[l.b];
+      if (hit) out[l.key] = hit.color;
+    });
+    return out;
+  }, [mappedAlerts]);
+
   const bounds = useMemo(() => {
     switch (mode) {
       case "flow":
-        return odLines.flatMap((r) => [r.from, r.to]);
+        return odLines.flatMap((r) => [r.from, r.to]).concat(CORRIDOR_LINES.flatMap((c) => c.positions));
       case "trajectory":
         return ROUTE_POINTS;
       case "alerts":
-        return mappedAlerts.map((a) => [a.lat, a.lng]);
+        return mappedAlerts
+          .map((a) => [a.lat, a.lng])
+          .concat(NETWORK_LINES.filter((l) => alertLinks[l.key]).flatMap((l) => l.positions));
       default:
         return CITY_BOUNDS;
     }
-  }, [mode, odLines, mappedAlerts]);
+  }, [mode, odLines, mappedAlerts, alertLinks]);
 
   return (
     <div className={`tn-map-panel ${maximized ? "is-maximized" : ""}`}>
@@ -148,7 +202,7 @@ export default function CommandMap({ mode, onModeChange, telemetry, navigate, re
 
         <div className="tn-map-canvas" role="region" aria-label={`City GIS map — ${activeMode.title}`}>
           <MapContainer
-            center={[17.475, 78.41]}
+            center={[17.43, 78.445]}
             zoom={12}
             scrollWheelZoom={false}
             dragging={!coarsePointer}
@@ -163,14 +217,37 @@ export default function CommandMap({ mode, onModeChange, telemetry, navigate, re
             />
             <MapViewController bounds={bounds} reducedMotion={reducedMotion} maximized={maximized} />
 
-            {/* Camera mesh links — always visible, faint */}
-            {CAMERA_NETWORK_EDGES.map(([a, b]) => (
-              <Polyline
-                key={`${a}-${b}`}
-                positions={[nodeById[a], nodeById[b]]}
-                pathOptions={{ color: "#6366f1", weight: 1, opacity: mode === "overview" ? 0.45 : 0.18, dashArray: "2 6" }}
-              />
-            ))}
+            {/* Camera network links (the shared city graph) — each layer lights the connections it is about:
+                overview = the whole mesh · trajectory = handoffs from the tracked route · alerts = interception links */}
+            {NETWORK_LINES.map((l) => {
+              const march = reducedMotion ? "" : "tn-net-link";
+              let role = "dim";
+              let style = { color: "#6366f1", weight: 1, opacity: 0.12, dashArray: "2 6" };
+              if (mode === "overview") {
+                role = "mesh";
+                style = { color: "#818cf8", weight: 1.4, opacity: 0.6, dashArray: "2 6", className: march };
+              } else if (mode === "trajectory" && (ROUTE_SET.has(l.ida) || ROUTE_SET.has(l.idb))) {
+                role = "handoff";
+                style = { color: "#60a5fa", weight: 1.5, opacity: 0.6, dashArray: "3 6", className: march };
+              } else if (mode === "alerts" && alertLinks[l.key]) {
+                role = "alert";
+                style = { color: alertLinks[l.key], weight: 2, opacity: 0.85, dashArray: "4 6", className: march };
+              }
+              // Leaflet applies a path's CSS class only when it is created: a new role re-creates the link
+              return <Polyline key={`${l.key}-${role}`} positions={l.positions} pathOptions={style} />;
+            })}
+
+            {/* Traffic layer: corridors as roads, coloured by congestion */}
+            {mode === "flow" &&
+              CORRIDOR_LINES.map((c) => (
+                <Polyline key={`cor-${c.id}`} positions={c.positions} pathOptions={{ color: STATUS_COLOR[c.status] ?? "#38bdf8", weight: 4, opacity: 0.9, className: reducedMotion ? "" : "tn-flow-line" }}>
+                  <Tooltip sticky className="tn-map-tip">
+                    <strong>{c.name}</strong>
+                    <br />
+                    {c.status} · {c.speed} km/h
+                  </Tooltip>
+                </Polyline>
+              ))}
 
             {(mode === "flow" || mode === "overview") &&
               areas.map((a) => (
@@ -195,8 +272,9 @@ export default function CommandMap({ mode, onModeChange, telemetry, navigate, re
                   positions={[r.from, r.to]}
                   pathOptions={{
                     color: "#38bdf8",
-                    weight: 2 + (r.volume / 2103) * 4,
-                    opacity: 0.85,
+                    weight: 1.5 + (r.volume / 2103) * 3,
+                    opacity: 0.55,
+                    dashArray: "6 8",
                     className: reducedMotion ? "" : "tn-flow-line",
                   }}
                 >
