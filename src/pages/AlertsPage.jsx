@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -16,12 +16,13 @@ import {
   Radio,
   ExternalLink,
 } from "lucide-react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Circle, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Circle, Polyline, useMap } from "react-leaflet";
 import Navbar from "../components/layout/Navbar";
 import { addToWatchlist, fetchAlerts } from "../lib/api";
 import { useAlerts } from "../context/AlertsContext";
 import { WATCHLIST_CAMERAS, cameraDisplayId } from "../data/demoData";
 import { alertsFeed as localAlerts, cameraById } from "../data/data";
+import { EDGES as NETWORK_EDGES, NODES as NETWORK_NODES } from "../data/cityGraph";
 import { AnimatedNumber, MapBoundary } from "../components/ui/Motion";
 import { formatClock, simNowSec } from "../lib/liveSim";
 
@@ -60,12 +61,42 @@ const sev = (a) => SEVERITY[a.severity] ?? SEVERITY.MEDIUM;
 const ANOMALY_CATEGORIES = ["Trajectory Anomaly", "Unusual Stop / Loitering", "Cloned Plate", "Invalid / Tampered Plate"];
 const isAnomaly = (a) => ANOMALY_CATEGORIES.includes(a.category);
 
-// Pans the existing map to the selected alert without re-creating it
-function FocusAlert({ alert }) {
+// The camera network (shared city graph): every camera and road link, and the map's city-wide frame
+const NETWORK_POINTS = NETWORK_NODES.map((n) => [n.lat, n.lng]);
+const NODE_INDEX = Object.fromEntries(NETWORK_NODES.map((n, i) => [n.id, i]));
+const NETWORK_LINES = NETWORK_EDGES.map(([a, b]) => ({
+  key: `${a}-${b}`,
+  a,
+  b,
+  positions: [[NETWORK_NODES[a].lat, NETWORK_NODES[a].lng], [NETWORK_NODES[b].lat, NETWORK_NODES[b].lng]],
+}));
+// camera an alert was raised at (its own camera, else the nearest one)
+const alertNode = (al) =>
+  NODE_INDEX[al.cameraId] ??
+  NETWORK_NODES.reduce((best, n, i) => {
+    const d = Math.hypot(n.lat - al.lat, n.lng - al.lng);
+    return !best || d < best[1] ? [i, d] : best;
+  }, null)?.[0];
+
+function FitNetwork() {
   const map = useMap();
   useEffect(() => {
-    if (alert) map.flyTo([alert.lat, alert.lng], 14, { duration: 0.8 });
-  }, [map, alert]);
+    map.fitBounds(NETWORK_POINTS, { padding: [24, 24], animate: false });
+  }, [map]);
+  return null;
+}
+
+// Pans to an alert when a different one is picked; the first selection keeps the city-wide view
+// (the alert objects are rebuilt on every live refresh, so this tracks the id, not the object)
+function FocusAlert({ alert }) {
+  const map = useMap();
+  const shown = useRef(alert?.id);
+  useEffect(() => {
+    if (!alert || alert.id === shown.current) return;
+    shown.current = alert.id;
+    map.flyTo([alert.lat, alert.lng], 14, { duration: 0.8 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, alert?.id]);
   return null;
 }
 
@@ -270,6 +301,28 @@ export default function AlertsPage({ navigate }) {
     return matchesFilter && matchesSearch;
   });
 
+  // From each open alert's camera: the network links a flagged vehicle can take next, in the alert's colour
+  const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const interception = useMemo(() => {
+    const rank = { CRITICAL: 3, HIGH: 2, MEDIUM: 1 };
+    const byNode = {};
+    alerts
+      .filter((al) => al.status !== "Resolved" && al.lat != null && al.lng != null)
+      .forEach((al) => {
+        const i = alertNode(al);
+        if (i == null) return;
+        const r = rank[al.severity] ?? 0;
+        if (!byNode[i] || r > byNode[i].r) byNode[i] = { r, color: sev(al).color };
+      });
+    const out = {};
+    NETWORK_LINES.forEach((l) => {
+      const hit = byNode[l.a] ?? byNode[l.b];
+      if (hit) out[l.key] = hit.color;
+    });
+    return out;
+  }, [alerts]);
+  const selectedNode = selectedAlert ? alertNode(selectedAlert) : null;
+
   return (
     <div className="relative flex w-full flex-col gap-6 pb-10">
 
@@ -336,8 +389,8 @@ export default function AlertsPage({ navigate }) {
             <div className="relative flex-1 w-full rounded-[20px] overflow-hidden border border-gray-200/60 shadow-inner z-10">
               <MapBoundary>
               <MapContainer
-                center={[selectedAlert ? selectedAlert.lat : 17.485, selectedAlert ? selectedAlert.lng : 78.41]}
-                zoom={13}
+                center={[17.43, 78.445]}
+                zoom={12}
                 scrollWheelZoom={false}
                 style={{ width: "100%", height: "100%" }}
               >
@@ -346,7 +399,29 @@ export default function AlertsPage({ navigate }) {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                <FitNetwork />
                 <FocusAlert alert={selectedAlert} />
+
+                {/* Camera network: road links, lit in the alert's colour where a flagged vehicle can be intercepted next */}
+                {NETWORK_LINES.map((l) => {
+                  const hit = interception[l.key];
+                  const focus = hit && selectedNode != null && (l.a === selectedNode || l.b === selectedNode);
+                  const role = hit ? (focus ? "focus" : "alert") : "mesh";
+                  const style = hit
+                    ? { color: hit, weight: focus ? 3 : 2, opacity: focus ? 0.95 : 0.7, dashArray: "4 6", className: reduceMotion ? "" : "tn-net-link" }
+                    : { color: "#6366f1", weight: 1, opacity: 0.3, dashArray: "2 6" };
+                  // Leaflet sets a path's CSS class only on creation: a new role re-creates the link
+                  return <Polyline key={`${l.key}-${role}`} positions={l.positions} pathOptions={style} interactive={false} />;
+                })}
+                {NETWORK_NODES.map((n) => (
+                  <CircleMarker
+                    key={n.id}
+                    center={[n.lat, n.lng]}
+                    radius={3.5}
+                    interactive={false}
+                    pathOptions={{ color: "#fff", weight: 1, fillColor: n.online ? "#6366f1" : "#94a3b8", fillOpacity: 0.9 }}
+                  />
+                ))}
                 {alerts.map((al) => {
                   const isCongestion = al.type === "traffic";
                   const color = sev(al).color;
