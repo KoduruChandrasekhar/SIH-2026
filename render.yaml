@@ -1,0 +1,41 @@
+# Render Blueprint — TraceNet API (FastAPI). See DEPLOYMENT.md.
+#
+# Render → New → Blueprint → pick this repository. Values marked `sync: false` are asked for
+# in the dashboard on first deploy and are never stored in the repository.
+#
+# The service runs from the repository root because the code imports the `backend.*` package.
+
+services:
+  - type: web
+    name: tracenet-api
+    runtime: python
+    plan: free
+    region: singapore                 # keep it in the same region as the database
+    buildCommand: pip install -r backend/requirements-render.txt
+    # One worker on purpose: the fusion engine, the WebSocket alert bus and the watchlist cache
+    # live in this process's memory (Redis/RabbitMQ are not used on this deployment).
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+
+      # PostgreSQL + PostGIS (Supabase session pooler URI, with ?sslmode=require)
+      - key: TRACENET_DATABASE_URL
+        sync: false
+
+      # JWT signing secret — generated once by Render
+      - key: TRACENET_JWT_SECRET
+        generateValue: true
+
+      # Deployed frontend origin(s), comma-separated, e.g. https://<your-project>.vercel.app
+      - key: TRACENET_CORS_ORIGINS
+        sync: false
+      # Optional: Vercel preview deployments, e.g. https://<your-project>-.*\.vercel\.app
+      - key: TRACENET_CORS_ORIGIN_REGEX
+        sync: false
+
+      # No RabbitMQ / Redis on this deployment: fuse sightings in-process (skips the start-up probe)
+      - key: TRACENET_FUSION_TRANSPORT
+        value: direct

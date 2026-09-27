@@ -1,0 +1,40 @@
+# TraceNet API — runtime dependencies for the hosted web service (Render).
+#
+# The API process never runs detection or OCR: it serves saved results, fuses posted sightings,
+# talks to PostgreSQL/PostGIS and pushes alerts. The heavy ML stack (ultralytics / torch,
+# paddlepaddle / paddleocr, imageio-ffmpeg) is only imported by the offline pipelines
+# (backend/scripts/*, backend/ingestion workers) and stays in requirements.txt for those.
+# Versions follow requirements.txt.
+#
+#   pip install -r backend/requirements-render.txt
+
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0   # also brings the `websockets` server used by /ws/alerts
+pydantic>=2.0.0
+
+# cv2 / numpy are imported at API start-up (Re-ID descriptor, scenario rendering).
+# Headless build: same cv2 API without the GUI/libGL system libraries a server does not have.
+numpy
+opencv-python-headless>=4.8.0,<5
+
+# Cross-camera fusion transport (optional at runtime - in-memory + direct fallbacks)
+redis>=5,<7
+pika>=1.3,<2
+
+# PostgreSQL + PostGIS
+asyncpg>=0.29
+psycopg[binary]>=3.1
+python-ulid>=2,<4
+
+# Macro analytics (Polars); connectorx -> ADBC -> psycopg reader fallback chain
+polars>=1.0
+pyarrow>=14
+connectorx>=0.4
+adbc-driver-postgresql>=1.0
+
+# JWT auth + live alerts
+pyjwt>=2.8
+websockets>=12
+
+# /api/v1/streams MediaMTX probe
+httpx>=0.27.0
