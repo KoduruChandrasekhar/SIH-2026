@@ -1,0 +1,10 @@
+# TraceNet ByteTrack settings (Ultralytics defaults except track_buffer).
+# Used by backend/ai/vehicle_tracker.py; boxes under VehicleTracker(min_box_px) are dropped before this tracker.
+
+tracker_type: bytetrack
+track_high_thresh: 0.25 # first-stage match threshold
+track_low_thresh: 0.1 # second-stage threshold for low-score matches
+new_track_thresh: 0.25 # start a new track if no match >= this
+track_buffer: 60 # frames a lost track is kept (default 30): survives occlusion by buses/trucks in dense traffic
+match_thresh: 0.8 # association similarity threshold
+fuse_score: True # fuse detection score with IoU for matching

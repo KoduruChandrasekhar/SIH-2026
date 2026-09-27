@@ -1,0 +1,82 @@
+# TraceNet local infrastructure.
+#
+#   docker compose up -d                               # PostGIS + Redis + RabbitMQ (the full live pipeline)
+#   docker compose up -d postgis                       # database only (the API then fuses in-process)
+#
+#   postgis   PostgreSQL 16 + PostGIS 3.4              localhost:5432
+#   redis     live vehicle window, alert Pub/Sub, fusion results   localhost:6379
+#   rabbitmq  q.fusion (ingest → fusion worker)        localhost:5672, management UI http://localhost:15672 (guest/guest)
+#   mediamtx  simulated live CCTV: RTSP :8554 · HLS :8888 · WebRTC :8889
+#             (run `python backend/scripts/prepare_streams.py` first - it writes docker/mediamtx.yml)
+#
+# Credentials come from backend/.env (see backend/.env.example); the defaults below are
+# local-development values only.
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: tracenet-postgis
+    environment:
+      POSTGRES_DB: ${TRACENET_DB_NAME:-tracenet}
+      POSTGRES_USER: ${TRACENET_DB_USER:-tracenet}
+      POSTGRES_PASSWORD: ${TRACENET_DB_PASSWORD:-tracenet}
+    ports:
+      - "${TRACENET_DB_PORT:-5432}:5432"
+    volumes:
+      - tracenet-pgdata:/var/lib/postgresql/data
+      # First start only; `python -m backend.db.migrate` applies the same file idempotently.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      # TCP check: the temporary init-time server only listens on the unix socket
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: tracenet-redis
+    # the active window is soft state (30 min, rebuilt from traffic) - no persistence needed
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: tracenet-rabbitmq
+    hostname: tracenet-rabbitmq              # fixed node name, so the durable queue survives re-creation
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - tracenet-rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.9.3-ffmpeg
+    container_name: tracenet-mediamtx
+    volumes:
+      - ./docker/mediamtx.yml:/mediamtx.yml:ro
+      - ./backend/output/streams:/streams:ro
+    ports:
+      - "8554:8554"          # RTSP
+      - "8888:8888"          # HLS
+      - "8889:8889"          # WebRTC (WHEP)
+      - "8189:8189/udp"      # WebRTC media
+    restart: unless-stopped
+
+volumes:
+  tracenet-pgdata:
+  tracenet-rabbitmq:

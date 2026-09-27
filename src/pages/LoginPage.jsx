@@ -8,15 +8,31 @@ import {
   ArrowLeft 
 } from "lucide-react";
 import tracenetLogo from "../assets/tracenet-logo.jpg";
+import { login } from "../lib/auth";
 
 export default function LoginPage({ navigate }) {
   // Toggle between 'police' and 'admin'
   const [role, setRole] = useState("police");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const handleLogin = (e) => {
+  // Phase 6: real JWT login (demo accounts: officer / police123, admin / admin123)
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Dummy login action: immediately route to the dashboard
-    navigate("dashboard");
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await login(username, password);
+      const expected = role === "police" ? "law_enforcement" : "camera_admin";
+      if (session.role !== expected) setError(`Signed in as ${session.role.replace("_", " ")}.`);
+      navigate(session.role === "camera_admin" ? "admin" : "dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -33,11 +49,6 @@ export default function LoginPage({ navigate }) {
         </button>
       </div>
 
-      {/* Background Animated Blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-gray-50/50">
-        <div className="animate-blob absolute left-[20%] top-[10%] h-[500px] w-[500px] rounded-full bg-blue-200/40 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[20%] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-200/40 mix-blend-multiply blur-[100px] filter" />
-      </div>
 
       {/* Main Login Card */}
       <div className="fade-up relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[32px] border border-white/80 bg-white/60 shadow-[0_8px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl md:flex-row">
@@ -101,6 +112,11 @@ export default function LoginPage({ navigate }) {
 
           {/* Form */}
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
+                {error}
+              </p>
+            )}
             {/* Username / Badge ID */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 pl-1">
@@ -111,6 +127,9 @@ export default function LoginPage({ navigate }) {
                 <input
                   type="text"
                   required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
                   placeholder={role === "police" ? "e.g. POL-4921" : "e.g. SYS-ADMIN"}
                   className="w-full rounded-xl border border-gray-200 bg-white/50 py-3 pl-10 pr-4 text-sm font-bold text-gray-900 transition-all placeholder:font-semibold placeholder:text-gray-300 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
                 />
@@ -127,6 +146,9 @@ export default function LoginPage({ navigate }) {
                 <input
                   type="password"
                   required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   className="w-full rounded-xl border border-gray-200 bg-white/50 py-3 pl-10 pr-4 text-sm font-bold text-gray-900 transition-all placeholder:text-gray-300 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
                 />
@@ -147,14 +169,16 @@ export default function LoginPage({ navigate }) {
             {/* Submit Button */}
             <button
               type="submit"
-              className={`group relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
+              disabled={busy}
+              aria-busy={busy}
+              className={`group relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:pointer-events-none disabled:opacity-70 ${
                 role === "police" 
                   ? "bg-blue-600 shadow-blue-600/30 hover:bg-blue-700" 
                   : "bg-indigo-600 shadow-indigo-600/30 hover:bg-indigo-700"
               }`}
             >
               <span className="relative z-10 flex items-center gap-2">
-                Authenticate & Login
+                {busy ? "Signing in…" : "Authenticate & Login"}
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
               </span>
             </button>

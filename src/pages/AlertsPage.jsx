@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -13,112 +13,276 @@ import {
   ShieldAlert,
   TrafficCone,
   Zap,
+  Radio,
+  ExternalLink,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
-import Navbar from "../components/Navbar";
+import { MapContainer, TileLayer, CircleMarker, Popup, Circle, Polyline, useMap } from "react-leaflet";
+import Navbar from "../components/layout/Navbar";
+import { addToWatchlist, fetchAlerts } from "../lib/api";
+import { useAlerts } from "../context/AlertsContext";
+import { WATCHLIST_CAMERAS, cameraDisplayId } from "../data/demoData";
+import { alertsFeed as localAlerts, cameraById } from "../data/data";
+import { EDGES as NETWORK_EDGES, NODES as NETWORK_NODES } from "../data/cityGraph";
+import { AnimatedNumber, MapBoundary } from "../components/ui/Motion";
+import { formatClock, simNowSec } from "../lib/liveSim";
 
-// Alert data incorporating distinct congestion vs surge, and route anomalies
-const initialAlerts = [
-  {
-    id: "ALT-9041",
+// One controlled demo event per session: the blacklisted SUV from ALT-9041 is re-sighted
+// at the next camera on its path (CAM-401 → CAM-402 is 1.4 km). Not a random alert generator.
+let sessionResighting = null; // persists across page visits for this session
+const RESIGHT_DELAY_MS = 9000;
+const makeResighting = () => {
+  const cam = cameraById["CAM #402"];
+  const t = formatClock(simNowSec()).slice(0, 5);
+  return {
+    id: "ALT-9044",
     plateNumber: "TS09EA4512",
     category: "Blacklisted Vehicle",
     type: "vehicle",
     severity: "CRITICAL",
-    timestamp: "Just Now (10:45 PM)",
-    cameraNode: "CAM-04 (Kukatpally Y-Junction)",
-    lat: 17.4947,
-    lng: 78.3996,
-    confidence: "98.4%",
-    description: "National Crime Database match: Stolen SUV reported. Trajectory tracking active.",
+    timestamp: `${t} (just now)`,
+    cameraId: cam.id,
+    cameraNode: `${cam.code} (${cam.name})`,
+    lat: cam.lat,
+    lng: cam.lng,
+    confidence: "97.4%",
+    description: "Watchlist re-sighting: same SUV as ALT-9041, now heading north-west past JNTU. Trajectory updated.",
     status: "Active",
-  },
-  {
-    id: "TRF-3012",
-    plateNumber: "Kukatpally ⇄ JNTU",
-    category: "High-Density Congestion",
-    type: "traffic",
-    severity: "CRITICAL",
-    timestamp: "2 mins ago (10:43 PM)",
-    cameraNode: "CAM-02 (Main Expressway)",
-    lat: 17.4985,
-    lng: 78.3912,
-    confidence: "Sector 2",
-    description: "Severe urban bottleneck: Traffic density exceeded capacity. Average speed dropped to 5 km/h.",
-    status: "Active",
-  },
-  {
-    id: "TRF-3015",
-    plateNumber: "Cyberabad IT Corridor",
-    category: "Sudden Traffic Surge",
-    type: "traffic",
-    severity: "HIGH",
-    timestamp: "5 mins ago (10:40 PM)",
-    cameraNode: "CAM-07 (Hitec City Flyover)",
-    lat: 17.4485,
-    lng: 78.3742,
-    confidence: "+45% Vol",
-    description: "Unexpected inflow spike. Current count: 1,240 veh/hr (Normal: 850 veh/hr). Signal adjustment advised.",
-    status: "Investigating",
-  },
-  {
-    id: "ALT-9038",
-    plateNumber: "AP28BK8821",
-    category: "Trajectory Anomaly",
-    type: "vehicle",
-    severity: "HIGH",
-    timestamp: "11 mins ago (10:34 PM)",
-    cameraNode: "CAM-12 (Balanagar Industrial)",
-    lat: 17.4682,
-    lng: 78.4357,
-    confidence: "95.1%",
-    description: "Missing expected camera detection sequence. Vehicle deviated >3km from expected standard route.",
-    status: "Active",
-  },
-  {
-    id: "ALT-9029",
-    plateNumber: "MH04EF7710",
-    category: "Unusual Stop / Loitering",
-    type: "vehicle",
-    severity: "MEDIUM",
-    timestamp: "24 mins ago (10:21 PM)",
-    cameraNode: "CAM-19 (Begumpet Airport Rd)",
-    lat: 17.4439,
-    lng: 78.4684,
-    confidence: "94.2%",
-    description: "Vehicle stopped for 18 minutes in restricted no-stopping zone. Repeated loitering detected.",
-    status: "Resolved",
-  },
-];
+    isNew: true,
+  };
+};
 
-export default function AlertsPage({ navigate, openModal }) {
-  const [alerts, setAlerts] = useState(initialAlerts);
+// One severity palette across the app: critical = red, high = orange, medium = amber
+const SEVERITY = {
+  CRITICAL: { color: "#ef4444", badge: "bg-red-500 text-white", icon: "bg-red-100 text-red-600", border: "border-red-500/80", ring: "ring-red-500/20" },
+  HIGH: { color: "#f97316", badge: "bg-orange-500 text-white", icon: "bg-orange-100 text-orange-600", border: "border-orange-500/80", ring: "ring-orange-500/20" },
+  MEDIUM: { color: "#eab308", badge: "bg-amber-500 text-amber-950", icon: "bg-amber-100 text-amber-600", border: "border-amber-500/80", ring: "ring-amber-500/20" },
+};
+const sev = (a) => SEVERITY[a.severity] ?? SEVERITY.MEDIUM;
+const ANOMALY_CATEGORIES = ["Trajectory Anomaly", "Unusual Stop / Loitering", "Cloned Plate", "Invalid / Tampered Plate"];
+const isAnomaly = (a) => ANOMALY_CATEGORIES.includes(a.category);
+
+// The camera network (shared city graph): every camera and road link, and the map's city-wide frame
+const NETWORK_POINTS = NETWORK_NODES.map((n) => [n.lat, n.lng]);
+const NODE_INDEX = Object.fromEntries(NETWORK_NODES.map((n, i) => [n.id, i]));
+const NETWORK_LINES = NETWORK_EDGES.map(([a, b]) => ({
+  key: `${a}-${b}`,
+  a,
+  b,
+  positions: [[NETWORK_NODES[a].lat, NETWORK_NODES[a].lng], [NETWORK_NODES[b].lat, NETWORK_NODES[b].lng]],
+}));
+// camera an alert was raised at (its own camera, else the nearest one)
+const alertNode = (al) =>
+  NODE_INDEX[al.cameraId] ??
+  NETWORK_NODES.reduce((best, n, i) => {
+    const d = Math.hypot(n.lat - al.lat, n.lng - al.lng);
+    return !best || d < best[1] ? [i, d] : best;
+  }, null)?.[0];
+
+function FitNetwork() {
+  const map = useMap();
+  useEffect(() => {
+    map.fitBounds(NETWORK_POINTS, { padding: [24, 24], animate: false });
+  }, [map]);
+  return null;
+}
+
+// Pans to an alert when a different one is picked; the first selection keeps the city-wide view
+// (the alert objects are rebuilt on every live refresh, so this tracks the id, not the object)
+function FocusAlert({ alert }) {
+  const map = useMap();
+  const shown = useRef(alert?.id);
+  useEffect(() => {
+    if (!alert || alert.id === shown.current) return;
+    shown.current = alert.id;
+    map.flyTo([alert.lat, alert.lng], 14, { duration: 0.8 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, alert?.id]);
+  return null;
+}
+
+export default function AlertsPage({ navigate }) {
+  const [alerts, setAlerts] = useState(() => (sessionResighting ? [{ ...sessionResighting, isNew: false }, ...localAlerts] : localAlerts));
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAlert, setSelectedAlert] = useState(initialAlerts[0]);
+  const [selectedAlert, setSelectedAlert] = useState(localAlerts[0]);
   const [toastMessage, setToastMessage] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
+  const [resolvingId, setResolvingId] = useState(null);
 
   const [newPlate, setNewPlate] = useState("");
   const [newReason, setNewReason] = useState("");
 
+  // ── Watchlist Propagation State ──
+  const [propagationState, setPropagationState] = useState('idle'); // idle | propagating | synced | detected
+  const [propagatedCameras, setPropagatedCameras] = useState([]);
+  const [detectedPlate, setDetectedPlate] = useState(null);
+  const timeoutIdsRef = useRef([]);
+
+  // Phase 6: when the backend stream is live, this table shows real alerts (snapshot + WebSocket)
+  const { live, alerts: liveAlerts, markRead, subscribe } = useAlerts();
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const pendingWatchPlate = useRef(null);
+  useEffect(() => {
+    if (!live) return;
+    setAlerts((prev) => liveAlerts.map((a) => ({ ...a, status: prev.find((p) => p.alertId && p.alertId === a.alertId)?.status ?? a.status })));
+    setSelectedAlert((cur) => (cur && liveAlerts.some((a) => a.alertId === cur.alertId) ? cur : liveAlerts[0] ?? null));
+    markRead();
+  }, [live, liveAlerts, markRead]);
+  // A real BLACKLIST_HIT for a plate just added here completes the propagation panel
+  useEffect(
+    () =>
+      subscribe((row) => {
+        if (row.alertType === "BLACKLIST_HIT" && row.plateNumber === pendingWatchPlate.current) {
+          setPropagationState("detected");
+          setDetectedPlate({ plate: row.plateNumber, camera: row.cameraId, timestamp: row.timestamp, confidence: row.confidence });
+        }
+      }),
+    [subscribe]
+  );
+
+  // Cleanup all timeouts on unmount or reset
+  const clearAllTimeouts = useCallback(() => {
+    timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+    timeoutIdsRef.current = [];
+  }, []);
+
+  useEffect(() => {
+    return () => clearAllTimeouts();
+  }, [clearAllTimeouts]);
+
+  const resetPropagation = useCallback(() => {
+    clearAllTimeouts();
+    setPropagationState('idle');
+    setPropagatedCameras([]);
+    setDetectedPlate(null);
+  }, [clearAllTimeouts]);
+
+  // Fetch from API with fallback
+  useEffect(() => {
+    fetchAlerts().then((data) => {
+      if (data && !liveRef.current) {
+        setAlerts(data);
+        setSelectedAlert(data[0]);
+      }
+    });
+  }, []);
+
   const triggerToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    const id = setTimeout(() => setToastMessage(null), 3500);
+    timeoutIdsRef.current.push(id);
   };
 
   const handleResolve = (id) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "Resolved" } : a))
-    );
-    triggerToast(`Alert ${id} marked as Resolved.`);
+    setResolvingId(id);
+    const t = setTimeout(() => {
+      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status: "Resolved", isNew: false } : a)));
+      setResolvingId(null);
+      triggerToast(`Alert ${id} marked as Resolved.`);
+    }, 450);
+    timeoutIdsRef.current.push(t);
   };
 
-  const handleAddWatchlist = (e) => {
+  // Controlled demo event (once per session)
+  useEffect(() => {
+    if (sessionResighting) return;
+    const t = setTimeout(() => {
+      if (liveRef.current) return; // real alerts only when the backend stream is live
+      const alert = makeResighting();
+      sessionResighting = alert;
+      setAlerts((prev) => (prev.some((a) => a.id === alert.id) ? prev : [alert, ...prev]));
+      setToastMessage(`New CRITICAL alert · ${alert.plateNumber} re-sighted at ${cameraById["CAM #402"].code}`);
+      setTimeout(() => setToastMessage(null), 3500);
+    }, RESIGHT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  // ── Propagation Sequence ──
+  const startPropagation = (plate, real = false) => {
+    clearAllTimeouts();
+    setPropagationState('propagating');
+    setPropagatedCameras([]);
+    setDetectedPlate(null);
+
+    // Stagger camera propagation
+    WATCHLIST_CAMERAS.forEach((cam, index) => {
+      const id = setTimeout(() => {
+        setPropagatedCameras((prev) => [...prev, cam]);
+      }, (index + 1) * 300);
+      timeoutIdsRef.current.push(id);
+    });
+
+    // After all cameras propagated → synced
+    const syncId = setTimeout(() => {
+      setPropagationState('synced');
+    }, WATCHLIST_CAMERAS.length * 300 + 400);
+    timeoutIdsRef.current.push(syncId);
+
+    // Real watchlist: detection happens only when a camera actually reads the plate (WebSocket)
+    if (real) {
+      pendingWatchPlate.current = plate;
+      const resetId = setTimeout(() => {
+        pendingWatchPlate.current = null;
+        resetPropagation();
+      }, 120000);
+      timeoutIdsRef.current.push(resetId);
+      return;
+    }
+
+    // After sync → detection
+    const detectId = setTimeout(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setPropagationState('detected');
+      setDetectedPlate({
+        plate,
+        camera: "CAM #403",
+        timestamp: timeStr,
+        confidence: "96.8%",
+      });
+    }, WATCHLIST_CAMERAS.length * 300 + 2400);
+    timeoutIdsRef.current.push(detectId);
+
+    // Auto-reset after 15 seconds
+    const resetId = setTimeout(() => {
+      resetPropagation();
+    }, 15000);
+    timeoutIdsRef.current.push(resetId);
+  };
+
+  const handleAddWatchlist = async (e) => {
     e.preventDefault();
     if (!newPlate) return;
-    triggerToast(`Plate [${newPlate.toUpperCase()}] registered to Central Watchlist.`);
+    const plate = newPlate.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (live) {
+      const res = await addToWatchlist(plate, newReason || "Added from the Alerts page");
+      if (!res.ok) {
+        triggerToast(`Watchlist update failed (${res.status || "offline"}).`);
+        return;
+      }
+      triggerToast(`Plate [${plate}] added to the central watchlist — enforced on the next sighting.`);
+      startPropagation(plate, true);
+    } else {
+      triggerToast(`Plate [${plate}] registered to Central Watchlist.`);
+      startPropagation(plate);
+    }
     setNewPlate("");
     setNewReason("");
+  };
+
+  const handleOpenTrajectory = () => {
+    const plate = detectedPlate?.plate;
+    resetPropagation();
+    navigate("tracking", plate ? { plate } : null);
+  };
+
+  const open = alerts.filter((a) => a.status !== "Resolved");
+  const metrics = {
+    blacklist: open.filter((a) => a.category === "Blacklisted Vehicle").length,
+    congestion: open.filter((a) => a.category === "High-Density Congestion").length,
+    surge: open.find((a) => a.category === "Sudden Traffic Surge"),
+    anomalies: open.filter(isAnomaly).length,
   };
 
   const filteredAlerts = alerts.filter((item) => {
@@ -126,7 +290,7 @@ export default function AlertsPage({ navigate, openModal }) {
       filterCategory === "ALL" ||
       (filterCategory === "CONGESTION" && item.type === "traffic") ||
       (filterCategory === "BLACKLIST" && item.category === "Blacklisted Vehicle") ||
-      (filterCategory === "ANOMALY" && (item.category === "Trajectory Anomaly" || item.category === "Unusual Stop / Loitering"));
+      (filterCategory === "ANOMALY" && isAnomaly(item));
 
     const matchesSearch =
       item.plateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -137,13 +301,30 @@ export default function AlertsPage({ navigate, openModal }) {
     return matchesFilter && matchesSearch;
   });
 
+  // From each open alert's camera: the network links a flagged vehicle can take next, in the alert's colour
+  const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const interception = useMemo(() => {
+    const rank = { CRITICAL: 3, HIGH: 2, MEDIUM: 1 };
+    const byNode = {};
+    alerts
+      .filter((al) => al.status !== "Resolved" && al.lat != null && al.lng != null)
+      .forEach((al) => {
+        const i = alertNode(al);
+        if (i == null) return;
+        const r = rank[al.severity] ?? 0;
+        if (!byNode[i] || r > byNode[i].r) byNode[i] = { r, color: sev(al).color };
+      });
+    const out = {};
+    NETWORK_LINES.forEach((l) => {
+      const hit = byNode[l.a] ?? byNode[l.b];
+      if (hit) out[l.key] = hit.color;
+    });
+    return out;
+  }, [alerts]);
+  const selectedNode = selectedAlert ? alertNode(selectedAlert) : null;
+
   return (
     <div className="relative flex w-full flex-col gap-6 pb-10">
-      {/* Background Blobs */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="animate-blob absolute -left-[10%] top-[-5%] h-[400px] w-[400px] rounded-full bg-red-300/25 mix-blend-multiply blur-[100px] filter" />
-        <div className="animate-blob animation-delay-2000 absolute right-[-5%] top-[20%] h-[400px] w-[400px] rounded-full bg-orange-300/25 mix-blend-multiply blur-[100px] filter" />
-      </div>
 
       {/* Floating Action Toast */}
       {toastMessage && (
@@ -154,8 +335,8 @@ export default function AlertsPage({ navigate, openModal }) {
       )}
 
       {/* Navbar */}
-      <div className="fade-up w-full">
-        <Navbar page="alerts" navigate={navigate} openModal={openModal} />
+      <div className="w-full">
+        <Navbar page="alerts" navigate={navigate} />
       </div>
 
       {/* Header Banner */}
@@ -174,38 +355,42 @@ export default function AlertsPage({ navigate, openModal }) {
         </p>
       </div>
 
-      {/* Metrics Row (2x2 on Mobile, 4x1 on Desktop) */}
+      {/* Metrics Row — computed from the alert feed (resolving an alert updates them) */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <AlertMetricCard title="Blacklist Detections" value="3 Active" trend="Action Required" icon={ShieldAlert} color="text-red-600" />
-        <AlertMetricCard title="High-Density Spots" value="2 Sectors" trend="Severe Gridlock" icon={TrafficCone} color="text-amber-500" />
-        <AlertMetricCard title="Sudden Traffic Surge" value="+45% Vol" trend="Cyberabad Corridor" icon={Activity} color="text-orange-500" />
-        <AlertMetricCard title="Trajectory Anomalies" value="4 Detected" trend="Unusual Stops/Routes" icon={Route} color="text-purple-600" />
+        <AlertMetricCard title="Blacklist Detections" value={<><AnimatedNumber value={metrics.blacklist} /> Active</>} trend={metrics.blacklist ? "Action required" : "None open"} icon={ShieldAlert} color="text-red-600" />
+        <AlertMetricCard title="High-Density Spots" value={<><AnimatedNumber value={metrics.congestion} /> {metrics.congestion === 1 ? "Corridor" : "Corridors"}</>} trend="≥85% road capacity" icon={TrafficCone} color="text-amber-500" />
+        <AlertMetricCard title="Sudden Traffic Surge" value={metrics.surge ? metrics.surge.confidence : "None"} trend={metrics.surge ? metrics.surge.plateNumber : "No surge open"} icon={Activity} color="text-orange-500" />
+        <AlertMetricCard title="Trajectory Anomalies" value={<><AnimatedNumber value={metrics.anomalies} /> Open</>} trend="Route deviations · stops" icon={Route} color="text-purple-600" />
       </div>
 
       {/* Main Content Grid (Map on Left, Alerts on Right) */}
       <div className="grid w-full gap-5 lg:grid-cols-[1fr_1.4fr] xl:grid-cols-[1fr_1.6fr]">
         
         {/* LEFT COLUMN: GIS Incident Spatial Map & Watchlist Tool */}
-        <div className="fade-up delay-300 flex flex-col gap-5 order-2 lg:order-1">
+        <div className="fade-up delay-300 flex min-w-0 flex-col gap-5 order-2 lg:order-1">
           
           {/* Leaflet Tactical Alert Map */}
           <div className="flex h-[420px] flex-col rounded-[28px] border border-white/80 bg-white/70 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-3 px-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2">
               <div className="flex items-center gap-2">
                 <ShieldAlert size={16} className="text-red-500" />
                 <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">
                   Incident & Congestion Map
                 </h3>
               </div>
-              <span className="text-[10px] font-bold text-gray-400">
-                Focus: {selectedAlert ? selectedAlert.plateNumber : "Mesh Grid"}
+              <span key={selectedAlert?.id} className="tn-new-item flex min-w-0 max-w-full items-center gap-1.5 truncate rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold text-gray-600" aria-live="polite">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: selectedAlert ? sev(selectedAlert).color : "#64748b" }} aria-hidden="true" />
+                Focus:
+                <span className="font-mono font-black text-gray-900">{selectedAlert ? selectedAlert.plateNumber : "Mesh Grid"}</span>
+                {selectedAlert && <span className="font-mono text-gray-400">{selectedAlert.cameraNode?.split(" ")[0]}</span>}
               </span>
             </div>
 
             <div className="relative flex-1 w-full rounded-[20px] overflow-hidden border border-gray-200/60 shadow-inner z-10">
+              <MapBoundary>
               <MapContainer
-                center={[selectedAlert ? selectedAlert.lat : 17.485, selectedAlert ? selectedAlert.lng : 78.41]}
-                zoom={13}
+                center={[17.43, 78.445]}
+                zoom={12}
                 scrollWheelZoom={false}
                 style={{ width: "100%", height: "100%" }}
               >
@@ -214,34 +399,74 @@ export default function AlertsPage({ navigate, openModal }) {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                <FitNetwork />
+                <FocusAlert alert={selectedAlert} />
+
+                {/* Camera network: road links, lit in the alert's colour where a flagged vehicle can be intercepted next */}
+                {NETWORK_LINES.map((l) => {
+                  const hit = interception[l.key];
+                  const focus = hit && selectedNode != null && (l.a === selectedNode || l.b === selectedNode);
+                  const role = hit ? (focus ? "focus" : "alert") : "mesh";
+                  const style = hit
+                    ? { color: hit, weight: focus ? 3 : 2, opacity: focus ? 0.95 : 0.7, dashArray: "4 6", className: reduceMotion ? "" : "tn-net-link" }
+                    : { color: "#6366f1", weight: 1, opacity: 0.3, dashArray: "2 6" };
+                  // Leaflet sets a path's CSS class only on creation: a new role re-creates the link
+                  return <Polyline key={`${l.key}-${role}`} positions={l.positions} pathOptions={style} interactive={false} />;
+                })}
+                {NETWORK_NODES.map((n) => (
+                  <CircleMarker
+                    key={n.id}
+                    center={[n.lat, n.lng]}
+                    radius={3.5}
+                    interactive={false}
+                    pathOptions={{ color: "#fff", weight: 1, fillColor: n.online ? "#6366f1" : "#94a3b8", fillOpacity: 0.9 }}
+                  />
+                ))}
                 {alerts.map((al) => {
                   const isCongestion = al.type === "traffic";
+                  const color = sev(al).color;
+                  const resolved = al.status === "Resolved";
                   return (
                     <div key={al.id}>
-                      <Marker position={[al.lat, al.lng]}>
+                      <Circle
+                        center={[al.lat, al.lng]}
+                        radius={isCongestion ? 900 : 350}
+                        pathOptions={{ color, weight: 1, fillColor: color, fillOpacity: resolved ? 0.05 : isCongestion ? 0.2 : 0.12, dashArray: isCongestion ? undefined : "4 4" }}
+                      />
+                      <CircleMarker
+                        center={[al.lat, al.lng]}
+                        radius={selectedAlert?.id === al.id ? 10 : hoveredId === al.id ? 10 : 7}
+                        pathOptions={{ color: hoveredId === al.id ? "#bfdbfe" : "#fff", weight: hoveredId === al.id ? 3 : 2, fillColor: resolved ? "#64748b" : color, fillOpacity: 1 }}
+                        eventHandlers={{ click: () => setSelectedAlert(al), mouseover: () => setHoveredId(al.id), mouseout: () => setHoveredId(null) }}
+                      >
                         <Popup>
                           <div className="p-1">
-                            <span className={`font-mono text-xs font-black ${isCongestion ? 'text-amber-600' : 'text-red-600'}`}>
+                            <span className="font-mono text-xs font-black" style={{ color }}>
                               {al.plateNumber}
                             </span>
                             <h4 className="text-[11px] font-bold text-gray-900 mt-0.5">{al.category}</h4>
                             <p className="text-[10px] text-gray-500">{al.cameraNode}</p>
                           </div>
                         </Popup>
-                      </Marker>
-                      <Circle
-                        center={[al.lat, al.lng]}
-                        radius={isCongestion ? 1200 : al.severity === "CRITICAL" ? 900 : 500}
-                        pathOptions={{
-                          color: isCongestion ? "#f59e0b" : al.severity === "CRITICAL" ? "#ef4444" : "#3b82f6",
-                          fillColor: isCongestion ? "#f59e0b" : al.severity === "CRITICAL" ? "#ef4444" : "#3b82f6",
-                          fillOpacity: 0.25,
-                        }}
-                      />
+                      </CircleMarker>
                     </div>
                   );
                 })}
+                {/* focus ring on the selected alert; a one-off ping marks a newly arrived alert */}
+                {selectedAlert && (
+                  <CircleMarker
+                    key={`focus-${selectedAlert.id}`}
+                    center={[selectedAlert.lat, selectedAlert.lng]}
+                    radius={16}
+                    interactive={false}
+                    pathOptions={{ color: sev(selectedAlert).color, weight: 2.5, fill: false, className: "tn-marker-selected" }}
+                  />
+                )}
+                {alerts.filter((a) => a.isNew).map((a) => (
+                  <CircleMarker key={`new-${a.id}`} center={[a.lat, a.lng]} radius={12} interactive={false} pathOptions={{ color: "#ef4444", weight: 2, fill: false, className: "tn-marker-ring" }} />
+                ))}
               </MapContainer>
+              </MapBoundary>
             </div>
           </div>
 
@@ -266,6 +491,7 @@ export default function AlertsPage({ navigate, openModal }) {
                   value={newPlate}
                   onChange={(e) => setNewPlate(e.target.value.toUpperCase())}
                   className="w-full font-mono rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-bold uppercase text-gray-900 focus:border-red-500 focus:outline-none"
+                  disabled={propagationState !== 'idle'}
                   required
                 />
               </div>
@@ -280,21 +506,133 @@ export default function AlertsPage({ navigate, openModal }) {
                   value={newReason}
                   onChange={(e) => setNewReason(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-800 focus:border-red-500 focus:outline-none"
+                  disabled={propagationState !== 'idle'}
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full rounded-xl bg-red-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-red-600/20 transition hover:bg-red-700 active:scale-95"
+                disabled={propagationState !== 'idle'}
+                className="w-full rounded-xl bg-red-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-red-600/20 transition hover:bg-red-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Register to Watch Mesh
               </button>
             </form>
+
+            {/* ── Watchlist Propagation Panel ── */}
+            {propagationState !== 'idle' && (
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-gray-50/70 p-4 transition-all duration-500">
+                {/* Propagation header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Radio size={14} className={`text-emerald-500 ${propagationState === 'propagating' ? 'animate-pulse' : ''}`} />
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                    {propagationState === 'propagating' && 'Propagating Watchlist...'}
+                    {propagationState === 'synced' && 'Propagating Watchlist...'}
+                    {propagationState === 'detected' && 'Propagation Complete'}
+                  </span>
+                </div>
+
+                {/* Camera list with staggered checks */}
+                <div className="space-y-1.5 mb-3">
+                  {WATCHLIST_CAMERAS.map((cam) => {
+                    const isPropagated = propagatedCameras.includes(cam);
+                    return (
+                      <div
+                        key={cam}
+                        className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 transition-all duration-300 ${
+                          isPropagated
+                            ? 'bg-emerald-50 opacity-100 translate-x-0'
+                            : 'opacity-30 -translate-x-2'
+                        }`}
+                      >
+                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
+                          isPropagated ? 'bg-emerald-500 scale-100' : 'bg-gray-300 scale-75'
+                        }`}>
+                          {isPropagated && (
+                            <CheckCircle2 size={12} className="text-white" />
+                          )}
+                        </div>
+                        <span className={`font-mono text-[11px] font-bold transition-colors duration-300 ${
+                          isPropagated ? 'text-gray-900' : 'text-gray-400'
+                        }`}>
+                          {cameraDisplayId(cam)}
+                        </span>
+                        {isPropagated && (
+                          <span className="ml-auto text-[10px] font-bold text-emerald-600">
+                            Synced
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Network Synchronized badge */}
+                {(propagationState === 'synced' || propagationState === 'detected') && (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 mb-3 transition-all duration-500">
+                    <CheckCircle2 size={14} className="text-emerald-500" />
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                      Network Synchronized
+                    </span>
+                    <span className="ml-auto text-[10px] font-bold text-emerald-500">
+                      {WATCHLIST_CAMERAS.length}/{WATCHLIST_CAMERAS.length} Nodes
+                    </span>
+                  </div>
+                )}
+
+                {/* Detection Alert */}
+                {propagationState === 'detected' && detectedPlate && (
+                  <div className="rounded-xl border border-amber-400/60 bg-gradient-to-r from-amber-50 to-red-50 p-4 shadow-lg shadow-amber-500/10 transition-all duration-500">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Zap size={14} className="text-amber-600" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700">
+                        Watchlist Match Detected
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 mb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Plate</span>
+                        <span className="font-mono text-xs font-black text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
+                          {detectedPlate.plate}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Camera</span>
+                        <span className="font-mono text-xs font-bold text-gray-800">
+                          {cameraDisplayId(detectedPlate.camera)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Timestamp</span>
+                        <span className="font-mono text-xs font-bold text-gray-800">
+                          {detectedPlate.timestamp}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Confidence</span>
+                        <span className="font-mono text-xs font-black text-emerald-600">
+                          {detectedPlate.confidence}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleOpenTrajectory}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95"
+                    >
+                      <ExternalLink size={14} />
+                      Open Trajectory
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* RIGHT COLUMN: Feed & Filter */}
-        <div className="fade-up delay-200 flex flex-col gap-4 order-1 lg:order-2">
+        <div className="fade-up delay-200 flex min-w-0 flex-col gap-4 order-1 lg:order-2">
           
           {/* Controls Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-[20px] border border-white/80 bg-white/80 p-3 shadow-sm backdrop-blur-xl">
@@ -313,17 +651,18 @@ export default function AlertsPage({ navigate, openModal }) {
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
-                { label: "All Alerts", key: "ALL" },
-                { label: "Congestion/Surge", key: "CONGESTION" },
-                { label: "Watchlist", key: "BLACKLIST" },
-                { label: "Anomalies", key: "ANOMALY" },
+                { label: "All Alerts", key: "ALL", active: "bg-blue-600" },
+                { label: "Congestion/Surge", key: "CONGESTION", active: "bg-orange-500" },
+                { label: "Watchlist", key: "BLACKLIST", active: "bg-red-500" },
+                { label: "Anomalies", key: "ANOMALY", active: "bg-purple-600" },
               ].map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setFilterCategory(f.key)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all shrink-0 ${
+                  aria-pressed={filterCategory === f.key}
+                  className={`tn-press rounded-xl px-3 py-1.5 text-xs font-bold shrink-0 ${
                     filterCategory === f.key
-                      ? "bg-red-500 text-white shadow-md shadow-red-500/20"
+                      ? `${f.active} text-white shadow-md`
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
@@ -334,10 +673,11 @@ export default function AlertsPage({ navigate, openModal }) {
           </div>
 
           {/* Alert Cards List (Rendered as a 2x2 Grid on Large Screens) */}
-          <div className="grid gap-3.5 sm:grid-cols-2">
+          <div key={filterCategory + "|" + searchQuery} className="tn-list-in grid gap-3.5 sm:grid-cols-2">
             {filteredAlerts.length === 0 ? (
-              <div className="col-span-full rounded-[24px] border border-dashed border-gray-300 bg-white/60 p-12 text-center text-xs font-bold text-gray-400">
-                No active alerts match the selected criteria.
+              <div className="tn-empty col-span-full">
+                <p className="tn-empty-title">No matching alerts</p>
+                <p className="tn-empty-sub">{searchQuery ? `Nothing matches “${searchQuery}” in this filter.` : "No alerts in this category right now."}</p>
               </div>
             ) : (
               filteredAlerts.map((item) => {
@@ -346,44 +686,46 @@ export default function AlertsPage({ navigate, openModal }) {
                 return (
                   <div
                     key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedAlert?.id === item.id}
                     onClick={() => setSelectedAlert(item)}
-                    className={`group relative flex flex-col gap-3 rounded-[24px] border p-5 transition-all duration-300 cursor-pointer backdrop-blur-xl ${
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), setSelectedAlert(item))}
+                    onMouseEnter={() => setHoveredId(item.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    className={`tn-card-hover group relative flex flex-col gap-3 rounded-[24px] border p-5 cursor-pointer backdrop-blur-xl ${item.isNew ? "tn-new-item" : ""} ${
                       selectedAlert?.id === item.id
-                        ? isTraffic
-                          ? "border-amber-500/80 bg-white shadow-lg shadow-amber-500/10 ring-2 ring-amber-500/20"
-                          : "border-red-500/80 bg-white shadow-lg shadow-red-500/10 ring-2 ring-red-500/20"
+                        ? `${sev(item).border} bg-white shadow-lg ring-2 ${sev(item).ring}`
                         : "border-white/80 bg-white/70 hover:bg-white hover:shadow-md"
-                    }`}
+                    } ${item.status === "Resolved" ? "opacity-70" : ""} ${item.severity === "CRITICAL" && item.status !== "Resolved" ? "tn-alert-critical" : ""}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black ${
-                            isTraffic
-                              ? "bg-amber-100 text-amber-600"
-                              : item.severity === "CRITICAL"
-                              ? "bg-red-100 text-red-600"
-                              : "bg-blue-100 text-blue-600"
+                            isAnomaly(item) ? "bg-purple-100 text-purple-600" : sev(item).icon
                           }`}
                         >
-                          {isTraffic ? <TrafficCone size={18} /> : <AlertTriangle size={18} />}
+                          {isTraffic ? <TrafficCone size={18} /> : isAnomaly(item) ? <Route size={18} /> : <AlertTriangle size={18} />}
                         </div>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-mono text-[11px] font-black tracking-wider text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
                               {item.plateNumber}
                             </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                                isTraffic
-                                  ? "bg-amber-500 text-white animate-pulse"
-                                  : item.severity === "CRITICAL"
-                                  ? "bg-red-500 text-white animate-pulse"
-                                  : "bg-blue-500 text-white"
-                              }`}
-                            >
+                            <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${sev(item).badge}`}>
+                              {/* urgency without flashing: critical/high pulse softly while open, medium is static */}
+                              <span
+                                style={{ background: "#fff" }}
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  item.status === "Resolved" ? "" : item.severity === "CRITICAL" ? "tn-pulse tn-pulse--red" : item.severity === "HIGH" ? "tn-pulse tn-pulse--orange" : ""
+                                }`}
+                                aria-hidden="true"
+                              />
                               {item.severity}
                             </span>
+                            <span className={`text-[9px] font-extrabold uppercase tracking-wider ${item.status === "Resolved" ? "text-emerald-600" : "text-gray-400"}`}>{item.status}</span>
+                            {item.isNew && <span className="rounded-md bg-red-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-red-500">New</span>}
                           </div>
                           <span className="text-[11px] font-bold text-gray-600 mt-1 block">{item.category}</span>
                         </div>
@@ -396,7 +738,7 @@ export default function AlertsPage({ navigate, openModal }) {
                       <div className="flex items-center justify-between text-gray-500">
                         <span className="flex items-center gap-1 font-semibold truncate pr-2">
                           <MapPin size={12} className={isTraffic ? "text-amber-500" : "text-red-500"} />
-                          <span className="truncate">{item.cameraNode.split("(")[0]}</span>
+                          <span className="truncate">{item.cameraNode}</span>
                         </span>
                         <span className="font-mono font-bold text-emerald-600 whitespace-nowrap">
                           {isTraffic ? `Metric: ${item.confidence}` : `Conf: ${item.confidence}`}
@@ -406,16 +748,17 @@ export default function AlertsPage({ navigate, openModal }) {
                       {/* Actions */}
                       <div className="flex items-center justify-between mt-1">
                         <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
-                          <Clock size={12} /> {item.timestamp.split(" ")[0]}
+                          <Clock size={12} /> {item.timestamp}
                         </span>
                         <div className="flex items-center gap-2">
                           {isTraffic ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate("traffic");
+                                navigate("traffic", item.corridorId ? { corridor: item.corridorId } : null);
                               }}
-                              className="flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-amber-600"
+                              className="tn-press flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-amber-950 hover:bg-amber-400 group-hover:shadow-md"
+                              aria-label={`View traffic flow${item.corridorId ? ` for ${item.corridorId}` : ""}`}
                             >
                               <Gauge size={12} /> View Flow
                             </button>
@@ -423,9 +766,10 @@ export default function AlertsPage({ navigate, openModal }) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate("tracking");
+                                navigate("tracking", { plate: item.plateNumber });
                               }}
-                              className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-blue-600"
+                              className="tn-press flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-blue-600 group-hover:shadow-md"
+                              aria-label={`Trace ${item.plateNumber} on the Tracking page`}
                             >
                               <Navigation size={12} /> Trace
                             </button>
@@ -437,9 +781,10 @@ export default function AlertsPage({ navigate, openModal }) {
                                 e.stopPropagation();
                                 handleResolve(item.id);
                               }}
-                              className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+                              disabled={resolvingId === item.id}
+                              className="tn-press flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
                             >
-                              Resolve
+                              {resolvingId === item.id ? <><span className="tn-spinner" style={{ width: 10, height: 10 }} aria-hidden="true" /> Resolving…</> : "Resolve"}
                             </button>
                           )}
                         </div>
@@ -459,7 +804,7 @@ export default function AlertsPage({ navigate, openModal }) {
 
 function AlertMetricCard({ title, value, trend, icon: Icon, color }) {
   return (
-    <div className="rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+    <div className="tn-kpi fade-up delay-100 rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">{title}</span>
         <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 ${color}`}>
@@ -467,7 +812,7 @@ function AlertMetricCard({ title, value, trend, icon: Icon, color }) {
         </div>
       </div>
       <div className="mt-3 flex items-baseline justify-between">
-        <h2 className="text-xl font-black text-gray-900 tracking-tight">{value}</h2>
+        <h2 className="tn-kpi-value text-xl font-black text-gray-900 tracking-tight tabular-nums">{value}</h2>
         <span className="text-[10px] font-bold text-gray-500 truncate ml-2">{trend}</span>
       </div>
     </div>

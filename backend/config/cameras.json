@@ -1,0 +1,68 @@
+{
+  "$comment": [
+    "TraceNet Phase 1 — camera network configuration.",
+    "Recorded MP4 files act as the simulation layer for the unavailable city camera network.",
+    "Paths are relative to the repository root so the project stays portable.",
+    "source_type: 'mp4' (recorded replay) or 'rtsp' (live ingestion; same downstream interface).",
+    "replay_start_time makes recorded timestamps deterministic: ts = replay_start_time + frame_index / source_fps."
+  ],
+  "replay_start_time": "2026-09-19T18:45:00+05:30",
+  "defaults": {
+    "processing_fps": 6.0,
+    "realtime": true,
+    "loop": false,
+    "max_consecutive_read_errors": 15
+  },
+  "cameras": [
+    {
+      "camera_id": "CAM-401",
+      "name": "Kukatpally Y-Junction",
+      "latitude": 17.4947,
+      "longitude": 78.3996,
+      "road": "JNTU–Kukatpally Road",
+      "sector": "Kukatpally",
+      "direction": "North-West",
+      "source_type": "mp4",
+      "source_path": "public/camera-feeds/CAM-401.mp4",
+      "enabled": true
+    },
+    {
+      "camera_id": "CAM-402",
+      "name": "JNTU Metro Station",
+      "aliases": ["Kukatpally Metro Station"],
+      "latitude": 17.4985,
+      "longitude": 78.3912,
+      "road": "JNTU Main Road",
+      "sector": "Kukatpally",
+      "direction": "East",
+      "source_type": "mp4",
+      "source_path": "public/camera-feeds/CAM-402.mp4",
+      "enabled": true
+    },
+    {
+      "camera_id": "CAM-403",
+      "name": "Balanagar Main Road",
+      "latitude": 17.4682,
+      "longitude": 78.4357,
+      "road": "Balanagar Main Road",
+      "sector": "Balanagar",
+      "direction": "South-West",
+      "source_type": "mp4",
+      "source_path": "public/camera-feeds/CAM-403.mp4",
+      "enabled": true
+    },
+    {
+      "camera_id": "CAM-406",
+      "name": "Madhapur IT Corridor",
+      "latitude": 17.4485,
+      "longitude": 78.3742,
+      "road": "Hitech City Road",
+      "sector": "Madhapur",
+      "direction": "South-West",
+      "source_type": "mp4",
+      "source_path": "public/hero/city-traffic-timelapse.mp4",
+      "source_note": "Placeholder street footage — no dedicated Madhapur recording exists in the repo yet. Drop a clip at public/camera-feeds/CAM-406.mp4 and point source_path here.",
+      "enabled": true
+    }
+  ]
+}

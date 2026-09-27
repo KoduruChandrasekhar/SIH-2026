@@ -1,0 +1,26 @@
+# TraceNet — regional vehicle detection dataset (YOLO format), written by prepare_uvh26.py.
+# Class order = the IISc UVH-26 YOLOv11 weights (backend/models/uvh26_yolo11s.pt), so fine-tuning
+# from those weights keeps every class head. Add your own cameras' images with the same 14 classes
+# (prepare_uvh26.py --extra-coco your_annotations.json --extra-images your_images/).
+#
+# `path` is rewritten to an absolute path by prepare_uvh26.py in datasets/uvh26/uvh26.yaml.
+
+path: datasets/uvh26
+train: images/train
+val: images/val
+
+names:
+  0: Hatchback
+  1: Sedan
+  2: SUV
+  3: MUV
+  4: Bus
+  5: Truck
+  6: Three-wheeler
+  7: Two-wheeler
+  8: LCV
+  9: Mini-bus
+  10: Tempo-traveller
+  11: Bicycle
+  12: Van
+  13: Others

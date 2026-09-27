@@ -1,0 +1,18 @@
+# Vercel builds only the React frontend (src/, public/, index.html, package*.json, vite.config.js).
+# Everything below stays in the repo for the backend / AI pipeline but is never uploaded to Vercel.
+
+backend/
+db/
+docker/
+docker-compose.yml
+docs/
+test_eval_tmp/
+*.py
+*.pt
+*.onnx
+__pycache__/
+.pytest_cache/
+.claude/
+
+# generated locally by the tracking pipeline (git-ignored too)
+public/camera-feeds/*_annotated.mp4

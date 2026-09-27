@@ -1,800 +1,282 @@
-# Trace Net — City-Wide AI Engine for Multi-Camera ANPR Trajectory Tracking & Urban Traffic Analytics
+<div align="center">
 
-**Trace Net** is a centralized AI-powered traffic intelligence platform designed for **Smart India Hackathon (SIH) 2026**, addressing **Problem Statement ID 26127** by **Bharat Electronics Limited (BEL)**.
+# TraceNet
 
-The platform is designed to eliminate isolated CCTV/ANPR camera silos by connecting geographically distributed camera feeds into a unified system for **ANPR/OCR, vehicle trajectory reconstruction, multi-camera tracking, city-wide traffic analytics, GIS visualization, and real-time alerts**.
+### One city. Every camera. One connected picture of how traffic moves.
 
----
+TraceNet turns a city's scattered traffic cameras into a single, connected intelligence network —
+so a vehicle seen at one junction is understood in the context of every other junction,
+and the people who keep a city moving can see, understand and act on what is happening, as it happens.
 
-## 🚨 Smart India Hackathon 2026
-
-| Details                  | Information                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------- |
-| **Hackathon**            | Smart India Hackathon (SIH) 2026                                                          |
-| **Problem Statement ID** | 26127                                                                                     |
-| **Problem Statement**    | City-Wide AI Engine for Multi-Camera ANPR Trajectory Tracking and Urban Traffic Analytics |
-| **Organization**         | Bharat Electronics Limited (BEL)                                                          |
-| **Department**           | Bharat Electronics Limited                                                                |
-| **Category**             | Software                                                                                  |
-| **Theme**                | Smart Automation                                                                          |
-
-### Problem Statement
-
-Modern urban environments operate large networks of CCTV and Automatic Number Plate Recognition (ANPR) cameras. However, many existing systems process individual camera feeds independently, making it difficult to connect vehicle observations across different locations and time periods.
-
-Trace Net addresses this challenge through a centralized software architecture capable of:
-
-* High-accuracy ANPR and OCR
-* Multi-camera vehicle identification
-* Spatial-temporal trajectory reconstruction
-* GIS-based vehicle movement visualization
-* City-wide traffic flow analytics
-* Traffic density and congestion analysis
-* Origin-Destination movement analysis
-* Real-time alerts for blacklisted vehicles and route anomalies
+</div>
 
 ---
 
-# 🌐 What is Trace Net?
+## Contents
 
-Trace Net acts as a centralized intelligence layer between distributed camera infrastructure and traffic-control operators.
-
-Instead of treating every ANPR camera as an isolated system, Trace Net combines observations from multiple cameras to build a unified understanding of vehicle movement and traffic behavior.
-
-```text
-                 CITY CAMERA NETWORK
-                         │
-          ┌──────────────┼──────────────┐
-          │              │              │
-       Camera 1       Camera 2       Camera N
-          │              │              │
-          └──────────────┼──────────────┘
-                         │
-                    ANPR / OCR
-                         │
-                Vehicle Detection
-                         │
-              Vehicle Re-Identification
-                         │
-              Spatial-Temporal Engine
-                         │
-          ┌──────────────┼──────────────┐
-          │              │              │
-     Trajectories    Traffic Flow     Alerts
-          │              │              │
-          └──────────────┼──────────────┘
-                         │
-                  TRACE NET PLATFORM
-                         │
-          ┌──────────────┼──────────────┐
-          │              │              │
-        GIS          Analytics       Dashboard
-```
+- [The problem](#the-problem)
+- [Why it matters](#why-it-matters)
+- [Our vision](#our-vision)
+- [What TraceNet does](#what-tracenet-does)
+- [A tour of the platform](#a-tour-of-the-platform)
+- [Who it is for](#who-it-is-for)
+- [Design principles](#design-principles)
+- [Privacy and responsible use](#privacy-and-responsible-use)
+- [Getting started](#getting-started)
+- [Project layout](#project-layout)
+- [Roadmap](#roadmap)
+- [Project status](#project-status)
 
 ---
 
-# ✨ Core Features
+## The problem
 
-## 1. High-Accuracy ANPR & OCR Engine
+Modern cities are watched by thousands of traffic and surveillance cameras. Yet most of them work **alone**.
 
-The ANPR/OCR layer is designed to detect and recognize vehicle license plates from distributed traffic-camera feeds.
+Each camera records what passes in front of it and little else. It does not know that the car it just saw was
+seen two kilometres away four minutes earlier, or that the queue building at its junction is spilling over from
+the next one. The footage exists — the *connections* between it do not.
 
-### Capabilities
+That gap shows up everywhere:
 
-* License plate detection
-* OCR-based plate recognition
-* Confidence scoring
-* Multi-lane traffic support
-* Angled vehicle/plate recognition
-* Motion-blur handling
-* Poor-lighting scenarios
-* Dirty or partially damaged plates
-* Vehicle metadata extraction
+| Where it hurts | What it looks like today |
+| --- | --- |
+| **Following a vehicle** | Reconstructing where one vehicle went means someone watching hours of footage, camera by camera, stitching the journey together by hand. |
+| **Understanding traffic** | Each junction reports its own numbers. Nobody sees how congestion forms, spreads and clears across the city as one system. |
+| **Responding to incidents** | A flagged vehicle is only noticed if the right person happens to be watching the right screen at the right moment. |
+| **Planning the city** | Decisions about signals, lanes and routes are made from sampled counts and surveys instead of how people actually move. |
+| **Coordinating teams** | Traffic control, enforcement and planning each look at different screens, different data and different versions of the truth. |
 
-The solution targets the **greater-than-90% recognition accuracy requirement** specified in the SIH problem statement.
-
-> Actual model accuracy will depend on the trained model, dataset, camera quality and deployment environment.
+The cameras are already in place. What is missing is the layer that **connects them**.
 
 ---
 
-# 2. Multi-Camera Vehicle Tracking
+## Why it matters
 
-Trace Net goes beyond detecting a vehicle at a single camera.
+When camera observations are connected, questions that once took days become answerable in seconds:
 
-The system is designed to associate observations of the same vehicle across geographically distributed ANPR cameras.
+- *Where did this vehicle come from, and where is it heading next?*
+- *Which junctions are choking right now — and which ones will be next?*
+- *Where do the morning's trips actually start and end?*
+- *Which cameras are down, and what are we missing because of it?*
 
-### Example
-
-```text
-CAM #401
-Kukatpally
-16:02:14
-     │
-     ▼
-CAM #402
-Kukatpally
-16:07:42
-     │
-     ▼
-CAM #403
-Balanagar
-16:14:31
-     │
-     ▼
-CAM #406
-Cyberabad
-16:26:05
-```
-
-This creates a chronological movement history for a vehicle.
-
-### Tracking Information
-
-* License plate
-* Camera ID
-* Timestamp
-* Camera location
-* Direction
-* Estimated speed
-* Detection confidence
-* Previous camera
-* Next camera
-* Complete reconstructed route
+Faster answers mean shorter response times, better-timed interventions, fewer blind spots and a city that plans
+around evidence rather than estimates.
 
 ---
 
-# 3. Spatial-Temporal Trajectory Reconstruction
+## Our vision
 
-Trace Net reconstructs vehicle movement using two dimensions:
+TraceNet is built around three simple ideas.
 
-### Spatial
+**1. Think in networks, not cameras.**
+Every camera is a node in a city-wide network. Observations only become meaningful when they are placed next to
+what the neighbouring cameras saw.
 
-Where was the vehicle detected?
+**2. Think in journeys, not snapshots.**
+A single sighting is a data point. A sequence of sightings across the city is a *journey* — and journeys are what
+investigators, planners and traffic controllers actually care about.
 
-```text
-Camera → Location → Road → Sector
-```
-
-### Temporal
-
-When was the vehicle detected?
-
-```text
-Timestamp 1
-     ↓
-Timestamp 2
-     ↓
-Timestamp 3
-     ↓
-Timestamp 4
-```
-
-Combining both allows Trace Net to reconstruct a vehicle's journey across the city.
+**3. Put everything on one map, in real time.**
+Vehicles, congestion, incidents and alerts belong on the same live map, shared by everyone who needs it — not
+spread across separate tools.
 
 ---
 
-# 4. GIS-Based Tracking
+## What TraceNet does
 
-The platform provides a GIS interface for visualizing:
-
-* ANPR camera locations
-* Vehicle trajectories
-* Camera-to-camera movement
-* Traffic corridors
-* Congestion zones
-* Traffic density
-* City sectors
-* Vehicle movement history
-
-The frontend uses **Leaflet** for interactive map visualization.
-
-The dashboard provides a lightweight map preview, while the dedicated GIS page provides the operational map interface.
+| Capability | What it gives you |
+| --- | --- |
+| **Connected camera network** | Every camera in the city on one live map, with its health and activity at a glance. |
+| **Vehicle journeys** | The path a vehicle took across multiple cameras, reconstructed and shown as a single journey on the map. |
+| **City-wide traffic picture** | Congestion, speed and flow across every monitored junction and corridor, updated continuously. |
+| **Live road conditions** | Current road speeds and incidents across the city, blended with the camera network's own view. |
+| **Movement patterns** | Where trips begin and end, which routes carry the most traffic, and how that changes over the day. |
+| **Real-time alerts** | Watchlisted vehicles, unusual movement and congestion build-ups surfaced the moment they happen. |
+| **One shared view** | Control rooms, field teams and planners working from the same map and the same numbers. |
 
 ---
 
-# 5. Macro Traffic Flow Analytics
+## A tour of the platform
 
-Trace Net aggregates information from multiple camera nodes to understand city-wide traffic behavior.
+TraceNet is a web application organised into focused modules. Each one answers a different kind of question.
 
-### Analytics include
+### 🏠 Home — the network at a glance
+An introduction to the platform: a live, animated view of the camera network, a guided story of a single vehicle
+journey across the city, and an interactive city map whose layers change as you explore — the whole network,
+a tracked journey, traffic flows and active alerts.
 
-* Vehicle counts
-* Traffic density
-* Average speed
-* Traffic flow
-* Corridor utilization
-* Congestion detection
-* Peak traffic periods
-* Sector-wise movement
-* Route density
-* Origin-Destination patterns
+### 📊 Dashboard — the command overview
+The control-room view. Network-wide speed, congestion and delay, active incidents and alerts, a live map of
+junctions coloured by current conditions, and trends through the day. Select any junction to focus on it.
 
-Example:
+### 🎥 Cameras — the camera wall
+Every camera in the network with its status, activity and latest reading. Hover a tile to preview its feed,
+open it for details, and see at a glance which cameras are live, degraded or offline.
 
-```text
-Kukatpally
-     │
-     │  2,840 vehicles
-     ▼
-Balanagar
-     │
-     │  1,920 vehicles
-     ▼
-Cyberabad / Madhapur
-```
+### 🧭 Tracking — follow a journey
+Search for a vehicle and see its journey across the city: every camera it passed, when, and in what order,
+laid out on a map and a timeline — including how each sighting was linked to the next.
 
-This enables traffic authorities to understand not only **what is happening at one camera**, but also **how traffic is moving across the city**.
+### 🚦 Traffic — the city's pulse
+A city-wide traffic view: every corridor with its current speed and congestion, a live heat view across all
+junctions, live road conditions and incidents, busiest corridors, trends through the day, and the movement
+between different parts of the city.
 
----
+### ⚙️ How it works — from a camera frame to an insight
+A visual, step-by-step walkthrough of how the platform turns what a camera sees into something an operator can
+act on, illustrated with recorded street footage.
 
-# 6. Origin-Destination Analytics
+### 🚨 Alerts — know first
+A single feed of everything that needs attention, prioritised by severity, with each alert placed on the map
+next to the cameras around it.
 
-The platform can aggregate camera observations to identify movement between city sectors.
-
-Example:
-
-| Origin       | Destination | Vehicles | Flow     |
-| ------------ | ----------- | -------: | -------- |
-| Kukatpally   | Balanagar   |    2,840 | High     |
-| Balanagar    | Cyberabad   |    1,920 | Medium   |
-| Kukatpally   | Madhapur    |    1,540 | High     |
-| Secunderabad | Begumpet    |    1,120 | Moderate |
-
-This can be visualized using:
-
-* Flow lines
-* Sector maps
-* OD matrices
-* Density indicators
-* Traffic heatmaps
+### 🔐 Administration
+User roles and access, camera management and system health for the people who run the platform.
 
 ---
 
-# 7. Congestion Detection
+## Who it is for
 
-Trace Net can identify traffic bottlenecks using aggregated camera information.
-
-The system can consider:
-
-* Vehicle density
-* Average speed
-* Flow rate
-* Historical traffic patterns
-* Sudden traffic increases
-* Camera-level congestion states
-
-Example:
-
-```text
-NORMAL
-55 km/h
-     ↓
-MODERATE
-48 km/h
-     ↓
-HIGH
-36 km/h
-     ↓
-CONGESTION
-< 30 km/h
-```
+- **Traffic control rooms** — see congestion form and respond before it spreads.
+- **Law enforcement** — follow a flagged vehicle across the city in moments, not hours.
+- **City and transport planners** — design signals, lanes and routes around real movement patterns.
+- **Emergency services** — understand road conditions along a route before committing to it.
+- **Operations teams** — keep the camera network healthy and know immediately when a camera goes dark.
 
 ---
 
-# 8. Alert & Threat Monitoring
+## Design principles
 
-Trace Net includes an alert layer for high-interest vehicle and traffic events.
-
-### Alert categories
-
-* Blacklisted vehicle detection
-* Suspicious route
-* Abnormal vehicle movement
-* Repeated route deviation
-* Congestion spike
-* ANPR confidence drop
-* Camera anomaly
-* High-density traffic event
-
-Example:
-
-```text
-⚠ BLACKLIST MATCH
-
-Vehicle:
-TS09AB4521
-
-Camera:
-CAM #402
-
-Time:
-16:07:42
-
-Confidence:
-98.2%
-
-Action:
-Priority Alert
-```
+- **Clarity first.** Every screen answers one question well. Colour always means the same thing:
+  green is flowing, yellow is building, orange is heavy and red is severe.
+- **Live by default.** Numbers update continuously; timestamps show exactly how fresh they are.
+- **One source of truth.** Every page reads from the same network, so the dashboard, the map and the camera wall
+  always agree.
+- **Graceful everywhere.** The platform works as a self-contained demo when no live services are connected, and
+  switches to live data automatically when they are.
+- **Built for control rooms and phones alike.** Responsive layouts, light and dark themes, keyboard navigation
+  and reduced-motion support throughout.
 
 ---
 
-# 🖥️ Frontend Dashboard
+## Privacy and responsible use
 
-The current frontend is designed as a clean enterprise-style command interface.
+A system that can follow vehicles across a city must be built with restraint. TraceNet is designed on these
+principles:
 
-### Main dashboard
+- **Purpose-bound.** Built for traffic management, public safety and planning — not for general surveillance.
+- **Role-based access.** People see only what their role requires; sensitive views sit behind authentication.
+- **Accountability.** Access to vehicle journeys is meant to be logged and auditable.
+- **Minimal retention.** Keep what is needed for the task, for as long as it is needed, and no longer.
+- **Aggregate where possible.** City-wide traffic insight does not need to identify anyone.
 
-The dashboard provides:
-
-* Trace Net navigation
-* Platform overview
-* Tracking module
-* Traffic analytics module
-* Dashboard access
-* Alert center
-* GIS overview
-* System status
-
-The design intentionally uses a minimal **white / black / gray visual system** with limited traffic-state colors.
+Any real-world deployment must follow the data-protection laws and policies of the jurisdiction it operates in.
 
 ---
 
-# 🗺️ GIS Command Center
+## Getting started
 
-The dedicated GIS page provides the operational visualization layer.
+### Prerequisites
 
-### GIS features
+- [Node.js](https://nodejs.org/) 20 or newer
+- npm (bundled with Node.js)
 
-* Interactive Leaflet map
-* Camera markers
-* Camera selection
-* Camera search
-* Zone selection
-* Camera-level traffic information
-* Speed information
-* Traffic-density indicators
-* Live monitoring state
-* Map controls
-* Selected camera information
-* Traffic status legend
-
-Traffic states are represented using:
-
-| Color     | Meaning                     |
-| --------- | --------------------------- |
-| 🟢 Green  | Low / Normal traffic        |
-| 🟡 Yellow | Moderate traffic            |
-| 🔴 Red    | High congestion             |
-| 🔵 Blue   | Information / tracked state |
-
----
-
-# 🎨 UI / UX
-
-Trace Net uses a minimal enterprise dashboard design inspired by modern command-center interfaces.
-
-### Design principles
-
-* Clean white background
-* Rounded cards
-* Subtle borders
-* Minimal shadows
-* Plus Jakarta Sans typography
-* Lucide icons
-* Responsive layouts
-* Smooth card hover effects
-* Page entrance animations
-* GIS visualization
-* Clear traffic-state indicators
-
-The UI is built using **Tailwind CSS**.
-
----
-
-# 🛠️ Technology Stack
-
-## Frontend
-
-* React.js
-* Vite
-* JavaScript / JSX
-* Tailwind CSS
-* Lucide React
-
-## GIS / Mapping
-
-* Leaflet
-* OpenStreetMap
-
-## Frontend Architecture
-
-* React Hooks
-* Component-based architecture
-* Custom application navigation
-* Centralized data configuration
-* Reusable UI components
-
-## Planned / Integratable AI Backend
-
-The frontend is designed to integrate with an AI backend containing components such as:
-
-* Python
-* FastAPI
-* YOLO-based vehicle detection
-* ANPR/OCR models
-* Vehicle re-identification
-* OpenCV
-* PostgreSQL / PostGIS
-* Redis
-* REST APIs
-* WebSocket-based live updates
-
----
-
-# 📁 Project Structure
-
-```text
-trace-net/
-│
-├── public/
-│
-├── src/
-│   │
-│   ├── components/
-│   │   ├── Modal.jsx
-│   │   ├── Navbar.jsx
-│   │   └── Shell.jsx
-│   │
-│   ├── pages/
-│   │   ├── HomePage.jsx
-│   │   └── DashboardPage.jsx
-│   │
-│   ├── data.js
-│   ├── App.jsx
-│   ├── index.css
-│   └── main.jsx
-│
-├── index.html
-├── package.json
-├── package-lock.json
-├── vite.config.js
-└── README.md
-```
-
----
-
-# 📦 Installation
-
-## Prerequisites
-
-Make sure the following are installed:
-
-* Node.js 16+
-* npm
-* Git
-
-Check your versions:
+### Run it locally
 
 ```bash
-node --version
-npm --version
-```
-
----
-
-## 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/trace-net.git
-```
-
-Move into the project:
-
-```bash
-cd trace-net
-```
-
----
-
-## 2. Install Dependencies
-
-```bash
+git clone <repository-url>
+cd TraceNet
 npm install
-```
-
----
-
-## 3. Run the Development Server
-
-```bash
 npm run dev
 ```
 
----
+Then open the address printed in the terminal (usually `http://localhost:5173`).
 
-## 4. Open the Application
+### Optional configuration
 
-Open:
-
-```text
-http://localhost:5173
-```
-
----
-
-# 🔧 Available Commands
-
-### Start development server
+The web app runs out of the box on built-in demo data. Optional settings — such as connecting live services —
+live in `.env.example`. To use them, copy it to `.env.local` and fill in the values you need:
 
 ```bash
-npm run dev
+cp .env.example .env.local
 ```
 
-### Build production version
+### Build for production
 
 ```bash
-npm run build
+npm run build     # outputs a static site to dist/
+npm run preview   # serves the production build locally
 ```
 
-### Preview production build
+The production build is a static site and can be hosted on any static host or CDN. A ready-made configuration
+for [Vercel](https://vercel.com/) is included (`vercel.json`).
 
-```bash
-npm run preview
-```
+### Available scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the development server with hot reload |
+| `npm run build` | Create an optimised production build in `dist/` |
+| `npm run preview` | Serve the production build locally |
 
 ---
 
-# 🔌 Backend Integration Architecture
-
-The frontend can communicate with the AI/backend layer through REST APIs and WebSockets.
-
-Example architecture:
+## Project layout
 
 ```text
-                    React Frontend
-                          │
-             ┌────────────┴────────────┐
-             │                         │
-          REST API                  WebSocket
-             │                         │
-             └────────────┬────────────┘
-                          │
-                       FastAPI
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-      ANPR             Tracking          Analytics
-        │                 │                 │
-      OCR              Re-ID             Traffic
-        │                 │                 │
-        └─────────────────┼─────────────────┘
-                          │
-                     Database
-                          │
-                  PostgreSQL/PostGIS
+TraceNet/
+├── index.html              App entry page
+├── public/                 Static media (videos, images, icons)
+├── src/
+│   ├── main.jsx            App bootstrap
+│   ├── App.jsx             Page switching and app shell
+│   ├── pages/              One file per module (Home, Dashboard, Cameras, Tracking, Traffic, …)
+│   ├── components/
+│   │   ├── layout/         Navigation, command palette, page backdrop
+│   │   ├── ui/             Shared building blocks (charts, animated numbers)
+│   │   ├── home/           Home page sections
+│   │   ├── map/            Map layers
+│   │   ├── camera/         Camera tiles
+│   │   ├── tracking/       Journey views
+│   │   ├── traffic/        Live traffic panels
+│   │   ├── pipeline/       "How it works" sections
+│   │   └── anpr/           Plate-read evidence panel
+│   ├── context/            App-wide state (theme, alerts)
+│   ├── hooks/              Reusable React hooks
+│   ├── lib/                Services and utilities
+│   ├── data/               Demo network and reference data
+│   ├── styles/             Global styles and design tokens
+│   └── assets/             Logo and bundled images
+├── backend/                Server-side services
+├── vite.config.js          Build configuration
+└── vercel.json             Hosting configuration
 ```
 
 ---
 
-# 📡 Example API Structure
+## Roadmap
 
-The backend can expose endpoints such as:
-
-```text
-GET  /api/cameras
-GET  /api/cameras/{camera_id}
-
-GET  /api/vehicles
-GET  /api/vehicles/{plate}
-
-GET  /api/vehicles/{plate}/trajectory
-
-GET  /api/traffic
-GET  /api/traffic/density
-
-GET  /api/traffic/heatmap
-
-GET  /api/alerts
-GET  /api/alerts/active
-
-POST /api/anpr/process
-```
-
-For live events:
-
-```text
-WebSocket
-/ws/traffic
-/ws/anpr
-/ws/alerts
-/ws/vehicles
-```
+- **Wider coverage** — bring more of the city's cameras and junctions onto the network.
+- **Smarter journeys** — link sightings more reliably in dense traffic, at night and in bad weather.
+- **Predictive traffic** — forecast where congestion will form in the next 15–60 minutes, not just where it is now.
+- **Signal coordination** — feed live insight back into traffic-signal timing.
+- **Incident playbooks** — guided, step-by-step responses when an alert fires.
+- **Mobile field app** — the same live picture for officers and crews on the ground.
+- **Open reporting** — anonymised, aggregate traffic insight for city planners and the public.
 
 ---
 
-# 🔐 Privacy & Security Considerations
+## Project status
 
-Because ANPR systems process potentially sensitive vehicle information, a production deployment should incorporate appropriate security and governance controls.
-
-Recommended measures include:
-
-* Role-based access control
-* Authentication and authorization
-* Encrypted API communication
-* Secure database storage
-* Audit logs
-* Data retention policies
-* Access logging
-* Controlled operator permissions
-* Secure camera endpoints
-* Protection of plate and vehicle information
-
-The system should be deployed according to applicable laws, regulations, organizational policies and authorized surveillance requirements.
+TraceNet is under active development. Unless connected to live services, the web app runs on **built-in demo
+data**: camera readings, journeys, alerts and statistics shown in demo mode are illustrative and do not describe
+real people, vehicles or incidents.
 
 ---
 
-# 📈 Scalability
+<div align="center">
 
-Trace Net is designed around a modular architecture so additional camera networks can be incorporated without redesigning the frontend.
+**TraceNet** — *Track · Analyze · Connect*
 
-```text
-10 Cameras
-    ↓
-100 Cameras
-    ↓
-1,000 Cameras
-    ↓
-City-Wide Camera Network
-```
-
-The architecture can be extended using:
-
-* Distributed inference
-* GPU-based AI processing
-* Message queues
-* Event streaming
-* Database indexing
-* Geographic partitioning
-* Horizontal API scaling
-* WebSocket event distribution
-* Caching
-
----
-
-# 🚀 Future Enhancements
-
-Planned enhancements include:
-
-* [ ] Live CCTV video integration
-* [ ] Real-time ANPR inference
-* [ ] YOLO vehicle detection
-* [ ] Advanced OCR integration
-* [ ] Vehicle re-identification model
-* [ ] Real-time trajectory reconstruction
-* [ ] Live traffic heatmaps
-* [ ] Dynamic OD matrices
-* [ ] Historical traffic playback
-* [ ] Blacklist database integration
-* [ ] Real-time WebSocket alerts
-* [ ] Role-based authentication
-* [ ] Operator management
-* [ ] Advanced analytics dashboard
-* [ ] PostgreSQL/PostGIS integration
-* [ ] Multi-city deployment
-* [ ] Cloud/edge deployment support
-
----
-
-# 🧪 Current Frontend Status
-
-The current repository provides the **Trace Net frontend and interactive prototype layer**.
-
-Currently implemented in the frontend:
-
-* ✅ Trace Net dashboard UI
-* ✅ Responsive navigation
-* ✅ Tracking module interface
-* ✅ Traffic analytics interface
-* ✅ Dashboard interface
-* ✅ Alert interface
-* ✅ GIS overview
-* ✅ Dedicated GIS page
-* ✅ Interactive Leaflet map
-* ✅ Camera markers
-* ✅ Camera selection
-* ✅ Zone selection
-* ✅ Camera search
-* ✅ Traffic status visualization
-* ✅ Modal interactions
-* ✅ Animated UI components
-* ✅ Mock telemetry and camera data
-
-The current `data.js` contains representative/mock telemetry for demonstrating the interface. Production deployment requires connecting these interfaces to the actual ANPR, tracking, analytics and alert-processing backend.
-
----
-
-# 🎯 SIH Problem Statement Mapping
-
-Trace Net maps directly to the major requirements of **SIH 2026 Problem Statement 26127**.
-
-| Problem Requirement         | Trace Net Component        |
-| --------------------------- | -------------------------- |
-| High-Accuracy ANPR & OCR    | ANPR/OCR Engine            |
-| Multi-camera processing     | Centralized Camera Network |
-| Vehicle trajectory          | Spatial-Temporal Tracking  |
-| Historical vehicle movement | Trajectory Reconstruction  |
-| GIS visualization           | GIS Command Center         |
-| Traffic density             | Traffic Analytics          |
-| Origin-Destination patterns | OD Analytics               |
-| Congestion detection        | Traffic Flow Engine        |
-| Heatmaps                    | GIS Traffic Visualization  |
-| Blacklisted vehicles        | Alert System               |
-| Suspicious route anomalies  | Anomaly Detection          |
-| Centralized dashboard       | Trace Net Dashboard        |
-
----
-
-# 🏆 Why Trace Net?
-
-Traditional camera systems often operate as independent silos.
-
-Trace Net focuses on connecting these observations into a single intelligence layer.
-
-```text
-Individual Cameras
-       ↓
-Individual Detections
-       ↓
-Centralized Intelligence
-       ↓
-Vehicle Trajectory
-       ↓
-Traffic Intelligence
-       ↓
-Actionable Alerts
-```
-
-The goal is to transform existing camera infrastructure from a collection of isolated feeds into a **city-wide traffic intelligence network**.
-
----
-
-# 👥 Hackathon
-
-Built for:
-
-**Smart India Hackathon 2026**
-
-### Problem Statement
-
-**26127 — City-Wide AI Engine for Multi-Camera ANPR Trajectory Tracking and Urban Traffic Analytics**
-
-### Organization
-
-**Bharat Electronics Limited (BEL)**
-
-### Category
-
-**Software**
-
-### Theme
-
-**Smart Automation**
-
----
-
-# 📄 Disclaimer
-
-Trace Net is a hackathon project/prototype developed for demonstrating the proposed architecture and solution for the SIH 2026 problem statement.
-
-Performance figures, vehicle records, camera telemetry and geographic data shown in the frontend may represent mock/demo data unless explicitly connected to validated real-world datasets and production AI models.
-
-Actual ANPR accuracy, tracking performance, latency and scalability depend on the deployed models, hardware, camera infrastructure, datasets and operating environment.
-
----
-
-# ⭐ Trace Net
-
-**Centralized AI. Connected Cameras. Complete Traffic Intelligence.**
-
-Built for **Smart India Hackathon 2026 — Problem Statement 26127**.
+</div>
